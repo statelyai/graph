@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "edge"
+    },
+    "id": {
+      "type": "string"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "targetId": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "data": {}
+  },
+  "required": [
+    "type",
+    "id",
+    "sourceId",
+    "targetId",
+    "label",
+    "data"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "directed",
+        "undirected"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "node"
+          },
+          "id": {
+            "type": "string"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "data": {}
+        },
+        "required": [
+          "type",
+          "id",
+          "parentId",
+          "label",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "edge"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "data": {}
+        },
+        "required": [
+          "type",
+          "id",
+          "sourceId",
+          "targetId",
+          "label",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "data": {}
+  },
+  "required": [
+    "id",
+    "type",
+    "nodes",
+    "edges",
+    "data"
+  ],
+  "additionalProperties": false
+}

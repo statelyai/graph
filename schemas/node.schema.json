@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "node"
+    },
+    "id": {
+      "type": "string"
+    },
+    "parentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "label": {
+      "type": "string"
+    },
+    "data": {}
+  },
+  "required": [
+    "type",
+    "id",
+    "parentId",
+    "label",
+    "data"
+  ],
+  "additionalProperties": false
+}
