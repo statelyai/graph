@@ -12,6 +12,10 @@ export type {
   GraphStep,
   GraphPath,
   PathOptions,
+  SinglePathOptions,
+  TraversalOptions,
+  MSTOptions,
+  AllPairsShortestPathsOptions,
 } from './types';
 
 // Factory & helpers
@@ -43,6 +47,9 @@ export {
 // Class wrapper
 export { GraphInstance } from './graph';
 
+// Indexing
+export { invalidateIndex } from './indexing';
+
 // Schemas
 export { GraphSchema, NodeSchema, EdgeSchema } from './schemas';
 
@@ -63,6 +70,8 @@ export {
   ancestors,
   descendants,
   roots,
+  getSources,
+  getSinks,
 } from './queries';
 
 // Algorithms
@@ -75,9 +84,27 @@ export {
   hasPath,
   isConnected,
   isTree,
+  getShortestPath,
   getShortestPaths,
+  genShortestPaths,
+  getSimplePath,
   getSimplePaths,
+  genSimplePaths,
+  getStronglyConnectedComponents,
+  getCycles,
+  genCycles,
+  getPreorder,
+  getPostorder,
+  getPreorders,
+  getPostorders,
+  genPreorders,
+  genPostorders,
+  getMinimumSpanningTree,
+  getAllPairsShortestPaths,
 } from './algorithms';
+
+// Transforms
+export { flatten } from './transforms';
 
 // Formats
 export {

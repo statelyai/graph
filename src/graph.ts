@@ -9,6 +9,14 @@ import type {
   EntitiesConfig,
   EntitiesUpdate,
 } from './types';
+import {
+  getIndex,
+  invalidateIndex,
+  indexAddNode,
+  indexAddEdge,
+  indexReparentNode,
+  indexUpdateEdgeEndpoints,
+} from './indexing';
 
 function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
   return {
@@ -56,22 +64,26 @@ export function createGraph<N = any, E = any, G = any>(
 
 /** Get a node by id, or `undefined` if not found. */
 export function getNode<N>(graph: Graph<N>, id: string): GraphNode<N> | undefined {
-  return graph.nodes.find((n) => n.id === id);
+  const idx = getIndex(graph);
+  const arrayIdx = idx.nodeById.get(id);
+  return arrayIdx !== undefined ? graph.nodes[arrayIdx] : undefined;
 }
 
 /** Get an edge by id, or `undefined` if not found. */
 export function getEdge<E>(graph: Graph<any, E>, id: string): GraphEdge<E> | undefined {
-  return graph.edges.find((e) => e.id === id);
+  const idx = getIndex(graph);
+  const arrayIdx = idx.edgeById.get(id);
+  return arrayIdx !== undefined ? graph.edges[arrayIdx] : undefined;
 }
 
 /** Check if a node exists in the graph. */
 export function hasNode(graph: Graph, id: string): boolean {
-  return graph.nodes.some((n) => n.id === id);
+  return getIndex(graph).nodeById.has(id);
 }
 
 /** Check if an edge exists in the graph. */
 export function hasEdge(graph: Graph, id: string): boolean {
-  return graph.edges.some((e) => e.id === id);
+  return getIndex(graph).edgeById.has(id);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,14 +95,16 @@ export function hasEdge(graph: Graph, id: string): boolean {
  * @returns The resolved node that was added.
  */
 export function addNode<N>(graph: Graph<N>, config: NodeConfig<N>): GraphNode<N> {
-  if (hasNode(graph, config.id)) {
+  const idx = getIndex(graph);
+  if (idx.nodeById.has(config.id)) {
     throw new Error(`Node "${config.id}" already exists`);
   }
-  if (config.parentId != null && !hasNode(graph, config.parentId)) {
+  if (config.parentId != null && !idx.nodeById.has(config.parentId)) {
     throw new Error(`Parent node "${config.parentId}" does not exist`);
   }
   const node = resolveNode(config);
-  graph.nodes.push(node);
+  const arrayIndex = graph.nodes.push(node) - 1;
+  indexAddNode(idx, node, arrayIndex);
   return node;
 }
 
@@ -99,17 +113,19 @@ export function addNode<N>(graph: Graph<N>, config: NodeConfig<N>): GraphNode<N>
  * @returns The resolved edge that was added.
  */
 export function addEdge<E>(graph: Graph<any, E>, config: EdgeConfig<E>): GraphEdge<E> {
-  if (hasEdge(graph, config.id)) {
+  const idx = getIndex(graph);
+  if (idx.edgeById.has(config.id)) {
     throw new Error(`Edge "${config.id}" already exists`);
   }
-  if (!hasNode(graph, config.sourceId)) {
+  if (!idx.nodeById.has(config.sourceId)) {
     throw new Error(`Source node "${config.sourceId}" does not exist`);
   }
-  if (!hasNode(graph, config.targetId)) {
+  if (!idx.nodeById.has(config.targetId)) {
     throw new Error(`Target node "${config.targetId}" does not exist`);
   }
   const edge = resolveEdge(config);
-  graph.edges.push(edge);
+  const arrayIndex = graph.edges.push(edge) - 1;
+  indexAddEdge(idx, edge, arrayIndex);
   return edge;
 }
 
@@ -147,6 +163,9 @@ export function deleteNode(
       (e) => !toDelete.has(e.sourceId) && !toDelete.has(e.targetId),
     );
   }
+
+  // Invalidate — filter creates new arrays, rebuild on next access
+  invalidateIndex(graph);
 }
 
 /**
@@ -157,6 +176,7 @@ export function deleteEdge(graph: Graph, id: string): void {
     throw new Error(`Edge "${id}" does not exist`);
   }
   graph.edges = graph.edges.filter((e) => e.id !== id);
+  invalidateIndex(graph);
 }
 
 /**
@@ -168,16 +188,18 @@ export function updateNode<N>(
   id: string,
   update: Partial<Omit<NodeConfig<N>, 'id'>>,
 ): GraphNode<N> {
-  const idx = graph.nodes.findIndex((n) => n.id === id);
-  if (idx === -1) {
+  const idx = getIndex(graph);
+  const arrayIdx = idx.nodeById.get(id);
+  if (arrayIdx === undefined) {
     throw new Error(`Node "${id}" does not exist`);
   }
   if (update.parentId !== undefined && update.parentId !== null) {
-    if (!hasNode(graph, update.parentId)) {
+    if (!idx.nodeById.has(update.parentId)) {
       throw new Error(`Parent node "${update.parentId}" does not exist`);
     }
   }
-  const node = graph.nodes[idx];
+  const node = graph.nodes[arrayIdx];
+  const oldParentId = node.parentId;
   const updated: GraphNode<N> = {
     ...node,
     ...(update.parentId !== undefined && { parentId: update.parentId ?? null }),
@@ -185,7 +207,13 @@ export function updateNode<N>(
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
   };
-  graph.nodes[idx] = updated;
+  graph.nodes[arrayIdx] = updated;
+
+  // Update hierarchy index if parentId changed
+  if (update.parentId !== undefined && updated.parentId !== oldParentId) {
+    indexReparentNode(idx, id, oldParentId, updated.parentId);
+  }
+
   return updated;
 }
 
@@ -198,17 +226,20 @@ export function updateEdge<E>(
   id: string,
   update: Partial<Omit<EdgeConfig<E>, 'id'>>,
 ): GraphEdge<E> {
-  const idx = graph.edges.findIndex((e) => e.id === id);
-  if (idx === -1) {
+  const idx = getIndex(graph);
+  const arrayIdx = idx.edgeById.get(id);
+  if (arrayIdx === undefined) {
     throw new Error(`Edge "${id}" does not exist`);
   }
-  if (update.sourceId !== undefined && !hasNode(graph, update.sourceId)) {
+  if (update.sourceId !== undefined && !idx.nodeById.has(update.sourceId)) {
     throw new Error(`Source node "${update.sourceId}" does not exist`);
   }
-  if (update.targetId !== undefined && !hasNode(graph, update.targetId)) {
+  if (update.targetId !== undefined && !idx.nodeById.has(update.targetId)) {
     throw new Error(`Target node "${update.targetId}" does not exist`);
   }
-  const edge = graph.edges[idx];
+  const edge = graph.edges[arrayIdx];
+  const oldSourceId = edge.sourceId;
+  const oldTargetId = edge.targetId;
   const updated: GraphEdge<E> = {
     ...edge,
     ...(update.sourceId !== undefined && { sourceId: update.sourceId }),
@@ -216,7 +247,13 @@ export function updateEdge<E>(
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
   };
-  graph.edges[idx] = updated;
+  graph.edges[arrayIdx] = updated;
+
+  // Update adjacency index if endpoints changed
+  if (updated.sourceId !== oldSourceId || updated.targetId !== oldTargetId) {
+    indexUpdateEdgeEndpoints(idx, id, oldSourceId, oldTargetId, updated.sourceId, updated.targetId);
+  }
+
   return updated;
 }
 
@@ -335,12 +372,14 @@ export class GraphInstance<N = any, E = any, G = any> {
 // ---------------------------------------------------------------------------
 
 function collectDescendants(graph: Graph, id: string): Set<string> {
+  const idx = getIndex(graph);
   const toDelete = new Set<string>();
   const walk = (nodeId: string) => {
     toDelete.add(nodeId);
-    for (const n of graph.nodes) {
-      if (n.parentId === nodeId && !toDelete.has(n.id)) {
-        walk(n.id);
+    const childIds = idx.childNodes.get(nodeId) ?? [];
+    for (const childId of childIds) {
+      if (!toDelete.has(childId)) {
+        walk(childId);
       }
     }
   };

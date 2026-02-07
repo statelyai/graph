@@ -110,3 +110,33 @@ export interface PathOptions<TEdgeData = any> {
   /** Edge weight function. Default: every edge = 1. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }
+
+export interface SinglePathOptions<TEdgeData = any> {
+  /** Source node ID. Default: graph.initialNodeId, else sole inDegree-0 node */
+  from?: string;
+  /** Target node ID. Required for single-path queries. */
+  to: string;
+  /** Edge weight function. Default: every edge = 1. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+}
+
+// --- Algorithm option types ---
+
+export interface TraversalOptions {
+  /** Source node ID. Default: graph.initialNodeId, else sole inDegree-0 node */
+  from?: string;
+}
+
+export interface MSTOptions<TEdgeData = any> {
+  /** Algorithm to use. Default: 'prim'. */
+  algorithm?: 'prim' | 'kruskal';
+  /** Edge weight function. Default: every edge = 1. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+}
+
+export interface AllPairsShortestPathsOptions<TEdgeData = any> {
+  /** Algorithm to use. Default: 'dijkstra'. */
+  algorithm?: 'floyd-warshall' | 'dijkstra';
+  /** Edge weight function. Default: every edge = 1. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+}
