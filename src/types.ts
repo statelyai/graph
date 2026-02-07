@@ -94,6 +94,8 @@ export interface GraphStep<TNodeData = any, TEdgeData = any> {
 }
 
 export interface GraphPath<TNodeData = any, TEdgeData = any> {
+  /** The source node where this path begins. */
+  source: GraphNode<TNodeData>;
   /** Ordered steps from source to target.
    *  `path.steps.at(-1)?.node` is the final/target node.
    *  Empty steps = source-only path. */

@@ -180,49 +180,8 @@ export function topologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
   return result;
 }
 
-export function shortestPath<N>(
-  graph: Graph<N>,
-  sourceId: string,
-  targetId: string,
-): GraphNode<N>[] | null {
-  if (sourceId === targetId) {
-    const node = graph.nodes.find((n) => n.id === sourceId);
-    return node ? [node] : null;
-  }
-
-  const prev = new Map<string, string>();
-  const visited = new Set<string>();
-  const queue: string[] = [sourceId];
-  visited.add(sourceId);
-
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    const neighborIds = getNeighborIds(graph, id);
-
-    for (const nId of neighborIds) {
-      if (!visited.has(nId)) {
-        visited.add(nId);
-        prev.set(nId, id);
-        if (nId === targetId) {
-          const path: GraphNode<N>[] = [];
-          let cur: string | undefined = targetId;
-          while (cur !== undefined) {
-            const node = graph.nodes.find((n) => n.id === cur);
-            if (node) path.unshift(node);
-            cur = prev.get(cur);
-          }
-          return path;
-        }
-        queue.push(nId);
-      }
-    }
-  }
-
-  return null;
-}
-
 export function hasPath(graph: Graph, sourceId: string, targetId: string): boolean {
-  return shortestPath(graph, sourceId, targetId) !== null;
+  return getShortestPaths(graph, { from: sourceId, to: targetId }).length > 0;
 }
 
 export function isConnected(graph: Graph): boolean {
@@ -351,10 +310,11 @@ export function getShortestPaths<N, E>(
     ? [opts.to].filter((id) => dist.has(id))
     : [...dist.keys()].filter((id) => id !== sourceId);
 
+  const sourceNode = graph.nodes.find((n) => n.id === sourceId)!;
   const results: GraphPath<N, E>[] = [];
 
   for (const targetId of targets) {
-    const paths = reconstructAllPaths<N, E>(graph, prev, sourceId, targetId);
+    const paths = reconstructAllPaths<N, E>(graph, prev, sourceNode, targetId);
     results.push(...paths);
   }
 
@@ -365,11 +325,11 @@ export function getShortestPaths<N, E>(
 function reconstructAllPaths<N, E>(
   graph: Graph<N, E>,
   prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>,
-  sourceId: string,
+  sourceNode: GraphNode<N>,
   targetId: string,
 ): GraphPath<N, E>[] {
-  if (targetId === sourceId) {
-    return [{ steps: [] }];
+  if (targetId === sourceNode.id) {
+    return [{ source: sourceNode, steps: [] }];
   }
 
   const preds = prev.get(targetId);
@@ -379,9 +339,10 @@ function reconstructAllPaths<N, E>(
   const targetNode = graph.nodes.find((n) => n.id === targetId)!;
 
   for (const { from, edge } of preds) {
-    const prefixPaths = reconstructAllPaths(graph, prev, sourceId, from);
+    const prefixPaths = reconstructAllPaths(graph, prev, sourceNode, from);
     for (const prefix of prefixPaths) {
       results.push({
+        source: sourceNode,
         steps: [...prefix.steps, { edge, node: targetNode }],
       });
     }
@@ -399,6 +360,7 @@ export function getSimplePaths<N, E>(
   opts?: PathOptions<E>,
 ): GraphPath<N, E>[] {
   const sourceId = resolveFrom(graph, opts);
+  const sourceNode = graph.nodes.find((n) => n.id === sourceId)!;
   const targetId = opts?.to;
   const results: GraphPath<N, E>[] = [];
   const visited = new Set<string>();
@@ -409,13 +371,13 @@ export function getSimplePaths<N, E>(
 
     if (targetId !== undefined) {
       if (nodeId === targetId) {
-        results.push({ steps: [...currentSteps] });
+        results.push({ source: sourceNode, steps: [...currentSteps] });
         visited.delete(nodeId);
         return; // don't explore past target
       }
     } else if (currentSteps.length > 0) {
       // no specific target: collect path to every reachable node
-      results.push({ steps: [...currentSteps] });
+      results.push({ source: sourceNode, steps: [...currentSteps] });
     }
 
     for (const { neighborId, edge } of getNeighborEdges(graph, nodeId)) {

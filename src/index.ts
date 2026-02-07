@@ -72,7 +72,6 @@ export {
   isAcyclic,
   connectedComponents,
   topologicalSort,
-  shortestPath,
   hasPath,
   isConnected,
   isTree,

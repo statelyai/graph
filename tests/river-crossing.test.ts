@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGraph, addNode, addEdge, getNode, getEdge } from '../src/graph';
-import { shortestPath } from '../src/algorithms';
+import { getShortestPaths } from '../src/algorithms';
 import { outEdges } from '../src/queries';
 
 /**
@@ -33,12 +33,14 @@ function buildStateGraph() {
   // --- Nodes: every valid configuration ---
   const states = new Map<string, { left: string[]; right: string[] }>();
 
-  for (let mask = 0; mask < 1 << ENTITIES.length; mask++) {
-    const left: string[] = [];
-    const right: string[] = [];
-    for (let i = 0; i < ENTITIES.length; i++) {
-      (mask & (1 << i) ? right : left).push(ENTITIES[i]);
-    }
+  // Generate all subsets of ENTITIES as left-bank configurations
+  const subsets: string[][] = [[]];
+  for (const entity of ENTITIES) {
+    subsets.push(...subsets.map((s) => [...s, entity]));
+  }
+
+  for (const left of subsets) {
+    const right = ENTITIES.filter((e) => !left.includes(e));
     if (isSafe(left) && isSafe(right)) {
       const id = stateId(left);
       states.set(id, { left: left.sort(), right: right.sort() });
@@ -106,28 +108,17 @@ describe('River Crossing Puzzle (Fox, Chicken & Cabbage)', () => {
   });
 
   it('finds the shortest solution in 7 moves (8 states)', () => {
-    const path = shortestPath(g, start, goal);
+    const paths = getShortestPaths(g, { from: start, to: goal });
 
-    expect(path).not.toBeNull();
-    expect(path!).toHaveLength(8); // 8 states = 7 river crossings
+    expect(paths).toHaveLength(2); // two classic solutions
+    const { steps } = paths[0];
+    expect(steps).toHaveLength(7); // 7 river crossings
 
-    // Start and end
-    expect(path![0].id).toBe(start);
-    expect(path![7].id).toBe(goal);
+    // End state
+    expect(steps[6].node.id).toBe(goal);
 
-    // Walk the solution and collect move labels
-    const moves: string[] = [];
-    for (let i = 0; i < path!.length - 1; i++) {
-      const fromId = path![i].id;
-      const toId = path![i + 1].id;
-      const edge = g.edges.find(
-        (e) => e.sourceId === fromId && e.targetId === toId,
-      );
-      expect(edge).toBeDefined();
-      moves.push(edge!.label);
-    }
-
-    expect(moves).toHaveLength(7);
+    // Collect move labels directly from steps
+    const moves = steps.map((s) => s.edge.label);
 
     // First move is always "take chicken"
     expect(moves[0]).toBe('take chicken');
@@ -144,11 +135,15 @@ describe('River Crossing Puzzle (Fox, Chicken & Cabbage)', () => {
   });
 
   it('every state in the solution is reachable and valid', () => {
-    const path = shortestPath(g, start, goal)!;
-    for (const node of path) {
-      const state = getNode(g, node.id);
+    const [{ steps }] = getShortestPaths(g, { from: start, to: goal });
+    const nodeIds = [start, ...steps.map((s) => s.node.id)];
+    for (const id of nodeIds) {
+      const state = getNode(g, id);
       expect(state).toBeDefined();
-      const { left, right } = state!.data as { left: string[]; right: string[] };
+      const { left, right } = state!.data as {
+        left: string[];
+        right: string[];
+      };
       expect(isSafe(left)).toBe(true);
       expect(isSafe(right)).toBe(true);
     }

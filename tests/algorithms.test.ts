@@ -6,7 +6,6 @@ import {
   isAcyclic,
   connectedComponents,
   topologicalSort,
-  shortestPath,
   hasPath,
   isConnected,
   isTree,
@@ -132,26 +131,6 @@ describe('topologicalSort', () => {
 
   it('returns null for cyclic graph', () => {
     expect(topologicalSort(makeCyclicGraph())).toBeNull();
-  });
-});
-
-describe('shortestPath', () => {
-  it('finds shortest path', () => {
-    const g = makeDAG();
-    const path = shortestPath(g, 'a', 'd');
-    expect(path).not.toBeNull();
-    expect(path!.map((n) => n.id)).toEqual(['a', 'b', 'd']);
-  });
-
-  it('returns null when no path exists', () => {
-    const g = makeDisconnectedGraph();
-    expect(shortestPath(g, 'a', 'c')).toBeNull();
-  });
-
-  it('returns single node for same source/target', () => {
-    const g = makeDAG();
-    const path = shortestPath(g, 'a', 'a');
-    expect(path!.map((n) => n.id)).toEqual(['a']);
   });
 });
 
@@ -317,6 +296,24 @@ describe('getShortestPaths', () => {
     expect(path.steps[0].edge.targetId).toBe('b');
     expect(path.steps[0].node.id).toBe('b'); // node is the destination
   });
+
+  it('source: every path includes the source node', () => {
+    const g = makeDAG(); // A→B→D, A→C→D
+    const paths = getShortestPaths(g, { from: 'a' });
+    for (const path of paths) {
+      expect(path.source.id).toBe('a');
+    }
+  });
+
+  it('source: multi-step path has source distinct from first step node', () => {
+    const g = makeDAG();
+    const paths = getShortestPaths(g, { from: 'a', to: 'd' });
+    for (const path of paths) {
+      expect(path.source.id).toBe('a');
+      // first step node is b or c, not a
+      expect(path.steps[0].node.id).not.toBe('a');
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -364,6 +361,22 @@ describe('getSimplePaths', () => {
     expect(path.steps).toHaveLength(1);
     expect(path.steps[0].edge.sourceId).toBe('a');
     expect(path.steps[0].node.id).toBe('b');
+  });
+
+  it('source: every path includes the source node', () => {
+    const g = makeDAG();
+    const paths = getSimplePaths(g, { from: 'a' });
+    for (const path of paths) {
+      expect(path.source.id).toBe('a');
+    }
+  });
+
+  it('source: single-step path has source as the origin', () => {
+    const g = makeDAG();
+    const paths = getSimplePaths(g, { from: 'a', to: 'b' });
+    expect(paths).toHaveLength(1);
+    expect(paths[0].source.id).toBe('a');
+    expect(paths[0].steps[0].node.id).toBe('b');
   });
 
   it('defaults from to graph.initialNodeId', () => {
