@@ -9,6 +9,12 @@ export function toGraphML(graph: Graph): string {
     { '@_id': 'parentId', '@_for': 'node', '@_attr.name': 'parentId', '@_attr.type': 'string' },
     { '@_id': 'data', '@_for': 'all', '@_attr.name': 'data', '@_attr.type': 'string' },
     { '@_id': 'graphData', '@_for': 'graph', '@_attr.name': 'data', '@_attr.type': 'string' },
+    { '@_id': 'x', '@_for': 'all', '@_attr.name': 'x', '@_attr.type': 'double' },
+    { '@_id': 'y', '@_for': 'all', '@_attr.name': 'y', '@_attr.type': 'double' },
+    { '@_id': 'width', '@_for': 'all', '@_attr.name': 'width', '@_attr.type': 'double' },
+    { '@_id': 'height', '@_for': 'all', '@_attr.name': 'height', '@_attr.type': 'double' },
+    { '@_id': 'shape', '@_for': 'node', '@_attr.name': 'shape', '@_attr.type': 'string' },
+    { '@_id': 'color', '@_for': 'all', '@_attr.name': 'color', '@_attr.type': 'string' },
   ];
 
   const nodes = graph.nodes.map((n) => {
@@ -16,6 +22,12 @@ export function toGraphML(graph: Graph): string {
     if (n.label) data.push({ '@_key': 'label', '#text': n.label });
     if (n.parentId !== null) data.push({ '@_key': 'parentId', '#text': n.parentId });
     if (n.data !== undefined) data.push({ '@_key': 'data', '#text': JSON.stringify(n.data) });
+    if (n.x !== undefined) data.push({ '@_key': 'x', '#text': n.x });
+    if (n.y !== undefined) data.push({ '@_key': 'y', '#text': n.y });
+    if (n.width !== undefined) data.push({ '@_key': 'width', '#text': n.width });
+    if (n.height !== undefined) data.push({ '@_key': 'height', '#text': n.height });
+    if (n.shape) data.push({ '@_key': 'shape', '#text': n.shape });
+    if (n.color) data.push({ '@_key': 'color', '#text': n.color });
     return {
       '@_id': n.id,
       ...(data.length > 0 && { data }),
@@ -26,6 +38,11 @@ export function toGraphML(graph: Graph): string {
     const data: any[] = [];
     if (e.label) data.push({ '@_key': 'label', '#text': e.label });
     if (e.data !== undefined) data.push({ '@_key': 'data', '#text': JSON.stringify(e.data) });
+    if (e.x !== undefined) data.push({ '@_key': 'x', '#text': e.x });
+    if (e.y !== undefined) data.push({ '@_key': 'y', '#text': e.y });
+    if (e.width !== undefined) data.push({ '@_key': 'width', '#text': e.width });
+    if (e.height !== undefined) data.push({ '@_key': 'height', '#text': e.height });
+    if (e.color) data.push({ '@_key': 'color', '#text': e.color });
     return {
       '@_id': e.id,
       '@_source': e.sourceId,

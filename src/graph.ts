@@ -8,6 +8,10 @@ import type {
   DeleteNodeOptions,
   EntitiesConfig,
   EntitiesUpdate,
+  VisualGraphConfig,
+  VisualGraph,
+  VisualNode,
+  VisualEdge,
 } from './types';
 import {
   getIndex,
@@ -19,7 +23,7 @@ import {
 } from './indexing';
 
 function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
-  return {
+  const node: GraphNode<T> = {
     type: 'node',
     id: config.id,
     parentId: config.parentId ?? null,
@@ -27,10 +31,18 @@ function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
     label: config.label ?? '',
     data: config.data as T,
   };
+  if (config.x !== undefined) node.x = config.x;
+  if (config.y !== undefined) node.y = config.y;
+  if (config.width !== undefined) node.width = config.width;
+  if (config.height !== undefined) node.height = config.height;
+  if (config.shape !== undefined) node.shape = config.shape;
+  if (config.color !== undefined) node.color = config.color;
+  if (config.style !== undefined) node.style = config.style;
+  return node;
 }
 
 function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
-  return {
+  const edge: GraphEdge<T> = {
     type: 'edge',
     id: config.id,
     sourceId: config.sourceId,
@@ -38,6 +50,13 @@ function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
     label: config.label ?? '',
     data: config.data as T,
   };
+  if (config.x !== undefined) edge.x = config.x;
+  if (config.y !== undefined) edge.y = config.y;
+  if (config.width !== undefined) edge.width = config.width;
+  if (config.height !== undefined) edge.height = config.height;
+  if (config.color !== undefined) edge.color = config.color;
+  if (config.style !== undefined) edge.style = config.style;
+  return edge;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,13 +67,46 @@ function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
 export function createGraph<N = any, E = any, G = any>(
   config?: GraphConfig<N, E, G>,
 ): Graph<N, E, G> {
-  return {
+  const graph: Graph<N, E, G> = {
     id: config?.id ?? '',
     type: config?.type ?? 'directed',
     initialNodeId: config?.initialNodeId ?? null,
     nodes: (config?.nodes ?? []).map(resolveNode),
     edges: (config?.edges ?? []).map(resolveEdge),
     data: (config?.data ?? undefined) as G,
+  };
+  if (config?.direction !== undefined) graph.direction = config.direction;
+  if (config?.style !== undefined) graph.style = config.style;
+  return graph;
+}
+
+/** Create a visual graph with required position/size on all nodes and edges. */
+export function createVisualGraph<N = any, E = any, G = any>(
+  config?: VisualGraphConfig<N, E, G>,
+): VisualGraph<N, E, G> {
+  const base = createGraph(config);
+  return {
+    ...base,
+    direction: config?.direction ?? 'down',
+    nodes: base.nodes.map(
+      (n): VisualNode<N> => ({
+        ...n,
+        x: n.x ?? 0,
+        y: n.y ?? 0,
+        width: n.width ?? 0,
+        height: n.height ?? 0,
+        shape: n.shape ?? 'rectangle',
+      }),
+    ),
+    edges: base.edges.map(
+      (e): VisualEdge<E> => ({
+        ...e,
+        x: e.x ?? 0,
+        y: e.y ?? 0,
+        width: e.width ?? 0,
+        height: e.height ?? 0,
+      }),
+    ),
   };
 }
 

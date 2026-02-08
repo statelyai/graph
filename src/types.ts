@@ -1,3 +1,12 @@
+// --- Visual base ---
+
+export interface Positioned {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // --- Config types (input, lenient) ---
 
 export interface GraphConfig<
@@ -11,6 +20,8 @@ export interface GraphConfig<
   nodes?: NodeConfig<TNodeData>[];
   edges?: EdgeConfig<TEdgeData>[];
   data?: TGraphData;
+  direction?: 'up' | 'down' | 'left' | 'right';
+  style?: Record<string, string | number>;
 }
 
 export interface NodeConfig<TNodeData = any> {
@@ -19,6 +30,13 @@ export interface NodeConfig<TNodeData = any> {
   initialNodeId?: string;
   label?: string;
   data?: TNodeData;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  shape?: string;
+  color?: string;
+  style?: Record<string, string | number>;
 }
 
 export interface EdgeConfig<TEdgeData = any> {
@@ -39,6 +57,12 @@ export interface EdgeConfig<TEdgeData = any> {
    */
   label?: string;
   data?: TEdgeData;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  color?: string;
+  style?: Record<string, string | number>;
 }
 
 // --- Primary types (plain JSON-serializable objects) ---
@@ -50,6 +74,8 @@ export interface Graph<TNodeData = any, TEdgeData = any, TGraphData = any> {
   nodes: GraphNode<TNodeData>[];
   edges: GraphEdge<TEdgeData>[];
   data: TGraphData;
+  direction?: 'up' | 'down' | 'left' | 'right';
+  style?: Record<string, string | number>;
 }
 
 export interface GraphNode<TNodeData = any> {
@@ -59,6 +85,13 @@ export interface GraphNode<TNodeData = any> {
   initialNodeId: string | null;
   label: string;
   data: TNodeData;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  shape?: string;
+  color?: string;
+  style?: Record<string, string | number>;
 }
 
 export interface GraphEdge<TEdgeData = any> {
@@ -68,6 +101,42 @@ export interface GraphEdge<TEdgeData = any> {
   targetId: string;
   label: string;
   data: TEdgeData;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  color?: string;
+  style?: Record<string, string | number>;
+}
+
+// --- Visual types (required position/size) ---
+
+export interface VisualNode<TNodeData = any>
+  extends Omit<GraphNode<TNodeData>, keyof Positioned>,
+    Positioned {
+  shape: string;
+}
+
+export interface VisualEdge<TEdgeData = any>
+  extends Omit<GraphEdge<TEdgeData>, keyof Positioned>,
+    Positioned {}
+
+export interface VisualGraph<
+  TNodeData = any,
+  TEdgeData = any,
+  TGraphData = any,
+> extends Omit<Graph<TNodeData, TEdgeData, TGraphData>, 'nodes' | 'edges'> {
+  nodes: VisualNode<TNodeData>[];
+  edges: VisualEdge<TEdgeData>[];
+  direction: 'up' | 'down' | 'left' | 'right';
+}
+
+export interface VisualGraphConfig<
+  TNodeData = any,
+  TEdgeData = any,
+  TGraphData = any,
+> extends GraphConfig<TNodeData, TEdgeData, TGraphData> {
+  direction?: 'up' | 'down' | 'left' | 'right';
 }
 
 export interface DeleteNodeOptions {

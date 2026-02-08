@@ -1,11 +1,16 @@
 // Types
 export type {
+  Positioned,
   Graph,
   GraphNode,
   GraphEdge,
   GraphConfig,
   NodeConfig,
   EdgeConfig,
+  VisualGraph,
+  VisualNode,
+  VisualEdge,
+  VisualGraphConfig,
   DeleteNodeOptions,
   EntitiesConfig,
   EntitiesUpdate,
@@ -21,6 +26,7 @@ export type {
 // Factory & helpers
 export {
   createGraph,
+  createVisualGraph,
   getNode,
   getEdge,
   hasNode,
