@@ -3,7 +3,7 @@ import { getIndex } from './indexing';
 
 // --- Edge queries ---
 
-export function edgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
+export function getEdgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const outIds = idx.outEdges.get(nodeId) ?? [];
   const inIds = idx.inEdges.get(nodeId) ?? [];
@@ -23,19 +23,19 @@ export function edgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[]
   return result;
 }
 
-export function inEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
+export function getInEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.inEdges.get(nodeId) ?? [];
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!]);
 }
 
-export function outEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
+export function getOutEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.outEdges.get(nodeId) ?? [];
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!]);
 }
 
-export function edgeBetween<E>(
+export function getEdgeBetween<E>(
   graph: Graph<any, E>,
   sourceId: string,
   targetId: string,
@@ -60,7 +60,7 @@ export function edgeBetween<E>(
 
 // --- Neighbor queries ---
 
-export function successors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
+export function getSuccessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.outEdges.get(nodeId) ?? [];
   const seen = new Set<string>();
@@ -76,7 +76,7 @@ export function successors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   return result;
 }
 
-export function predecessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
+export function getPredecessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.inEdges.get(nodeId) ?? [];
   const seen = new Set<string>();
@@ -92,7 +92,7 @@ export function predecessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
   return result;
 }
 
-export function neighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
+export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
   const ids = new Set<string>();
   for (const eid of idx.outEdges.get(nodeId) ?? []) {
@@ -106,7 +106,7 @@ export function neighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
 
 // --- Degree queries ---
 
-export function degree(graph: Graph, nodeId: string): number {
+export function getDegree(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
   if (graph.type === 'undirected') {
     // Count unique edges (an edge where sourceId === targetId === nodeId should count once)
@@ -118,17 +118,17 @@ export function degree(graph: Graph, nodeId: string): number {
   return (idx.inEdges.get(nodeId)?.length ?? 0) + (idx.outEdges.get(nodeId)?.length ?? 0);
 }
 
-export function inDegree(graph: Graph, nodeId: string): number {
+export function getInDegree(graph: Graph, nodeId: string): number {
   return getIndex(graph).inEdges.get(nodeId)?.length ?? 0;
 }
 
-export function outDegree(graph: Graph, nodeId: string): number {
+export function getOutDegree(graph: Graph, nodeId: string): number {
   return getIndex(graph).outEdges.get(nodeId)?.length ?? 0;
 }
 
 // --- Hierarchy queries ---
 
-export function children<N>(
+export function getChildren<N>(
   graph: Graph<N>,
   nodeId: string | null,
 ): GraphNode<N>[] {
@@ -137,7 +137,7 @@ export function children<N>(
   return childIds.map((id) => graph.nodes[idx.nodeById.get(id)!]).filter(Boolean);
 }
 
-export function parent<N>(
+export function getParent<N>(
   graph: Graph<N>,
   nodeId: string,
 ): GraphNode<N> | undefined {
@@ -150,7 +150,7 @@ export function parent<N>(
   return pi !== undefined ? graph.nodes[pi] : undefined;
 }
 
-export function ancestors<N>(
+export function getAncestors<N>(
   graph: Graph<N>,
   nodeId: string,
 ): GraphNode<N>[] {
@@ -169,7 +169,7 @@ export function ancestors<N>(
   return result;
 }
 
-export function descendants<N>(
+export function getDescendants<N>(
   graph: Graph<N>,
   nodeId: string,
 ): GraphNode<N>[] {
@@ -189,9 +189,94 @@ export function descendants<N>(
   return result;
 }
 
-export function roots<N>(graph: Graph<N>): GraphNode<N>[] {
+export function getRoots<N>(graph: Graph<N>): GraphNode<N>[] {
   const idx = getIndex(graph);
   return idx.childNodes.get(null)?.map((id) => graph.nodes[idx.nodeById.get(id)!]).filter(Boolean) ?? [];
+}
+
+/** Whether a node has children (is a compound/group node). */
+export function isCompound(graph: Graph, nodeId: string): boolean {
+  const idx = getIndex(graph);
+  const childIds = idx.childNodes.get(nodeId) ?? [];
+  return childIds.length > 0;
+}
+
+/** Whether a node has no children (is a leaf/atomic node). */
+export function isLeaf(graph: Graph, nodeId: string): boolean {
+  return !isCompound(graph, nodeId);
+}
+
+/** Depth of a node in the hierarchy (root = 0). */
+export function getDepth(graph: Graph, nodeId: string): number {
+  const idx = getIndex(graph);
+  let d = 0;
+  let ni = idx.nodeById.get(nodeId);
+  if (ni === undefined) return -1;
+  let current = graph.nodes[ni];
+  while (current.parentId !== null) {
+    d++;
+    const pi = idx.nodeById.get(current.parentId);
+    if (pi === undefined) break;
+    current = graph.nodes[pi];
+  }
+  return d;
+}
+
+/** Sibling nodes (same parentId, excluding the node itself). */
+export function getSiblings<N>(
+  graph: Graph<N>,
+  nodeId: string,
+): GraphNode<N>[] {
+  const idx = getIndex(graph);
+  const ni = idx.nodeById.get(nodeId);
+  if (ni === undefined) return [];
+  const node = graph.nodes[ni];
+  const childIds = idx.childNodes.get(node.parentId) ?? [];
+  return childIds
+    .filter((id) => id !== nodeId)
+    .map((id) => graph.nodes[idx.nodeById.get(id)!])
+    .filter(Boolean);
+}
+
+/**
+ * Least Common Ancestor — deepest proper ancestor of all given nodes.
+ * A proper ancestor excludes the input nodes themselves.
+ */
+export function getLCA<N>(
+  graph: Graph<N>,
+  ...nodeIds: string[]
+): GraphNode<N> | undefined {
+  if (nodeIds.length === 0) return undefined;
+
+  const idx = getIndex(graph);
+  const getAncestorChain = (id: string): string[] => {
+    const result: string[] = [id];
+    let ni = idx.nodeById.get(id);
+    if (ni === undefined) return result;
+    let current = graph.nodes[ni];
+    while (current.parentId !== null) {
+      result.push(current.parentId);
+      const pi = idx.nodeById.get(current.parentId);
+      if (pi === undefined) break;
+      current = graph.nodes[pi];
+    }
+    return result;
+  };
+
+  let common = getAncestorChain(nodeIds[0]);
+  for (let i = 1; i < nodeIds.length; i++) {
+    const set = new Set(getAncestorChain(nodeIds[i]));
+    common = common.filter((id) => set.has(id));
+  }
+
+  // Must be a proper ancestor of all inputs
+  const inputSet = new Set(nodeIds);
+  common = common.filter((id) => !inputSet.has(id));
+
+  if (common.length === 0) return undefined;
+  const lcaId = common[0];
+  const ni = idx.nodeById.get(lcaId);
+  return ni !== undefined ? graph.nodes[ni] : undefined;
 }
 
 // --- Graph-level queries ---

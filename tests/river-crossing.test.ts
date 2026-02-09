@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createGraph, addNode, addEdge, getNode, getEdge } from '../src/graph';
+import { createGraph, addNode, addEdge, getNode } from '../src/graph';
 import { getShortestPaths } from '../src/algorithms';
-import { outEdges } from '../src/queries';
+import { getOutEdges } from '../src/queries';
 
 /**
  * The Fox, Chicken & Cabbage river-crossing puzzle modeled as a graph:
@@ -102,7 +102,7 @@ describe('River Crossing Puzzle (Fox, Chicken & Cabbage)', () => {
   });
 
   it('only one legal first move: take the chicken', () => {
-    const firstMoves = outEdges(g, start);
+    const firstMoves = getOutEdges(g, start);
     expect(firstMoves).toHaveLength(1);
     expect(firstMoves[0].label).toBe('take chicken');
   });

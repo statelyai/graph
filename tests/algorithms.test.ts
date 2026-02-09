@@ -4,8 +4,8 @@ import {
   bfs,
   dfs,
   isAcyclic,
-  connectedComponents,
-  topologicalSort,
+  getConnectedComponents,
+  getTopologicalSort,
   hasPath,
   isConnected,
   isTree,
@@ -103,24 +103,24 @@ describe('isAcyclic', () => {
   });
 });
 
-describe('connectedComponents', () => {
+describe('getConnectedComponents', () => {
   it('returns one component for connected graph', () => {
-    const components = connectedComponents(makeDAG());
+    const components = getConnectedComponents(makeDAG());
     expect(components).toHaveLength(1);
     expect(components[0]).toHaveLength(4);
   });
 
   it('returns multiple components', () => {
-    const components = connectedComponents(makeDisconnectedGraph());
+    const components = getConnectedComponents(makeDisconnectedGraph());
     expect(components).toHaveLength(2);
     expect(components[0]).toHaveLength(2);
     expect(components[1]).toHaveLength(2);
   });
 });
 
-describe('topologicalSort', () => {
+describe('getTopologicalSort', () => {
   it('returns valid topological order for DAG', () => {
-    const result = topologicalSort(makeDAG());
+    const result = getTopologicalSort(makeDAG());
     expect(result).not.toBeNull();
     const ids = result!.map((n) => n.id);
     expect(ids.indexOf('a')).toBeLessThan(ids.indexOf('b'));
@@ -130,7 +130,7 @@ describe('topologicalSort', () => {
   });
 
   it('returns null for cyclic graph', () => {
-    expect(topologicalSort(makeCyclicGraph())).toBeNull();
+    expect(getTopologicalSort(makeCyclicGraph())).toBeNull();
   });
 });
 

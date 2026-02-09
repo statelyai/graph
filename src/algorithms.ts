@@ -133,7 +133,7 @@ function isAcyclicUndirected(graph: Graph): boolean {
   return true;
 }
 
-export function connectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
+export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
   const idx = getIndex(graph);
   const visited = new Set<string>();
   const components: GraphNode<N>[][] = [];
@@ -176,7 +176,7 @@ export function connectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
   return components;
 }
 
-export function topologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
+export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
   const idx = getIndex(graph);
   const inDeg = new Map<string, number>();
   for (const n of graph.nodes) inDeg.set(n.id, 0);
@@ -215,7 +215,7 @@ export function hasPath(graph: Graph, sourceId: string, targetId: string): boole
 
 export function isConnected(graph: Graph): boolean {
   if (graph.nodes.length === 0) return true;
-  const components = connectedComponents(graph);
+  const components = getConnectedComponents(graph);
   return components.length <= 1;
 }
 

@@ -3,9 +3,9 @@ import {
   createGraph,
   flatten,
   getShortestPaths,
-  topologicalSort,
+  getTopologicalSort,
   isAcyclic,
-  connectedComponents,
+  getConnectedComponents,
 } from '../src';
 
 describe('flatten', () => {
@@ -437,7 +437,7 @@ describe('flatten', () => {
     const flat = flatten(g);
     expect(isAcyclic(flat)).toBe(true);
 
-    const sorted = topologicalSort(flat);
+    const sorted = getTopologicalSort(flat);
     expect(sorted).not.toBeNull();
     expect(sorted!.map((n) => n.id)).toContain('idle');
     expect(sorted!.map((n) => n.id)).toContain('done');
@@ -490,7 +490,7 @@ describe('flatten', () => {
     });
 
     const flat = flatten(g);
-    const comps = connectedComponents(flat);
+    const comps = getConnectedComponents(flat);
     expect(comps).toHaveLength(2);
   });
 
