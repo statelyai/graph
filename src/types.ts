@@ -209,3 +209,40 @@ export interface AllPairsShortestPathsOptions<TEdgeData = any> {
   /** Edge weight function. Default: every edge = 1. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }
+
+// --- Diff types (read-only summary) ---
+
+export interface NodeChange<TNodeData = any> {
+  id: string;
+  old: Partial<GraphNode<TNodeData>>;
+  new: Partial<GraphNode<TNodeData>>;
+}
+
+export interface EdgeChange<TEdgeData = any> {
+  id: string;
+  old: Partial<GraphEdge<TEdgeData>>;
+  new: Partial<GraphEdge<TEdgeData>>;
+}
+
+export interface GraphDiff<TNodeData = any, TEdgeData = any> {
+  nodes: {
+    added: NodeConfig<TNodeData>[];
+    removed: NodeConfig<TNodeData>[];
+    updated: NodeChange<TNodeData>[];
+  };
+  edges: {
+    added: EdgeConfig<TEdgeData>[];
+    removed: EdgeConfig<TEdgeData>[];
+    updated: EdgeChange<TEdgeData>[];
+  };
+}
+
+// --- Patch types (operational) ---
+
+export type GraphPatch<TNodeData = any, TEdgeData = any> =
+  | { op: 'addNode'; node: NodeConfig<TNodeData>; description?: string }
+  | { op: 'updateNode'; id: string; data: Partial<Omit<NodeConfig<TNodeData>, 'id'>>; description?: string }
+  | { op: 'deleteNode'; node: NodeConfig<TNodeData>; description?: string }
+  | { op: 'addEdge'; edge: EdgeConfig<TEdgeData>; description?: string }
+  | { op: 'updateEdge'; id: string; data: Partial<Omit<EdgeConfig<TEdgeData>, 'id'>>; description?: string }
+  | { op: 'deleteEdge'; edge: EdgeConfig<TEdgeData>; description?: string }

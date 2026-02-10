@@ -71,7 +71,7 @@ const diagram = createVisualGraph({
     { id: 'a', x: 0, y: 0, width: 120, height: 60, shape: 'rectangle' },
     { id: 'b', x: 200, y: 0, width: 120, height: 60, shape: 'ellipse', color: '#3b82f6' },
   ],
-  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', width: 100, height: 100 }],
 });
 ```
 

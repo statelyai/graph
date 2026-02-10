@@ -21,6 +21,10 @@ export type {
   TraversalOptions,
   MSTOptions,
   AllPairsShortestPathsOptions,
+  NodeChange,
+  EdgeChange,
+  GraphDiff,
+  GraphPatch,
 } from './types';
 
 // Factory & helpers
@@ -113,6 +117,19 @@ export {
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
 } from './algorithms';
+
+// Diff & Patches
+export {
+  getDiff,
+  isEmptyDiff,
+  invertDiff,
+  getPatches,
+  applyPatches,
+  invertPatch,
+  invertPatches,
+  toPatches,
+  toDiff,
+} from './diff';
 
 // Transforms
 export { flatten } from './transforms';

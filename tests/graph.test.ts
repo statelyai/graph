@@ -65,14 +65,21 @@ describe('createGraph', () => {
       type: 'directed',
       initialNodeId: null,
       nodes: [
-        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: null },
+        {
+          type: 'node',
+          id: 'a',
+          parentId: null,
+          initialNodeId: null,
+          label: 'A',
+          data: null,
+        },
       ],
       edges: [],
       data: null,
     } satisfies Graph;
 
     expect(hasNode(g, 'a')).toBe(true);
-    expect(getNode(g, 'a').label).toBe('A');
+    expect(getNode(g, 'a')?.label).toBe('A');
   });
 
   it('supports type annotation', () => {
@@ -188,7 +195,7 @@ describe('Mutable: deleteNode / deleteEdge', () => {
     });
     deleteNode(g, 'mid', { reparent: true });
     expect(g.nodes).toHaveLength(2);
-    expect(getNode(g, 'leaf').parentId).toBe('root');
+    expect(getNode(g, 'leaf')?.parentId).toBe('root');
   });
 
   it('deleteEdge() mutates in place', () => {
@@ -206,18 +213,20 @@ describe('Mutable: updateNode / updateEdge', () => {
     const g = createGraph({ nodes: [{ id: 'a', label: 'old' }] });
     const updated = updateNode(g, 'a', { label: 'new' });
     expect(updated.label).toBe('new');
-    expect(getNode(g, 'a').label).toBe('new');
+    expect(getNode(g, 'a')?.label).toBe('new');
   });
 
   it('updateNode() updates data', () => {
     const g = createGraph({ nodes: [{ id: 'a', data: { x: 1 } }] });
     updateNode(g, 'a', { data: { x: 2 } });
-    expect(getNode(g, 'a').data).toEqual({ x: 2 });
+    expect(getNode(g, 'a')?.data).toEqual({ x: 2 });
   });
 
   it('updateNode() throws on missing node', () => {
     const g = createGraph();
-    expect(() => updateNode(g, 'missing', { label: 'x' })).toThrow('does not exist');
+    expect(() => updateNode(g, 'missing', { label: 'x' })).toThrow(
+      'does not exist',
+    );
   });
 
   it('updateEdge() mutates in place', () => {
@@ -228,7 +237,7 @@ describe('Mutable: updateNode / updateEdge', () => {
     const updated = updateEdge(g, 'e1', { targetId: 'c', label: 'updated' });
     expect(updated.targetId).toBe('c');
     expect(updated.label).toBe('updated');
-    expect(getEdge(g, 'e1').targetId).toBe('c');
+    expect(getEdge(g, 'e1')?.targetId).toBe('c');
   });
 
   it('updateEdge() updates data', () => {
@@ -237,12 +246,14 @@ describe('Mutable: updateNode / updateEdge', () => {
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', data: { w: 1 } }],
     });
     updateEdge(g, 'e1', { data: { w: 5 } });
-    expect(getEdge(g, 'e1').data).toEqual({ w: 5 });
+    expect(getEdge(g, 'e1')?.data).toEqual({ w: 5 });
   });
 
   it('updateEdge() throws on missing edge', () => {
     const g = createGraph();
-    expect(() => updateEdge(g, 'missing', { label: 'x' })).toThrow('does not exist');
+    expect(() => updateEdge(g, 'missing', { label: 'x' })).toThrow(
+      'does not exist',
+    );
   });
 });
 
@@ -354,7 +365,7 @@ describe('Mutable batch: deleteEntities()', () => {
     });
     deleteEntities(g, 'mid', { reparent: true });
     expect(g.nodes).toHaveLength(2);
-    expect(getNode(g, 'leaf').parentId).toBe('root');
+    expect(getNode(g, 'leaf')?.parentId).toBe('root');
   });
 
   it('silently skips unknown ids', () => {
@@ -367,7 +378,10 @@ describe('Mutable batch: deleteEntities()', () => {
 describe('Mutable batch: updateEntities()', () => {
   it('updates multiple nodes and edges', () => {
     const g = createGraph({
-      nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      nodes: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', label: 'old' }],
     });
     updateEntities(g, {
@@ -377,15 +391,15 @@ describe('Mutable batch: updateEntities()', () => {
       ],
       edges: [{ id: 'e1', label: 'new' }],
     });
-    expect(getNode(g, 'a').label).toBe('A-updated');
-    expect(getNode(g, 'b').label).toBe('B-updated');
-    expect(getEdge(g, 'e1').label).toBe('new');
+    expect(getNode(g, 'a')?.label).toBe('A-updated');
+    expect(getNode(g, 'b')?.label).toBe('B-updated');
+    expect(getEdge(g, 'e1')?.label).toBe('new');
   });
 
   it('updates only nodes', () => {
     const g = createGraph({ nodes: [{ id: 'a', data: 1 }] });
     updateEntities(g, { nodes: [{ id: 'a', data: 99 }] });
-    expect(getNode(g, 'a').data).toBe(99);
+    expect(getNode(g, 'a')?.data).toBe(99);
   });
 
   it('throws on missing entity', () => {
@@ -446,8 +460,8 @@ describe('GraphInstance', () => {
     });
     gi.updateNode('a', { label: 'new' });
     gi.updateEdge('e1', { label: 'new' });
-    expect(gi.getNode('a').label).toBe('new');
-    expect(gi.getEdge('e1').label).toBe('new');
+    expect(gi.getNode('a')?.label).toBe('new');
+    expect(gi.getEdge('e1')?.label).toBe('new');
   });
 
   it('addEntities() batch', () => {
@@ -476,7 +490,7 @@ describe('GraphInstance', () => {
       edges: [],
     });
     gi.updateEntities({ nodes: [{ id: 'a', label: 'updated' }] });
-    expect(gi.getNode('a').label).toBe('updated');
+    expect(gi.getNode('a')?.label).toBe('updated');
   });
 
   it('hasNode() / hasEdge()', () => {
