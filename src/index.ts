@@ -1,6 +1,6 @@
 // Types
 export type {
-  Positioned,
+  EntityRect as Positioned,
   Graph,
   GraphNode,
   GraphEdge,
@@ -48,11 +48,7 @@ export {
 } from './graph';
 
 // Mutable batch operations
-export {
-  addEntities,
-  deleteEntities,
-  updateEntities,
-} from './graph';
+export { addEntities, deleteEntities, updateEntities } from './graph';
 
 // Class wrapper
 export { GraphInstance } from './graph';
@@ -125,8 +121,6 @@ export {
   invertDiff,
   getPatches,
   applyPatches,
-  invertPatch,
-  invertPatches,
   toPatches,
   toDiff,
 } from './diff';

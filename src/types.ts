@@ -1,6 +1,6 @@
 // --- Visual base ---
 
-export interface Positioned {
+export interface EntityRect {
   x: number;
   y: number;
   width: number;
@@ -112,14 +112,12 @@ export interface GraphEdge<TEdgeData = any> {
 // --- Visual types (required position/size) ---
 
 export interface VisualNode<TNodeData = any>
-  extends Omit<GraphNode<TNodeData>, keyof Positioned>,
-    Positioned {
+  extends Omit<GraphNode<TNodeData>, keyof EntityRect>, EntityRect {
   shape: string;
 }
 
 export interface VisualEdge<TEdgeData = any>
-  extends Omit<GraphEdge<TEdgeData>, keyof Positioned>,
-    Positioned {}
+  extends Omit<GraphEdge<TEdgeData>, keyof EntityRect>, EntityRect {}
 
 export interface VisualGraph<
   TNodeData = any,
@@ -241,8 +239,18 @@ export interface GraphDiff<TNodeData = any, TEdgeData = any> {
 
 export type GraphPatch<TNodeData = any, TEdgeData = any> =
   | { op: 'addNode'; node: NodeConfig<TNodeData>; description?: string }
-  | { op: 'updateNode'; id: string; data: Partial<Omit<NodeConfig<TNodeData>, 'id'>>; description?: string }
-  | { op: 'deleteNode'; node: NodeConfig<TNodeData>; description?: string }
+  | {
+      op: 'updateNode';
+      id: string;
+      data: Partial<Omit<NodeConfig<TNodeData>, 'id'>>;
+      description?: string;
+    }
+  | { op: 'deleteNode'; id: string; description?: string }
   | { op: 'addEdge'; edge: EdgeConfig<TEdgeData>; description?: string }
-  | { op: 'updateEdge'; id: string; data: Partial<Omit<EdgeConfig<TEdgeData>, 'id'>>; description?: string }
-  | { op: 'deleteEdge'; edge: EdgeConfig<TEdgeData>; description?: string }
+  | {
+      op: 'updateEdge';
+      id: string;
+      data: Partial<Omit<EdgeConfig<TEdgeData>, 'id'>>;
+      description?: string;
+    }
+  | { op: 'deleteEdge'; id: string; description?: string };

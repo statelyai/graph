@@ -225,7 +225,7 @@ export function applyPatches<N, E>(
         addNode(graph, patch.node);
         break;
       case 'deleteNode': {
-        deleteNode(graph, patch.node.id);
+        deleteNode(graph, patch.id);
         break;
       }
       case 'updateNode':
@@ -235,60 +235,13 @@ export function applyPatches<N, E>(
         addEdge(graph, patch.edge);
         break;
       case 'deleteEdge':
-        deleteEdge(graph, patch.edge.id);
+        deleteEdge(graph, patch.id);
         break;
       case 'updateEdge':
         updateEdge(graph, patch.id, patch.data);
         break;
     }
   }
-}
-
-/** Invert a single patch. */
-export function invertPatch<N, E>(patch: GraphPatch<N, E>): GraphPatch<N, E> {
-  switch (patch.op) {
-    case 'addNode':
-      return {
-        op: 'deleteNode',
-        node: patch.node,
-        description: patch.description,
-      };
-    case 'deleteNode':
-      return {
-        op: 'addNode',
-        node: patch.node,
-        description: patch.description,
-      };
-    case 'addEdge':
-      return {
-        op: 'deleteEdge',
-        edge: patch.edge,
-        description: patch.description,
-      };
-    case 'deleteEdge':
-      return {
-        op: 'addEdge',
-        edge: patch.edge,
-        description: patch.description,
-      };
-    case 'updateNode': {
-      // We need the old values to invert — look at the data keys
-      // updateNode patches from getPatches carry the new values;
-      // the inverse needs to be computed from the graph state.
-      // For standalone invertPatch, we can only flip what we have.
-      return patch;
-    }
-    case 'updateEdge': {
-      return patch;
-    }
-  }
-}
-
-/** Invert and reverse a list of patches (for undo). */
-export function invertPatches<N, E>(
-  patches: GraphPatch<N, E>[],
-): GraphPatch<N, E>[] {
-  return [...patches].reverse().map(invertPatch);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,12 +273,12 @@ export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
 
   // 3. Delete edges
   for (const edge of diff.edges.removed) {
-    patches.push({ op: 'deleteEdge', edge });
+    patches.push({ op: 'deleteEdge', id: edge.id });
   }
 
   // 4. Delete nodes (safe now — updated edges no longer reference them)
   for (const node of diff.nodes.removed) {
-    patches.push({ op: 'deleteNode', node });
+    patches.push({ op: 'deleteNode', id: node.id });
   }
 
   // 5. Add edges (all referenced nodes exist)
@@ -358,7 +311,7 @@ export function toDiff<N, E>(patches: GraphPatch<N, E>[]): GraphDiff<N, E> {
         diff.nodes.added.push(patch.node);
         break;
       case 'deleteNode':
-        diff.nodes.removed.push(patch.node);
+        diff.nodes.removed.push({ id: patch.id } as NodeConfig<N>);
         break;
       case 'updateNode': {
         const newPartial: Partial<GraphNode<N>> = {};
@@ -372,7 +325,7 @@ export function toDiff<N, E>(patches: GraphPatch<N, E>[]): GraphDiff<N, E> {
         diff.edges.added.push(patch.edge);
         break;
       case 'deleteEdge':
-        diff.edges.removed.push(patch.edge);
+        diff.edges.removed.push({ id: patch.id } as EdgeConfig<E>);
         break;
       case 'updateEdge': {
         const newPartial: Partial<GraphEdge<E>> = {};

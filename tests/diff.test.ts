@@ -6,7 +6,6 @@ import {
   invertDiff,
   getPatches,
   applyPatches,
-  invertPatches,
   toPatches,
   toDiff,
 } from '../src/index';
@@ -215,34 +214,6 @@ describe('applyPatches', () => {
 
     expect(a.nodes).toHaveLength(0);
     expect(a.edges).toHaveLength(0);
-  });
-});
-
-describe('invertPatches', () => {
-  it('add↔delete node inversion', () => {
-    const patches = invertPatches([
-      { op: 'addNode', node: { id: 'x' } },
-    ]);
-    expect(patches).toHaveLength(1);
-    expect(patches[0].op).toBe('deleteNode');
-  });
-
-  it('add↔delete edge inversion', () => {
-    const patches = invertPatches([
-      { op: 'addEdge', edge: { id: 'e', sourceId: 'a', targetId: 'b' } },
-    ]);
-    expect(patches).toHaveLength(1);
-    expect(patches[0].op).toBe('deleteEdge');
-  });
-
-  it('reverses patch order', () => {
-    const patches = invertPatches([
-      { op: 'addNode', node: { id: 'x' } },
-      { op: 'addNode', node: { id: 'y' } },
-    ]);
-    expect(patches[0].op).toBe('deleteNode');
-    expect((patches[0] as any).node.id).toBe('y');
-    expect((patches[1] as any).node.id).toBe('x');
   });
 });
 
