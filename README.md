@@ -2,6 +2,8 @@
 
 A TypeScript graph library built on plain JSON objects. Supports directed/undirected graphs, hierarchical nodes, graph algorithms, visual properties, and serialization to DOT, GraphML, and more.
 
+Made from our experience at [stately.ai](https://stately.ai), where we build visual tools for complex systems.
+
 ## Install
 
 ```bash
@@ -80,10 +82,17 @@ const diagram = createVisualGraph({
 ```ts
 import { toDOT, toGraphML, toAdjacencyList, toEdgeList } from '@statelyai/graph';
 
-toDOT(graph);           // Graphviz DOT
-toGraphML(graph);       // GraphML XML
-toAdjacencyList(graph); // { a: ['b'], b: ['c'] }
-toEdgeList(graph);      // [['a', 'b'], ['b', 'c']]
+console.log(toDOT(graph));
+// Logs a Graphviz DOT string
+
+console.log(toGraphML(graph));
+// Logs a GraphML XML string
+
+console.log(toAdjacencyList(graph));
+// Logs an adjacency object, e.g. { a: ['b'], b: ['c'] }
+
+console.log(toEdgeList(graph));
+// Logs an array of [sourceId, targetId] pairs, e.g. [['a', 'b'], ['b', 'c']]
 ```
 
 ## API
