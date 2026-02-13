@@ -112,6 +112,7 @@ export {
   genPostorders,
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
+  joinPaths,
 } from './algorithms';
 
 // Diff & Patches

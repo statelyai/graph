@@ -1219,3 +1219,35 @@ function fwReconstruct<N, E>(
 
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Path joining
+// ---------------------------------------------------------------------------
+
+/**
+ * Joins two paths end-to-end. The last node of the head path must equal
+ * the source of the tail path (the overlap node).
+ *
+ * Steps are concatenated: head.steps ++ tail.steps (tail already starts
+ * from the overlap node, so no slicing is needed).
+ */
+export function joinPaths<N, E>(
+  headPath: GraphPath<N, E>,
+  tailPath: GraphPath<N, E>,
+): GraphPath<N, E> {
+  const headEnd =
+    headPath.steps.length > 0
+      ? headPath.steps[headPath.steps.length - 1].node
+      : headPath.source;
+
+  if (headEnd.id !== tailPath.source.id) {
+    throw new Error(
+      `Paths cannot be joined: head path ends at "${headEnd.id}" but tail path starts at "${tailPath.source.id}"`,
+    );
+  }
+
+  return {
+    source: headPath.source,
+    steps: [...headPath.steps, ...tailPath.steps],
+  };
+}
