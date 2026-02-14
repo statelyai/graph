@@ -1,5 +1,6 @@
 {
   "name": "@statelyai/graph",
+  "packageManager": "pnpm@10.28.2",
   "type": "module",
   "version": "0.1.0",
   "description": "A TypeScript-first graph library with plain JSON-serializable objects",
