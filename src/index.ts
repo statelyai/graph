@@ -25,12 +25,14 @@ export type {
   EdgeChange,
   GraphDiff,
   GraphPatch,
+  TransitionOptions,
 } from './types';
 
 // Factory & helpers
 export {
   createGraph,
   createVisualGraph,
+  createGraphFromTransition,
   getNode,
   getEdge,
   hasNode,
@@ -93,6 +95,7 @@ export {
   getConnectedComponents,
   getTopologicalSort,
   hasPath,
+  joinPaths,
   isConnected,
   isTree,
   getShortestPath,
@@ -112,7 +115,6 @@ export {
   genPostorders,
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
-  joinPaths,
 } from './algorithms';
 
 // Diff & Patches

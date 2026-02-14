@@ -1,10 +1,24 @@
-import type { Graph, GraphNode, GraphEdge, GraphPath, GraphStep, PathOptions, SinglePathOptions, TraversalOptions, MSTOptions, AllPairsShortestPathsOptions } from './types';
+import type {
+  Graph,
+  GraphNode,
+  GraphEdge,
+  GraphPath,
+  GraphStep,
+  PathOptions,
+  SinglePathOptions,
+  TraversalOptions,
+  MSTOptions,
+  AllPairsShortestPathsOptions,
+} from './types';
 import { getIndex } from './indexing';
 import { createGraph } from './graph';
 
 // --- Traversal generators ---
 
-export function* bfs<N>(graph: Graph<N>, startId: string): Generator<GraphNode<N>> {
+export function* bfs<N>(
+  graph: Graph<N>,
+  startId: string,
+): Generator<GraphNode<N>> {
   const idx = getIndex(graph);
   const visited = new Set<string>();
   const queue: string[] = [startId];
@@ -25,7 +39,10 @@ export function* bfs<N>(graph: Graph<N>, startId: string): Generator<GraphNode<N
   }
 }
 
-export function* dfs<N>(graph: Graph<N>, startId: string): Generator<GraphNode<N>> {
+export function* dfs<N>(
+  graph: Graph<N>,
+  startId: string,
+): Generator<GraphNode<N>> {
   const idx = getIndex(graph);
   const visited = new Set<string>();
   const stack: string[] = [startId];
@@ -75,7 +92,9 @@ export function isAcyclic(graph: Graph): boolean {
   if (graph.type === 'undirected') {
     return isAcyclicUndirected(graph);
   }
-  const WHITE = 0, GRAY = 1, BLACK = 2;
+  const WHITE = 0,
+    GRAY = 1,
+    BLACK = 2;
   const color = new Map<string, number>();
   for (const n of graph.nodes) color.set(n.id, WHITE);
 
@@ -209,7 +228,11 @@ export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
   return result;
 }
 
-export function hasPath(graph: Graph, sourceId: string, targetId: string): boolean {
+export function hasPath(
+  graph: Graph,
+  sourceId: string,
+  targetId: string,
+): boolean {
   return getShortestPaths(graph, { from: sourceId, to: targetId }).length > 0;
 }
 
@@ -236,7 +259,9 @@ function resolveFrom(graph: Graph, opts?: PathOptions): string {
   for (const e of graph.edges) {
     inDeg.set(e.targetId, (inDeg.get(e.targetId) ?? 0) + 1);
   }
-  const roots = [...inDeg.entries()].filter(([, d]) => d === 0).map(([id]) => id);
+  const roots = [...inDeg.entries()]
+    .filter(([, d]) => d === 0)
+    .map(([id]) => id);
   if (roots.length === 1) return roots[0];
 
   throw new Error(
@@ -360,7 +385,10 @@ function* reconstructPaths<N, E>(
 
   const idx = getIndex(graph);
   const targetNi = idx.nodeById.get(targetId);
-  const targetNode = targetNi !== undefined ? graph.nodes[targetNi] : graph.nodes.find((n) => n.id === targetId)!;
+  const targetNode =
+    targetNi !== undefined
+      ? graph.nodes[targetNi]
+      : graph.nodes.find((n) => n.id === targetId)!;
 
   for (const { from, edge } of preds) {
     for (const prefix of reconstructPaths(graph, prev, sourceNode, from)) {
@@ -382,14 +410,21 @@ export function* genShortestPaths<N, E>(
 ): Generator<GraphPath<N, E>> {
   const idx = getIndex(graph);
   const sourceId = resolveFrom(graph, opts);
-  const { dist, prev } = computeShortestDistances(graph, sourceId, opts?.getWeight);
+  const { dist, prev } = computeShortestDistances(
+    graph,
+    sourceId,
+    opts?.getWeight,
+  );
 
   const targets = opts?.to
     ? [opts.to].filter((id) => dist.has(id))
     : [...dist.keys()].filter((id) => id !== sourceId);
 
   const sourceNi = idx.nodeById.get(sourceId);
-  const sourceNode = sourceNi !== undefined ? graph.nodes[sourceNi] : graph.nodes.find((n) => n.id === sourceId)!;
+  const sourceNode =
+    sourceNi !== undefined
+      ? graph.nodes[sourceNi]
+      : graph.nodes.find((n) => n.id === sourceId)!;
 
   for (const targetId of targets) {
     yield* reconstructPaths<N, E>(graph, prev, sourceNode, targetId);
@@ -438,7 +473,10 @@ export function* genSimplePaths<N, E>(
   const idx = getIndex(graph);
   const sourceId = resolveFrom(graph, opts);
   const sourceNi = idx.nodeById.get(sourceId);
-  const sourceNode = sourceNi !== undefined ? graph.nodes[sourceNi] : graph.nodes.find((n) => n.id === sourceId)!;
+  const sourceNode =
+    sourceNi !== undefined
+      ? graph.nodes[sourceNi]
+      : graph.nodes.find((n) => n.id === sourceId)!;
   const targetId = opts?.to;
   const visited = new Set<string>();
   const currentSteps: GraphStep<N, E>[] = [];
@@ -460,7 +498,10 @@ export function* genSimplePaths<N, E>(
     for (const { neighborId, edge } of getNeighborEdges(graph, nodeId)) {
       if (!visited.has(neighborId)) {
         const neighborNi = idx.nodeById.get(neighborId);
-        const neighborNode = neighborNi !== undefined ? graph.nodes[neighborNi] : graph.nodes.find((n) => n.id === neighborId)!;
+        const neighborNode =
+          neighborNi !== undefined
+            ? graph.nodes[neighborNi]
+            : graph.nodes.find((n) => n.id === neighborId)!;
         currentSteps.push({ edge: edge as GraphEdge<E>, node: neighborNode });
         dfsCollect(neighborId);
         currentSteps.pop();
@@ -558,7 +599,9 @@ export function getCycles<N, E>(graph: Graph<N, E>): GraphPath<N, E>[] {
  * Lazily yields cycles one at a time.
  * Use `getCycles` for the full array.
  */
-export function* genCycles<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, E>> {
+export function* genCycles<N, E>(
+  graph: Graph<N, E>,
+): Generator<GraphPath<N, E>> {
   if (graph.type === 'undirected') {
     yield* genCyclesUndirected(graph);
   } else {
@@ -566,7 +609,9 @@ export function* genCycles<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, E>>
   }
 }
 
-function* genCyclesDirected<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, E>> {
+function* genCyclesDirected<N, E>(
+  graph: Graph<N, E>,
+): Generator<GraphPath<N, E>> {
   const idx = getIndex(graph);
   const sortedIds = graph.nodes.map((n) => n.id).sort();
 
@@ -588,7 +633,10 @@ function* genCyclesDirected<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, E>
         const e = graph.edges[ai];
         const neighborId = e.targetId;
 
-        if (neighborId === startId && (steps.length > 0 || currentId === startId)) {
+        if (
+          neighborId === startId &&
+          (steps.length > 0 || currentId === startId)
+        ) {
           found.push({
             source: startNode,
             steps: [...steps, { edge: e as GraphEdge<E>, node: startNode }],
@@ -609,7 +657,9 @@ function* genCyclesDirected<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, E>
   }
 }
 
-function* genCyclesUndirected<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, E>> {
+function* genCyclesUndirected<N, E>(
+  graph: Graph<N, E>,
+): Generator<GraphPath<N, E>> {
   const idx = getIndex(graph);
   const sortedIds = graph.nodes.map((n) => n.id).sort();
   const seen = new Set<string>();
@@ -626,19 +676,28 @@ function* genCyclesUndirected<N, E>(graph: Graph<N, E>): Generator<GraphPath<N, 
     function dfsFind(currentId: string, parentId: string | null): void {
       visited.add(currentId);
 
-      for (const { neighborId, edge } of getNeighborEdgesAll(graph, currentId)) {
+      for (const { neighborId, edge } of getNeighborEdgesAll(
+        graph,
+        currentId,
+      )) {
         if (neighborId === parentId) {
           parentId = null;
           continue;
         }
 
         if (neighborId === startId && steps.length >= 2) {
-          const innerIds = steps.map((s) => s.node.id).sort().join(',');
+          const innerIds = steps
+            .map((s) => s.node.id)
+            .sort()
+            .join(',');
           if (!seen.has(innerIds)) {
             seen.add(innerIds);
             found.push({
               source: startNode,
-              steps: [...steps, { edge: edge as GraphEdge<E>, node: startNode }],
+              steps: [
+                ...steps,
+                { edge: edge as GraphEdge<E>, node: startNode },
+              ],
             });
           }
         } else if (allowed.has(neighborId) && !visited.has(neighborId)) {
@@ -1105,13 +1164,9 @@ function floydWarshallAllPaths<N, E>(
   for (let i = 0; i < n; i++) idxOf.set(nodeIds[i], i);
 
   const INF = Infinity;
-  const dist: number[][] = Array.from({ length: n }, () =>
-    Array(n).fill(INF),
-  );
+  const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(INF));
   const prev: Array<Array<Array<{ from: number; edge: GraphEdge<E> }>>> =
-    Array.from({ length: n }, () =>
-      Array.from({ length: n }, () => []),
-    );
+    Array.from({ length: n }, () => Array.from({ length: n }, () => []));
 
   // Initialize diagonal
   for (let i = 0; i < n; i++) dist[i][i] = 0;
@@ -1169,7 +1224,15 @@ function floydWarshallAllPaths<N, E>(
     for (let j = 0; j < n; j++) {
       if (i === j || dist[i][j] === INF) continue;
 
-      const paths = fwReconstruct(graph, prev, idxOf, nodeIds, sourceNode, i, j);
+      const paths = fwReconstruct(
+        graph,
+        prev,
+        idxOf,
+        nodeIds,
+        sourceNode,
+        i,
+        j,
+      );
       results.push(...paths);
     }
   }

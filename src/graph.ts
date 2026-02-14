@@ -12,6 +12,7 @@ import type {
   VisualGraph,
   VisualNode,
   VisualEdge,
+  TransitionOptions,
 } from './types';
 import {
   getIndex,
@@ -108,6 +109,85 @@ export function createVisualGraph<N = any, E = any, G = any>(
       }),
     ),
   };
+}
+
+/**
+ * Create a graph by BFS exploration of a transition function.
+ * Each unique state becomes a node; each (state, event) → nextState becomes an edge.
+ *
+ * - Node IDs are determined by `serializeState` (default: `JSON.stringify`).
+ * - Edge IDs use the format `sourceId|serializedEvent|targetId` for uniqueness
+ *   and debuggability. Edge labels are just the serialized event string.
+ */
+export function createGraphFromTransition<TState, TEvent>(
+  transition: (state: TState, event: TEvent) => TState,
+  options: TransitionOptions<TState, TEvent>,
+): Graph<TState, TEvent> {
+  const serializeState = options.serializeState ?? JSON.stringify;
+  const serializeEvent = options.serializeEvent ?? JSON.stringify;
+  const limit = options.limit ?? Infinity;
+  const getEvents =
+    typeof options.events === 'function'
+      ? options.events
+      : () => options.events as TEvent[];
+
+  const nodes: NodeConfig<TState>[] = [];
+  const edges: EdgeConfig<TEvent>[] = [];
+  const visited = new Set<string>();
+  const edgeSet = new Set<string>();
+  const queue: TState[] = [options.initialState];
+
+  const initialStateId = serializeState(options.initialState);
+  visited.add(initialStateId);
+  nodes.push({ id: initialStateId, label: initialStateId, data: options.initialState });
+
+  let iterations = 0;
+
+  while (queue.length > 0) {
+    const state = queue.shift()!;
+    const stateId = serializeState(state);
+
+    if (++iterations > limit) {
+      throw new Error('Traversal limit exceeded');
+    }
+
+    if (options.stopWhen?.(state)) {
+      continue;
+    }
+
+    const events = getEvents(state);
+    for (const event of events) {
+      const nextState = transition(state, event);
+      const nextStateId = serializeState(nextState);
+      const eventStr = serializeEvent(event);
+
+      if (!visited.has(nextStateId)) {
+        visited.add(nextStateId);
+        nodes.push({ id: nextStateId, label: nextStateId, data: nextState });
+        queue.push(nextState);
+      }
+
+      const edgeKey = `${stateId}|${eventStr}|${nextStateId}`;
+      if (!edgeSet.has(edgeKey)) {
+        edgeSet.add(edgeKey);
+        edges.push({
+          id: edgeKey,
+          sourceId: stateId,
+          targetId: nextStateId,
+          label: eventStr,
+          data: event,
+        });
+      }
+    }
+  }
+
+  return createGraph({
+    id: options.id ?? '',
+    type: 'directed',
+    initialNodeId: initialStateId,
+    nodes,
+    edges,
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -254,3 +254,22 @@ export type GraphPatch<TNodeData = any, TEdgeData = any> =
       description?: string;
     }
   | { op: 'deleteEdge'; id: string; description?: string };
+
+// --- Transition exploration options ---
+
+export interface TransitionOptions<TState, TEvent> {
+  /** Initial state to begin BFS exploration from. */
+  initialState: TState;
+  /** Events to try at each state. Array or function of state. */
+  events: TEvent[] | ((state: TState) => TEvent[]);
+  /** Serialize state to unique string for node dedup. Default: JSON.stringify */
+  serializeState?: (state: TState) => string;
+  /** Serialize event to string for edge labels/IDs. Default: JSON.stringify */
+  serializeEvent?: (event: TEvent) => string;
+  /** Max BFS iterations before throwing. Default: Infinity */
+  limit?: number;
+  /** When true, node is kept but outgoing transitions are not explored. */
+  stopWhen?: (state: TState) => boolean;
+  /** Optional graph ID. */
+  id?: string;
+}
