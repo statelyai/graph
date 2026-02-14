@@ -58,8 +58,6 @@ export { GraphInstance } from './graph';
 // Indexing
 export { invalidateIndex } from './indexing';
 
-// Schemas
-export { GraphSchema, NodeSchema, EdgeSchema } from './schemas';
 
 // Queries
 export {
@@ -131,10 +129,8 @@ export {
 // Transforms
 export { flatten } from './transforms';
 
-// Formats
+// Formats (dep-free only; GraphML requires @statelyai/graph/formats/graphml)
 export {
-  toGraphML,
-  fromGraphML,
   toDOT,
   toAdjacencyList,
   fromAdjacencyList,
