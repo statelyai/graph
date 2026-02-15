@@ -135,15 +135,29 @@ export function toGEXF(graph: Graph): string {
 }
 
 export function fromGEXF(xml: string): Graph {
+  if (typeof xml !== 'string') {
+    throw new Error('GEXF: expected a string');
+  }
   const parser = new XMLParser({
     ignoreAttributes: false,
     isArray: (name) =>
       ['node', 'edge', 'attribute', 'attvalue', 'attributes'].includes(name),
   });
 
-  const parsed = parser.parse(xml);
-  const gexf = parsed.gexf;
+  let parsed: any;
+  try {
+    parsed = parser.parse(xml);
+  } catch (e: any) {
+    throw new Error(`GEXF: invalid XML — ${e.message}`);
+  }
+  const gexf = parsed?.gexf;
+  if (!gexf) {
+    throw new Error('GEXF: missing <gexf> root element');
+  }
   const graphEl = gexf.graph;
+  if (!graphEl) {
+    throw new Error('GEXF: missing <graph> element');
+  }
 
   const graphType: 'directed' | 'undirected' =
     graphEl['@_defaultedgetype'] === 'undirected' ? 'undirected' : 'directed';

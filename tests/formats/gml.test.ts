@@ -85,4 +85,36 @@ describe('GML', () => {
     expect(parsed.nodes[0].width).toBe(100);
     expect(parsed.nodes[0].height).toBe(50);
   });
+
+  it('throws on empty input', () => {
+    expect(() => fromGML('')).toThrow('GML: input is empty');
+    expect(() => fromGML('   ')).toThrow('GML: input is empty');
+  });
+
+  it('throws on missing graph block', () => {
+    expect(() => fromGML('node [ id "a" ]')).toThrow('GML: missing top-level "graph" block');
+  });
+
+  it('handles graph with no nodes or edges', () => {
+    const graph = fromGML('graph [ directed 1 ]');
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+    expect(graph.type).toBe('directed');
+  });
+
+  it('handles comments in GML', () => {
+    const gml = `
+# This is a comment
+graph [
+  directed 1
+  # Another comment
+  node [
+    id "a"
+    label "A"
+  ]
+]`;
+    const graph = fromGML(gml);
+    expect(graph.nodes).toHaveLength(1);
+    expect(graph.nodes[0].label).toBe('A');
+  });
 });

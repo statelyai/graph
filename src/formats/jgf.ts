@@ -74,7 +74,19 @@ export function toJGF(graph: Graph): JGFGraph {
 }
 
 export function fromJGF(jgf: JGFGraph): Graph {
+  if (!jgf || typeof jgf !== 'object') {
+    throw new Error('JGF: expected an object');
+  }
+  if (!jgf.graph || typeof jgf.graph !== 'object') {
+    throw new Error('JGF: missing "graph" property');
+  }
   const g = jgf.graph;
+  if (!Array.isArray(g.nodes)) {
+    throw new Error('JGF: "graph.nodes" must be an array');
+  }
+  if (!Array.isArray(g.edges)) {
+    throw new Error('JGF: "graph.edges" must be an array');
+  }
   return {
     id: g.id ?? '',
     type: g.directed === false ? 'undirected' : 'directed',

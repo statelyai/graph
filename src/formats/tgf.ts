@@ -22,6 +22,9 @@ export function toTGF(graph: Graph): string {
 }
 
 export function fromTGF(tgf: string): Graph {
+  if (typeof tgf !== 'string') {
+    throw new Error('TGF: expected a string');
+  }
   const lines = tgf.split('\n');
   const sepIdx = lines.indexOf('#');
   const nodeLines = sepIdx >= 0 ? lines.slice(0, sepIdx) : lines;

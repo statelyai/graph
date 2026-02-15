@@ -48,6 +48,15 @@ export function toD3Graph(graph: Graph): D3Graph {
 }
 
 export function fromD3Graph(d3: D3Graph): Graph {
+  if (!d3 || typeof d3 !== 'object') {
+    throw new Error('D3: expected an object');
+  }
+  if (!Array.isArray(d3.nodes)) {
+    throw new Error('D3: "nodes" must be an array');
+  }
+  if (!Array.isArray(d3.links)) {
+    throw new Error('D3: "links" must be an array');
+  }
   return {
     id: '',
     type: 'directed',

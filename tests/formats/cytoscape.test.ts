@@ -51,4 +51,24 @@ describe('Cytoscape.js JSON', () => {
     expect(parsed.edges[0].data).toEqual({ cost: 3 });
     expect(parsed.data).toEqual({ meta: true });
   });
+
+  it('throws on null/undefined input', () => {
+    expect(() => fromCytoscapeJSON(null as any)).toThrow('Cytoscape: expected an object');
+    expect(() => fromCytoscapeJSON(undefined as any)).toThrow('Cytoscape: expected an object');
+  });
+
+  it('throws on missing elements', () => {
+    expect(() => fromCytoscapeJSON({} as any)).toThrow('Cytoscape: missing "elements" property');
+  });
+
+  it('throws on missing nodes/edges arrays', () => {
+    expect(() => fromCytoscapeJSON({ elements: { edges: [] } } as any)).toThrow('Cytoscape: "elements.nodes" must be an array');
+    expect(() => fromCytoscapeJSON({ elements: { nodes: [] } } as any)).toThrow('Cytoscape: "elements.edges" must be an array');
+  });
+
+  it('handles empty elements', () => {
+    const graph = fromCytoscapeJSON({ elements: { nodes: [], edges: [] } });
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+  });
 });

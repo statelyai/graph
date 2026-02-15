@@ -58,4 +58,26 @@ describe('JGF', () => {
     const parsed = fromJGF(jgf);
     expect(parsed.type).toBe('undirected');
   });
+
+  it('throws on null/undefined input', () => {
+    expect(() => fromJGF(null as any)).toThrow('JGF: expected an object');
+    expect(() => fromJGF(undefined as any)).toThrow('JGF: expected an object');
+  });
+
+  it('throws on missing graph property', () => {
+    expect(() => fromJGF({} as any)).toThrow('JGF: missing "graph" property');
+    expect(() => fromJGF({ graph: 'not an object' } as any)).toThrow('JGF: missing "graph" property');
+  });
+
+  it('throws on missing nodes/edges arrays', () => {
+    expect(() => fromJGF({ graph: { edges: [] } } as any)).toThrow('JGF: "graph.nodes" must be an array');
+    expect(() => fromJGF({ graph: { nodes: [] } } as any)).toThrow('JGF: "graph.edges" must be an array');
+  });
+
+  it('handles empty graph', () => {
+    const graph = fromJGF({ graph: { nodes: [], edges: [] } });
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+    expect(graph.type).toBe('directed');
+  });
 });

@@ -74,4 +74,28 @@ describe('GEXF', () => {
     expect(parsed.nodes[0].y).toBe(200);
     expect(parsed.nodes[0].color).toBe('#ff0000');
   });
+
+  it('throws on non-string input', () => {
+    expect(() => fromGEXF(null as any)).toThrow('GEXF: expected a string');
+  });
+
+  it('throws on invalid XML', () => {
+    expect(() => fromGEXF('not xml at all <><><')).toThrow('GEXF:');
+  });
+
+  it('throws on XML without <gexf> root', () => {
+    expect(() => fromGEXF('<root><child/></root>')).toThrow('GEXF: missing <gexf> root element');
+  });
+
+  it('throws on <gexf> without <graph>', () => {
+    expect(() => fromGEXF('<gexf><meta/></gexf>')).toThrow('GEXF: missing <graph> element');
+  });
+
+  it('handles empty graph', () => {
+    const xml = '<gexf><graph defaultedgetype="directed"></graph></gexf>';
+    const graph = fromGEXF(xml);
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+    expect(graph.type).toBe('directed');
+  });
 });

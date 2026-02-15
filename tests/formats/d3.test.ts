@@ -48,4 +48,20 @@ describe('D3.js JSON', () => {
     expect(parsed.edges[0].sourceId).toBe('x');
     expect(parsed.edges[0].targetId).toBe('y');
   });
+
+  it('throws on null/undefined input', () => {
+    expect(() => fromD3Graph(null as any)).toThrow('D3: expected an object');
+    expect(() => fromD3Graph(undefined as any)).toThrow('D3: expected an object');
+  });
+
+  it('throws on missing nodes/links arrays', () => {
+    expect(() => fromD3Graph({} as any)).toThrow('D3: "nodes" must be an array');
+    expect(() => fromD3Graph({ nodes: [] } as any)).toThrow('D3: "links" must be an array');
+  });
+
+  it('handles empty graph', () => {
+    const graph = fromD3Graph({ nodes: [], links: [] });
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+  });
 });

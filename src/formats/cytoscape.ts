@@ -66,6 +66,18 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
 }
 
 export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
+  if (!cyto || typeof cyto !== 'object') {
+    throw new Error('Cytoscape: expected an object');
+  }
+  if (!cyto.elements || typeof cyto.elements !== 'object') {
+    throw new Error('Cytoscape: missing "elements" property');
+  }
+  if (!Array.isArray(cyto.elements.nodes)) {
+    throw new Error('Cytoscape: "elements.nodes" must be an array');
+  }
+  if (!Array.isArray(cyto.elements.edges)) {
+    throw new Error('Cytoscape: "elements.edges" must be an array');
+  }
   return {
     id: cyto.data?.id ?? '',
     type: cyto.data?.type === 'undirected' ? 'undirected' : 'directed',

@@ -82,14 +82,28 @@ export function toGraphML(graph: Graph): string {
 }
 
 export function fromGraphML(xml: string): Graph {
+  if (typeof xml !== 'string') {
+    throw new Error('GraphML: expected a string');
+  }
   const parser = new XMLParser({
     ignoreAttributes: false,
     isArray: (name) => ['node', 'edge', 'data', 'key'].includes(name),
   });
 
-  const parsed = parser.parse(xml);
-  const graphml = parsed.graphml;
+  let parsed: any;
+  try {
+    parsed = parser.parse(xml);
+  } catch (e: any) {
+    throw new Error(`GraphML: invalid XML — ${e.message}`);
+  }
+  const graphml = parsed?.graphml;
+  if (!graphml) {
+    throw new Error('GraphML: missing <graphml> root element');
+  }
   const graphEl = graphml.graph;
+  if (!graphEl) {
+    throw new Error('GraphML: missing <graph> element');
+  }
 
   const graphType: 'directed' | 'undirected' =
     graphEl['@_edgedefault'] === 'undirected' ? 'undirected' : 'directed';

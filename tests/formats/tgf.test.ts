@@ -40,4 +40,28 @@ describe('TGF', () => {
     expect(graph.nodes[0].label).toBe('');
     expect(graph.edges[0].label).toBe('');
   });
+
+  it('throws on non-string input', () => {
+    expect(() => fromTGF(null as any)).toThrow('TGF: expected a string');
+    expect(() => fromTGF(42 as any)).toThrow('TGF: expected a string');
+  });
+
+  it('handles empty string', () => {
+    const graph = fromTGF('');
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+  });
+
+  it('handles missing # separator (nodes only)', () => {
+    const graph = fromTGF('a Node A\nb Node B');
+    expect(graph.nodes).toHaveLength(2);
+    expect(graph.edges).toHaveLength(0);
+  });
+
+  it('handles extra whitespace and blank lines', () => {
+    const tgf = '  a Hello  \n\n  b World  \n#\n  a b edge  \n';
+    const graph = fromTGF(tgf);
+    expect(graph.nodes).toHaveLength(2);
+    expect(graph.edges).toHaveLength(1);
+  });
 });

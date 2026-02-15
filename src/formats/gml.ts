@@ -81,7 +81,16 @@ function gmlString(s: string): string {
 // --- GML parser ---
 
 export function fromGML(gml: string): Graph {
+  if (typeof gml !== 'string') {
+    throw new Error('GML: expected a string');
+  }
+  if (!gml.trim()) {
+    throw new Error('GML: input is empty');
+  }
   const tokens = tokenize(gml);
+  if (tokens.length === 0) {
+    throw new Error('GML: no tokens found');
+  }
   const obj = parseBlock(tokens, 0);
   const graphBlock = obj.value['graph'];
   if (!graphBlock) throw new Error('GML: missing top-level "graph" block');
