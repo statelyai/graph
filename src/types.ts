@@ -255,6 +255,28 @@ export type GraphPatch<TNodeData = any, TEdgeData = any> =
     }
   | { op: 'deleteEdge'; id: string; description?: string };
 
+// --- Format converter ---
+
+/**
+ * A bidirectional converter between `Graph` and a serialized format.
+ *
+ * Implement this interface to create a custom format converter.
+ *
+ * @example
+ * ```ts
+ * const myConverter: GraphFormatConverter<string> = {
+ *   to(graph) { return JSON.stringify(graph); },
+ *   from(input) { return JSON.parse(input); },
+ * };
+ * ```
+ */
+export interface GraphFormatConverter<TSerial> {
+  /** Convert a Graph to the serialized format. */
+  to(graph: Graph): TSerial;
+  /** Convert from the serialized format to a Graph. */
+  from(input: TSerial): Graph;
+}
+
 // --- Transition exploration options ---
 
 export interface TransitionOptions<TState, TEvent> {

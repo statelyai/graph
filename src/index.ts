@@ -26,6 +26,7 @@ export type {
   GraphDiff,
   GraphPatch,
   TransitionOptions,
+  GraphFormatConverter,
 } from './types';
 
 // Factory & helpers
@@ -136,4 +137,7 @@ export {
   fromAdjacencyList,
   toEdgeList,
   fromEdgeList,
+  createFormatConverter,
+  adjacencyListConverter,
+  edgeListConverter,
 } from './formats';
