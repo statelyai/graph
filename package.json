@@ -29,6 +29,12 @@
     "./formats/dot": "./dist/formats/dot.mjs",
     "./formats/edge-list": "./dist/formats/edge-list.mjs",
     "./formats/graphml": "./dist/formats/graphml.mjs",
+    "./formats/gexf": "./dist/formats/gexf.mjs",
+    "./formats/jgf": "./dist/formats/jgf.mjs",
+    "./formats/cytoscape": "./dist/formats/cytoscape.mjs",
+    "./formats/d3": "./dist/formats/d3.mjs",
+    "./formats/gml": "./dist/formats/gml.mjs",
+    "./formats/tgf": "./dist/formats/tgf.mjs",
     "./queries": "./dist/queries.mjs",
     "./schemas": "./dist/schemas.mjs",
     "./package.json": "./package.json"

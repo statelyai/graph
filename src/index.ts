@@ -130,7 +130,7 @@ export {
 // Transforms
 export { flatten } from './transforms';
 
-// Formats (dep-free only; GraphML requires @statelyai/graph/formats/graphml)
+// Formats (dep-free only; GraphML/GEXF require @statelyai/graph/formats/graphml or /gexf)
 export {
   toDOT,
   toAdjacencyList,
@@ -140,4 +140,32 @@ export {
   createFormatConverter,
   adjacencyListConverter,
   edgeListConverter,
+  toJGF,
+  fromJGF,
+  jgfConverter,
+  toCytoscapeJSON,
+  fromCytoscapeJSON,
+  cytoscapeConverter,
+  toD3Graph,
+  fromD3Graph,
+  d3Converter,
+  toGML,
+  fromGML,
+  gmlConverter,
+  toTGF,
+  fromTGF,
+  tgfConverter,
+} from './formats';
+
+// Format types
+export type {
+  JGFGraph,
+  JGFNode,
+  JGFEdge,
+  CytoscapeJSON,
+  CytoscapeNode,
+  CytoscapeEdge,
+  D3Graph,
+  D3Node,
+  D3Link,
 } from './formats';
