@@ -1,0 +1,539 @@
+import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
+import { createFormatConverter } from '../converter';
+import {
+  validateInput,
+  prepareLines,
+  escapeMermaidLabel,
+  unescapeMermaidLabel,
+  generateEdgeId,
+} from './shared';
+
+// --- Types ---
+
+export interface SequenceNodeData {
+  actorType: 'participant' | 'actor';
+  alias?: string;
+  // TODO: created/destroyed mid-sequence not yet mapped to graph lifecycle
+  created?: boolean;
+  destroyed?: boolean;
+}
+
+export interface SequenceEdgeData {
+  kind: 'message' | 'activation' | 'deactivation';
+  stroke?: 'solid' | 'dotted';
+  arrowType?: 'filled' | 'open' | 'cross' | 'async';
+  bidirectional?: boolean;
+  sequenceNumber?: number;
+}
+
+// TODO: SequenceBlock types for loop/alt/par/opt/critical/break/rect
+// These control-flow blocks are not graph topology; they describe ordering
+// constraints. Storing them in graphData.blocks for round-trip fidelity
+// but they don't affect nodes/edges directly.
+export type SequenceBlock =
+  | { type: 'loop'; label: string; edgeIds: string[] }
+  | {
+      type: 'alt';
+      label: string;
+      branches: { label?: string; edgeIds: string[] }[];
+    }
+  | { type: 'opt'; label: string; edgeIds: string[] }
+  | {
+      type: 'par';
+      branches: { label: string; edgeIds: string[] }[];
+    }
+  | {
+      type: 'critical';
+      label: string;
+      edgeIds: string[];
+      options?: { label: string; edgeIds: string[] }[];
+    }
+  | { type: 'break'; label: string; edgeIds: string[] }
+  | { type: 'rect'; color: string; edgeIds: string[] };
+
+export interface SequenceGraphData {
+  diagramType: 'sequence';
+  autonumber?: boolean;
+  blocks?: SequenceBlock[];
+  // TODO: actor links/menus (link Alice: Dashboard @ url) not yet supported
+  // TODO: rect background highlighting partially supported via blocks
+}
+
+type SequenceGraph = Graph<SequenceNodeData, SequenceEdgeData, SequenceGraphData>;
+type SequenceNode = GraphNode<SequenceNodeData>;
+type SequenceEdge = GraphEdge<SequenceEdgeData>;
+
+// --- Arrow parsing ---
+
+interface ArrowInfo {
+  stroke: 'solid' | 'dotted';
+  arrowType: 'filled' | 'open' | 'cross' | 'async';
+  bidirectional: boolean;
+}
+
+// Ordered longest-first so greedy match works
+const ARROW_PATTERNS: [string, ArrowInfo][] = [
+  ['<<-->>', { stroke: 'dotted', arrowType: 'filled', bidirectional: true }],
+  ['<<->>', { stroke: 'solid', arrowType: 'filled', bidirectional: true }],
+  ['-->>', { stroke: 'dotted', arrowType: 'filled', bidirectional: false }],
+  ['-->', { stroke: 'dotted', arrowType: 'open', bidirectional: false }],
+  ['--x', { stroke: 'dotted', arrowType: 'cross', bidirectional: false }],
+  ['--)', { stroke: 'dotted', arrowType: 'async', bidirectional: false }],
+  ['->>', { stroke: 'solid', arrowType: 'filled', bidirectional: false }],
+  ['->', { stroke: 'solid', arrowType: 'open', bidirectional: false }],
+  ['-x', { stroke: 'solid', arrowType: 'cross', bidirectional: false }],
+  ['-)', { stroke: 'solid', arrowType: 'async', bidirectional: false }],
+];
+
+function parseArrow(arrow: string): ArrowInfo | undefined {
+  for (const [pattern, info] of ARROW_PATTERNS) {
+    if (arrow === pattern) return info;
+  }
+  return undefined;
+}
+
+// Regex to match a message line: Actor arrow Actor: message
+// Captures: [1] source (may end with +/-), [2] arrow, [3] target (may start with +/-), [4] message
+const MESSAGE_RE =
+  /^(\S+?)\s*(<<-->>|<<->>|-->>|-->|--x|--\)|->>|->|-x|-\))\s*(\S+?)\s*:\s*(.*)$/;
+
+// --- Parser ---
+
+export function fromMermaidSequence(input: string): SequenceGraph {
+  validateInput(input, 'Mermaid sequence');
+  const { lines } = prepareLines(input);
+
+  // Validate header
+  const header = lines[0]?.trim();
+  if (!header || !header.startsWith('sequenceDiagram')) {
+    throw new Error('Mermaid sequence: expected "sequenceDiagram" header');
+  }
+
+  const nodeMap = new Map<string, SequenceNode>();
+  const edges: SequenceEdge[] = [];
+  const blocks: SequenceBlock[] = [];
+  let autonumber = false;
+  let edgeCounter = 0;
+  let seqNum = 0;
+
+  // Block nesting stack
+  const blockStack: {
+    type: string;
+    label: string;
+    edgeIds: string[];
+    branches?: { label?: string; edgeIds: string[] }[];
+    options?: { label: string; edgeIds: string[] }[];
+    color?: string;
+  }[] = [];
+
+  function ensureNode(
+    id: string,
+    actorType: 'participant' | 'actor' = 'participant',
+  ): void {
+    if (!nodeMap.has(id)) {
+      nodeMap.set(id, {
+        type: 'node',
+        id,
+        parentId: null,
+        initialNodeId: null,
+        label: id,
+        data: { actorType },
+      });
+    }
+  }
+
+  function addEdge(edge: SequenceEdge): void {
+    edges.push(edge);
+    // Add to current block if inside one
+    if (blockStack.length > 0) {
+      const top = blockStack[blockStack.length - 1];
+      if (top.branches && top.branches.length > 0) {
+        top.branches[top.branches.length - 1].edgeIds.push(edge.id);
+      } else if (top.options && top.options.length > 0) {
+        top.options[top.options.length - 1].edgeIds.push(edge.id);
+      } else {
+        top.edgeIds.push(edge.id);
+      }
+    }
+  }
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // autonumber
+    if (line === 'autonumber') {
+      autonumber = true;
+      continue;
+    }
+
+    // participant / actor declaration
+    const participantMatch = line.match(
+      /^(participant|actor)\s+(\S+?)(?:\s+as\s+(.+))?$/,
+    );
+    if (participantMatch) {
+      const actorType = participantMatch[1] as 'participant' | 'actor';
+      const id = participantMatch[2];
+      const alias = participantMatch[3]?.trim();
+      ensureNode(id, actorType);
+      const node = nodeMap.get(id)!;
+      node.data.actorType = actorType;
+      if (alias) {
+        node.data.alias = alias;
+        node.label = alias;
+      }
+      continue;
+    }
+
+    // TODO: `create participant` / `destroy` — mark node as created/destroyed
+    const createMatch = line.match(/^create\s+(participant|actor)\s+(\S+?)(?:\s+as\s+(.+))?$/);
+    if (createMatch) {
+      const actorType = createMatch[1] as 'participant' | 'actor';
+      const id = createMatch[2];
+      const alias = createMatch[3]?.trim();
+      ensureNode(id, actorType);
+      const node = nodeMap.get(id)!;
+      node.data.created = true;
+      if (alias) {
+        node.data.alias = alias;
+        node.label = alias;
+      }
+      continue;
+    }
+
+    const destroyMatch = line.match(/^destroy\s+(\S+)$/);
+    if (destroyMatch) {
+      const id = destroyMatch[1];
+      ensureNode(id);
+      nodeMap.get(id)!.data.destroyed = true;
+      continue;
+    }
+
+    // activate / deactivate → self-edge
+    const activateMatch = line.match(/^(activate|deactivate)\s+(\S+)$/);
+    if (activateMatch) {
+      const kind = activateMatch[1] === 'activate' ? 'activation' : 'deactivation';
+      const actorId = activateMatch[2];
+      ensureNode(actorId);
+      const edgeId = generateEdgeId(actorId, actorId, edgeCounter++);
+      addEdge({
+        type: 'edge',
+        id: edgeId,
+        sourceId: actorId,
+        targetId: actorId,
+        label: '',
+        data: {
+          kind: kind as 'activation' | 'deactivation',
+          ...(autonumber && { sequenceNumber: ++seqNum }),
+        },
+      });
+      continue;
+    }
+
+    // Block keywords: loop, alt, else, opt, par, and, critical, option, break, rect, end
+    // TODO: box grouping → parentId for actors inside box
+    if (/^(loop|alt|opt|par|critical|break)\s+/.test(line) || line.startsWith('rect ')) {
+      const spaceIdx = line.indexOf(' ');
+      const keyword = line.slice(0, spaceIdx);
+      const label = line.slice(spaceIdx + 1).trim();
+      if (keyword === 'alt' || keyword === 'par' || keyword === 'critical') {
+        blockStack.push({
+          type: keyword,
+          label,
+          edgeIds: [],
+          branches:
+            keyword === 'par'
+              ? [{ label, edgeIds: [] }]
+              : keyword === 'alt'
+                ? [{ label, edgeIds: [] }]
+                : undefined,
+          options: keyword === 'critical' ? [] : undefined,
+        });
+      } else if (keyword === 'rect') {
+        blockStack.push({ type: 'rect', label: '', edgeIds: [], color: label });
+      } else {
+        blockStack.push({ type: keyword, label, edgeIds: [] });
+      }
+      continue;
+    }
+
+    if (line.startsWith('else') || line === 'else') {
+      if (blockStack.length > 0) {
+        const top = blockStack[blockStack.length - 1];
+        if (top.branches) {
+          const elseLabel = line.length > 4 ? line.slice(5).trim() : undefined;
+          top.branches.push({ label: elseLabel, edgeIds: [] });
+        }
+      }
+      continue;
+    }
+
+    if (line.startsWith('and ')) {
+      if (blockStack.length > 0) {
+        const top = blockStack[blockStack.length - 1];
+        if (top.branches) {
+          top.branches.push({ label: line.slice(4).trim(), edgeIds: [] });
+        }
+      }
+      continue;
+    }
+
+    if (line.startsWith('option ')) {
+      if (blockStack.length > 0) {
+        const top = blockStack[blockStack.length - 1];
+        if (top.options) {
+          top.options.push({ label: line.slice(7).trim(), edgeIds: [] });
+        }
+      }
+      continue;
+    }
+
+    if (line === 'end') {
+      if (blockStack.length > 0) {
+        const finished = blockStack.pop()!;
+        const block = buildBlock(finished);
+        if (block) {
+          // If nested, add to parent; otherwise add to top-level
+          if (blockStack.length > 0) {
+            // Merge edge IDs into parent
+            const parent = blockStack[blockStack.length - 1];
+            parent.edgeIds.push(
+              ...finished.edgeIds,
+              ...(finished.branches?.flatMap((b) => b.edgeIds) ?? []),
+              ...(finished.options?.flatMap((o) => o.edgeIds) ?? []),
+            );
+          }
+          blocks.push(block);
+        }
+      }
+      continue;
+    }
+
+    // Note → skip (notes are not nodes/edges)
+    // TODO: store notes on actor nodeData
+    if (/^Note\s+(left|right|over)\s+/i.test(line)) {
+      continue;
+    }
+
+    // Message line
+    const msgMatch = line.match(MESSAGE_RE);
+    if (msgMatch) {
+      let sourceId = msgMatch[1];
+      const arrowStr = msgMatch[2];
+      let targetId = msgMatch[3];
+      const messageText = msgMatch[4].trim();
+
+      // Handle activation shorthand: +/- suffix on target
+      let activationOnTarget: 'activation' | 'deactivation' | null = null;
+      if (targetId.startsWith('+')) {
+        activationOnTarget = 'activation';
+        targetId = targetId.slice(1);
+      } else if (targetId.startsWith('-')) {
+        activationOnTarget = 'deactivation';
+        targetId = targetId.slice(1);
+      }
+      // Also check source suffix (less common but valid)
+      let activationOnSource: 'activation' | 'deactivation' | null = null;
+      if (sourceId.endsWith('+')) {
+        activationOnSource = 'activation';
+        sourceId = sourceId.slice(0, -1);
+      } else if (sourceId.endsWith('-')) {
+        activationOnSource = 'deactivation';
+        sourceId = sourceId.slice(0, -1);
+      }
+
+      ensureNode(sourceId);
+      ensureNode(targetId);
+
+      const arrowInfo = parseArrow(arrowStr);
+      if (!arrowInfo) continue; // skip unparseable arrows
+
+      const edgeId = generateEdgeId(sourceId, targetId, edgeCounter++);
+      const data: SequenceEdgeData = {
+        kind: 'message',
+        stroke: arrowInfo.stroke,
+        arrowType: arrowInfo.arrowType,
+        ...(arrowInfo.bidirectional && { bidirectional: true }),
+        ...(autonumber && { sequenceNumber: ++seqNum }),
+      };
+
+      addEdge({
+        type: 'edge',
+        id: edgeId,
+        sourceId,
+        targetId,
+        label: unescapeMermaidLabel(messageText),
+        data,
+      });
+
+      // Emit activation self-edges from shorthand
+      if (activationOnTarget) {
+        const actEdgeId = generateEdgeId(targetId, targetId, edgeCounter++);
+        addEdge({
+          type: 'edge',
+          id: actEdgeId,
+          sourceId: targetId,
+          targetId: targetId,
+          label: '',
+          data: { kind: activationOnTarget },
+        });
+      }
+      if (activationOnSource) {
+        const actEdgeId = generateEdgeId(sourceId, sourceId, edgeCounter++);
+        addEdge({
+          type: 'edge',
+          id: actEdgeId,
+          sourceId: sourceId,
+          targetId: sourceId,
+          label: '',
+          data: { kind: activationOnSource },
+        });
+      }
+      continue;
+    }
+
+    // Ignore unrecognized lines (title, etc.)
+  }
+
+  return {
+    id: '',
+    type: 'directed',
+    initialNodeId: null,
+    nodes: Array.from(nodeMap.values()),
+    edges,
+    data: {
+      diagramType: 'sequence',
+      ...(autonumber && { autonumber: true }),
+      ...(blocks.length > 0 && { blocks }),
+    },
+  };
+}
+
+interface RawBlock {
+  type: string;
+  label: string;
+  edgeIds: string[];
+  branches?: { label?: string; edgeIds: string[] }[];
+  options?: { label: string; edgeIds: string[] }[];
+  color?: string;
+}
+
+function buildBlock(raw: RawBlock): SequenceBlock | null {
+  switch (raw.type) {
+    case 'loop':
+      return { type: 'loop', label: raw.label, edgeIds: raw.edgeIds };
+    case 'alt':
+      return {
+        type: 'alt',
+        label: raw.label,
+        branches: raw.branches ?? [{ edgeIds: raw.edgeIds }],
+      };
+    case 'opt':
+      return { type: 'opt', label: raw.label, edgeIds: raw.edgeIds };
+    case 'par':
+      return {
+        type: 'par',
+        branches: (raw.branches ?? []).map((b) => ({
+          label: b.label ?? '',
+          edgeIds: b.edgeIds,
+        })),
+      };
+    case 'critical':
+      return {
+        type: 'critical',
+        label: raw.label,
+        edgeIds: raw.edgeIds,
+        ...(raw.options &&
+          raw.options.length > 0 && { options: raw.options }),
+      };
+    case 'break':
+      return { type: 'break', label: raw.label, edgeIds: raw.edgeIds };
+    case 'rect':
+      return {
+        type: 'rect',
+        color: raw.color ?? '',
+        edgeIds: raw.edgeIds,
+      };
+    default:
+      return null;
+  }
+}
+
+// --- Serializer ---
+
+const ARROW_MAP: Record<string, Record<string, string>> = {
+  solid: {
+    open: '->',
+    filled: '->>',
+    cross: '-x',
+    async: '-)',
+  },
+  dotted: {
+    open: '-->',
+    filled: '-->>',
+    cross: '--x',
+    async: '--)',
+  },
+};
+
+export function toMermaidSequence(graph: SequenceGraph): string {
+  const lines: string[] = ['sequenceDiagram'];
+  const gd = graph.data;
+
+  if (gd?.autonumber) {
+    lines.push('    autonumber');
+  }
+
+  // Emit participant/actor declarations
+  for (const node of graph.nodes) {
+    const d = node.data;
+    const keyword = d?.actorType === 'actor' ? 'actor' : 'participant';
+    const alias = d?.alias ? ` as ${escapeMermaidLabel(d.alias)}` : '';
+    if (d?.created) {
+      lines.push(`    create ${keyword} ${node.id}${alias}`);
+    } else {
+      lines.push(`    ${keyword} ${node.id}${alias}`);
+    }
+  }
+
+  // TODO: blocks are serialized in order but nesting is not reconstructed
+  // For now, emit edges in order. Block reconstruction would need edge ordering.
+
+  for (const edge of graph.edges) {
+    const d = edge.data;
+    if (!d) continue;
+
+    if (d.kind === 'activation') {
+      lines.push(`    activate ${edge.sourceId}`);
+      continue;
+    }
+    if (d.kind === 'deactivation') {
+      lines.push(`    deactivate ${edge.sourceId}`);
+      continue;
+    }
+
+    // Message
+    const stroke = d.stroke ?? 'solid';
+    const arrowType = d.arrowType ?? 'filled';
+    let arrow: string;
+    if (d.bidirectional) {
+      arrow = stroke === 'dotted' ? '<<-->>' : '<<->>';
+    } else {
+      arrow = ARROW_MAP[stroke]?.[arrowType] ?? '->>';
+    }
+
+    const label = edge.label ? `: ${escapeMermaidLabel(edge.label)}` : ':';
+    lines.push(
+      `    ${edge.sourceId}${arrow}${edge.targetId}${label}`,
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/** Bidirectional converter for Mermaid sequence diagram format. */
+export const mermaidSequenceConverter: GraphFormatConverter<string> =
+  createFormatConverter(
+    toMermaidSequence as (graph: Graph) => string,
+    fromMermaidSequence,
+  );

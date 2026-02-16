@@ -26,7 +26,8 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
   const graphData: Record<string, any> = {};
   if (graph.id) graphData.id = graph.id;
   graphData.type = graph.type;
-  if (graph.initialNodeId !== null) graphData.initialNodeId = graph.initialNodeId;
+  if (graph.initialNodeId !== null)
+    graphData.initialNodeId = graph.initialNodeId;
   if (graph.data !== undefined) graphData.graphData = graph.data;
   if (graph.direction) graphData.direction = graph.direction;
 
