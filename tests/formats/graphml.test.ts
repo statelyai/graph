@@ -64,4 +64,28 @@ describe('GraphML', () => {
     const parsed = fromGraphML(xml);
     expect(parsed.type).toBe('undirected');
   });
+
+  it('throws on non-string input', () => {
+    expect(() => fromGraphML(null as any)).toThrow('GraphML: expected a string');
+  });
+
+  it('throws on invalid XML', () => {
+    expect(() => fromGraphML('not xml <><><')).toThrow('GraphML:');
+  });
+
+  it('throws on XML without <graphml> root', () => {
+    expect(() => fromGraphML('<root><child/></root>')).toThrow('GraphML: missing <graphml> root element');
+  });
+
+  it('throws on <graphml> without <graph>', () => {
+    expect(() => fromGraphML('<graphml xmlns="http://graphml.graphdrawing.org/xmlns"><key id="k"/></graphml>')).toThrow('GraphML: missing <graph> element');
+  });
+
+  it('handles empty graph', () => {
+    const xml = '<graphml><graph id="g" edgedefault="directed"></graph></graphml>';
+    const graph = fromGraphML(xml);
+    expect(graph.nodes).toHaveLength(0);
+    expect(graph.edges).toHaveLength(0);
+    expect(graph.id).toBe('g');
+  });
 });

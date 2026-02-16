@@ -4,6 +4,18 @@ A TypeScript graph library built on plain JSON objects. Supports directed/undire
 
 Made from our experience at [stately.ai](https://stately.ai), where we build visual tools for complex systems.
 
+## Why this library?
+
+Graph file formats (GEXF, GraphML) define how to _store_ graphs. Visualization libraries (Cytoscape.js, D3) define how to _render_ them. Neither gives you a good way to _work with_ them in between.
+
+This library is the computational layer: plain JSON objects in, algorithms and mutations, plain JSON objects out. No classes, no DOM, no rendering engine — just data and functions.
+
+```
+GEXF file → fromGEXF() → Graph → run algorithms, mutate → toCytoscapeJSON() → render
+```
+
+Your `Graph` is a plain object that survives `JSON.stringify`, `structuredClone`, `postMessage`, and `localStorage` without adapters. Format converters are the I/O ports — read from any supported format, do your work, export to whatever your renderer or database expects.
+
 ## Install
 
 ```bash
@@ -77,22 +89,36 @@ const diagram = createVisualGraph({
 });
 ```
 
-### Serialization
+### Format Conversion
 
 ```ts
-import { toDOT, toGraphML, toAdjacencyList, toEdgeList } from '@statelyai/graph';
+import { toCytoscapeJSON, fromJGF, toD3Graph, toDOT } from '@statelyai/graph';
+import { toGraphML, fromGEXF } from '@statelyai/graph/formats/graphml';
 
-console.log(toDOT(graph));
-// Logs a Graphviz DOT string
+// Export to web visualization libraries
+const cytoData = toCytoscapeJSON(graph); // Cytoscape.js JSON (compound graphs preserved)
+const d3Data = toD3Graph(graph);         // D3.js { nodes, links }
 
-console.log(toGraphML(graph));
-// Logs a GraphML XML string
+// Export to text formats
+const dot = toDOT(graph);               // Graphviz DOT
+const xml = toGraphML(graph);            // GraphML XML
 
-console.log(toAdjacencyList(graph));
-// Logs an adjacency object, e.g. { a: ['b'], b: ['c'] }
+// Import from any format
+const g1 = fromJGF(jsonGraphData);       // JSON Graph Format
+const g2 = fromGEXF(gexfXmlString);      // GEXF (Gephi)
+```
 
-console.log(toEdgeList(graph));
-// Logs an array of [sourceId, targetId] pairs, e.g. [['a', 'b'], ['b', 'c']]
+Each bidirectional format also has a converter object for a unified interface:
+
+```ts
+import { cytoscapeConverter, createFormatConverter } from '@statelyai/graph';
+
+// Use a built-in converter
+const cyto = cytoscapeConverter.to(graph);
+const back = cytoscapeConverter.from(cyto);
+
+// Create your own
+const myConverter = createFormatConverter(myToFn, myFromFn);
 ```
 
 ## API
@@ -176,15 +202,28 @@ console.log(toEdgeList(graph));
 
 Generator variants: `genShortestPaths`, `genSimplePaths`, `genCycles`, `genPreorders`, `genPostorders`.
 
-### Transforms & Formats
+### Transforms
 
 | Function | Description |
 |----------|-------------|
 | `flatten(graph)` | Decompose hierarchy into flat leaf-node graph |
-| `toDOT` / `toGraphML` | Export to Graphviz DOT / GraphML |
-| `fromGraphML` | Import from GraphML |
-| `toAdjacencyList` / `fromAdjacencyList` | Adjacency list conversion |
-| `toEdgeList` / `fromEdgeList` | Edge list conversion |
+
+### Formats
+
+| Format | Export | Import | Compound? | Notes |
+|--------|--------|--------|-----------|-------|
+| **Cytoscape.js JSON** | `toCytoscapeJSON` | `fromCytoscapeJSON` | Yes | `parent` maps to `parentId` |
+| **D3.js JSON** | `toD3Graph` | `fromD3Graph` | No | `{ nodes, links }` for force layouts |
+| **JSON Graph Format** | `toJGF` | `fromJGF` | Yes | Formal spec, metadata-extensible |
+| **GEXF** | `toGEXF` | `fromGEXF` | Yes | Gephi native, `pid` hierarchy, viz module |
+| **GraphML** | `toGraphML` | `fromGraphML` | Yes | XML standard, requires `fast-xml-parser` |
+| **GML** | `toGML` | `fromGML` | Yes | Nested node blocks for hierarchy |
+| **TGF** | `toTGF` | `fromTGF` | No | Minimal (id + label only) |
+| **DOT** | `toDOT` | — | No | Graphviz export |
+| **Adjacency list** | `toAdjacencyList` | `fromAdjacencyList` | No | `Record<string, string[]>` |
+| **Edge list** | `toEdgeList` | `fromEdgeList` | No | `[source, target][]` |
+
+GEXF and GraphML require `fast-xml-parser` (optional peer dep). All other formats are dependency-free.
 
 ## License
 
