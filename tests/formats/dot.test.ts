@@ -197,6 +197,21 @@ describe('fromDOT', () => {
     expect(n1!.parentId).toBe('cluster_b');
   });
 
+  it('expands subgraph endpoints in edge statements', () => {
+    const g = fromDOT(`digraph G {
+      a;
+      subgraph cluster_x { b; c; }
+      a -> { b c };
+      { b c } -> d;
+    }`);
+
+    const edgePairs = new Set(g.edges.map((e) => `${e.sourceId}->${e.targetId}`));
+    expect(edgePairs.has('a->b')).toBe(true);
+    expect(edgePairs.has('a->c')).toBe(true);
+    expect(edgePairs.has('b->d')).toBe(true);
+    expect(edgePairs.has('c->d')).toBe(true);
+  });
+
   it('applies node defaults', () => {
     const g = fromDOT(`digraph G {
       node [shape=box];

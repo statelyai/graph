@@ -168,13 +168,35 @@ export function fromDOT(dot: string): Graph {
   }
 
   function getNodeIdsFromSubgraph(children: any[]): string[] {
-    const ids: string[] = [];
-    for (const child of children) {
-      if (child.type === 'node_stmt') {
-        ids.push(child.node_id.id);
+    const ids = new Set<string>();
+
+    function collect(statements: any[]): void {
+      for (const stmt of statements) {
+        switch (stmt.type) {
+          case 'node_stmt': {
+            ids.add(stmt.node_id.id);
+            break;
+          }
+          case 'edge_stmt': {
+            for (const item of stmt.edge_list) {
+              if (item.type === 'node_id') {
+                ids.add(item.id);
+              } else if (item.type === 'subgraph') {
+                collect(item.children);
+              }
+            }
+            break;
+          }
+          case 'subgraph': {
+            collect(stmt.children);
+            break;
+          }
+        }
       }
     }
-    return ids;
+
+    collect(children);
+    return [...ids];
   }
 
   function walkChildren(
@@ -217,38 +239,45 @@ export function fromDOT(dot: string): Graph {
           const edgeAttrs = attrsToMap(stmt.attr_list);
           const mergedEdgeAttrs = { ...ed, ...edgeAttrs };
 
-          // Walk edge_list: each consecutive pair is an edge
-          // Items can be node_id or subgraph
-          const ids: string[] = [];
+          // Walk edge_list: each consecutive pair forms edges between endpoint sets.
+          // DOT allows node IDs or subgraphs as endpoints; subgraphs expand to all
+          // contained nodes (e.g., A -> {B C} == A->B and A->C).
+          const endpointGroups: string[][] = [];
           for (const item of stmt.edge_list) {
             if (item.type === 'node_id') {
               ensureNode(item.id, parentId, nd);
-              ids.push(item.id);
+              endpointGroups.push([item.id]);
             } else if (item.type === 'subgraph') {
-              // TODO: Inline subgraphs in edge statements connect all
-              // contained nodes, not just the first. Currently we only
-              // use the first node as the edge endpoint.
               walkChildren(item.children, parentId, nd, ed);
               const subNodeIds = getNodeIdsFromSubgraph(item.children);
+              for (const subNodeId of subNodeIds) {
+                ensureNode(subNodeId, parentId, nd);
+              }
               if (subNodeIds.length > 0) {
-                ids.push(subNodeIds[0]);
+                endpointGroups.push(subNodeIds);
               }
             }
           }
 
-          for (let i = 0; i < ids.length - 1; i++) {
-            const edge: GraphEdge = {
-              type: 'edge',
-              id: `e${edgeIdx++}`,
-              sourceId: ids[i],
-              targetId: ids[i + 1],
-              label: mergedEdgeAttrs['label'] ?? '',
-              data: undefined as any,
-              ...(mergedEdgeAttrs['color'] && {
-                color: mergedEdgeAttrs['color'],
-              }),
-            };
-            edges.push(edge);
+          for (let i = 0; i < endpointGroups.length - 1; i++) {
+            const left = endpointGroups[i];
+            const right = endpointGroups[i + 1];
+            for (const sourceId of left) {
+              for (const targetId of right) {
+                const edge: GraphEdge = {
+                  type: 'edge',
+                  id: `e${edgeIdx++}`,
+                  sourceId,
+                  targetId,
+                  label: mergedEdgeAttrs['label'] ?? '',
+                  data: undefined as any,
+                  ...(mergedEdgeAttrs['color'] && {
+                    color: mergedEdgeAttrs['color'],
+                  }),
+                };
+                edges.push(edge);
+              }
+            }
           }
           break;
         }
