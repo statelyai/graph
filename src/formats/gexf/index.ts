@@ -1,6 +1,6 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
-import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../types';
-import { createFormatConverter } from './converter';
+import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
+import { createFormatConverter } from '../converter';
 
 // --- GEXF (Graph Exchange XML Format, https://gexf.net/) ---
 

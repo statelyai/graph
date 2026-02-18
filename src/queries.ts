@@ -279,6 +279,153 @@ export function getLCA<N>(
   return ni !== undefined ? graph.nodes[ni] : undefined;
 }
 
+// --- Distance queries ---
+
+/**
+ * Returns a map of nodeId → shortest-path distance for all sibling nodes
+ * (same parentId). Distance is measured from the parent's `initialNodeId`
+ * (or `graph.initialNodeId` for root-level nodes).
+ *
+ * Only follows edges between siblings. Unreachable siblings are omitted.
+ *
+ * @example Root-level nodes (uses `graph.initialNodeId`):
+ * ```ts
+ * const graph = createGraph({
+ *   initialNodeId: 'a',
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ * getRelativeDistanceMap(graph, null);
+ * // => { a: 0, b: 1, c: 2 }
+ * ```
+ *
+ * @example Nested nodes (uses parent's `initialNodeId`):
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent', initialNodeId: 's1' },
+ *     { id: 's1', parentId: 'parent' },
+ *     { id: 's2', parentId: 'parent' },
+ *     { id: 's3', parentId: 'parent' },
+ *   ],
+ *   edges: [
+ *     { id: 'e1', sourceId: 's1', targetId: 's2' },
+ *     { id: 'e2', sourceId: 's2', targetId: 's3' },
+ *   ],
+ * });
+ * getRelativeDistanceMap(graph, 'parent');
+ * // => { s1: 0, s2: 1, s3: 2 }
+ * ```
+ */
+export function getRelativeDistanceMap(
+  graph: Graph,
+  parentId: string | null,
+): Record<string, number> {
+  const idx = getIndex(graph);
+
+  // Determine source: parent's initialNodeId, or graph.initialNodeId for roots
+  let sourceId: string | null = null;
+  if (parentId !== null) {
+    const pi = idx.nodeById.get(parentId);
+    if (pi !== undefined) {
+      sourceId = graph.nodes[pi].initialNodeId;
+    }
+  } else {
+    sourceId = graph.initialNodeId;
+  }
+  if (!sourceId) return {};
+
+  // BFS from source, only following edges between siblings (same parentId)
+  const siblingSet = new Set(idx.childNodes.get(parentId) ?? []);
+  if (!siblingSet.has(sourceId)) return {};
+
+  const dist = new Map<string, number>();
+  dist.set(sourceId, 0);
+  const queue: string[] = [sourceId];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const d = dist.get(id)!;
+
+    for (const eid of idx.outEdges.get(id) ?? []) {
+      const ai = idx.edgeById.get(eid);
+      if (ai === undefined) continue;
+      const neighborId = graph.edges[ai].targetId;
+      if (siblingSet.has(neighborId) && !dist.has(neighborId)) {
+        dist.set(neighborId, d + 1);
+        queue.push(neighborId);
+      }
+    }
+    if (graph.type === 'undirected') {
+      for (const eid of idx.inEdges.get(id) ?? []) {
+        const ai = idx.edgeById.get(eid);
+        if (ai === undefined) continue;
+        const neighborId = graph.edges[ai].sourceId;
+        if (siblingSet.has(neighborId) && !dist.has(neighborId)) {
+          dist.set(neighborId, d + 1);
+          queue.push(neighborId);
+        }
+      }
+    }
+  }
+
+  const result: Record<string, number> = {};
+  for (const [id, d] of dist) {
+    result[id] = d;
+  }
+  return result;
+}
+
+/**
+ * Returns the shortest-path distance of a node from its parent's initial node.
+ * Automatically scopes to the node's sibling group (same `parentId`).
+ *
+ * Returns `undefined` if the node is not found or unreachable.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   initialNodeId: 'a',
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ * getRelativeDistance(graph, 'a'); // => 0
+ * getRelativeDistance(graph, 'b'); // => 1
+ * getRelativeDistance(graph, 'c'); // => 2
+ * ```
+ *
+ * @example Nested nodes:
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent', initialNodeId: 's1' },
+ *     { id: 's1', parentId: 'parent' },
+ *     { id: 's2', parentId: 'parent' },
+ *   ],
+ *   edges: [{ id: 'e1', sourceId: 's1', targetId: 's2' }],
+ * });
+ * getRelativeDistance(graph, 's1'); // => 0
+ * getRelativeDistance(graph, 's2'); // => 1
+ * ```
+ */
+export function getRelativeDistance(
+  graph: Graph,
+  nodeId: string,
+): number | undefined {
+  const idx = getIndex(graph);
+  const ni = idx.nodeById.get(nodeId);
+  if (ni === undefined) return undefined;
+  const node = graph.nodes[ni];
+  const map = getRelativeDistanceMap(graph, node.parentId);
+  return map[nodeId];
+}
+
 // --- Graph-level queries ---
 
 /** Nodes with no incoming edges (inDegree 0). */

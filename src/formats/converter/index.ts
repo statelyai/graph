@@ -1,6 +1,6 @@
-import type { Graph, GraphFormatConverter } from '../types';
-import { toAdjacencyList, fromAdjacencyList } from './adjacency-list';
-import { toEdgeList, fromEdgeList } from './edge-list';
+import type { Graph, GraphFormatConverter } from '../../types';
+import { toAdjacencyList, fromAdjacencyList } from '../adjacency-list';
+import { toEdgeList, fromEdgeList } from '../edge-list';
 
 /**
  * Create a `GraphFormatConverter` from a pair of `to`/`from` functions.

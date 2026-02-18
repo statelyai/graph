@@ -1,5 +1,5 @@
-import type { Graph, GraphNode, GraphFormatConverter } from '../types';
-import { createFormatConverter } from './converter';
+import type { Graph, GraphNode, GraphFormatConverter } from '../../types';
+import { createFormatConverter } from '../converter';
 
 // --- GML serializer ---
 

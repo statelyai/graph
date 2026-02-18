@@ -21,6 +21,8 @@ import {
   getDepth,
   getSiblings,
   getLCA,
+  getRelativeDistanceMap,
+  getRelativeDistance,
 } from '../src/queries';
 
 function makeDirectedGraph() {
@@ -310,5 +312,143 @@ describe('getLCA', () => {
       nodes: [{ id: 'x' }, { id: 'y' }],
     });
     expect(getLCA(g, 'x', 'y')).toBeUndefined();
+  });
+});
+
+// --- Distance queries ---
+
+describe('getRelativeDistanceMap', () => {
+  it('returns distances from graph.initialNodeId for root-level nodes', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b' },
+        { id: 'e2', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+    const map = getRelativeDistanceMap(g, null);
+    expect(map).toEqual({ a: 0, b: 1, c: 2 });
+  });
+
+  it('returns distances from parent.initialNodeId for nested nodes', () => {
+    const g = createGraph({
+      initialNodeId: 'root',
+      nodes: [
+        { id: 'root', initialNodeId: 's1' },
+        { id: 's1', parentId: 'root' },
+        { id: 's2', parentId: 'root' },
+        { id: 's3', parentId: 'root' },
+      ],
+      edges: [
+        { id: 'e1', sourceId: 's1', targetId: 's2' },
+        { id: 'e2', sourceId: 's2', targetId: 's3' },
+      ],
+    });
+    const map = getRelativeDistanceMap(g, 'root');
+    expect(map).toEqual({ s1: 0, s2: 1, s3: 2 });
+  });
+
+  it('omits unreachable siblings', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+    });
+    const map = getRelativeDistanceMap(g, null);
+    expect(map).toEqual({ a: 0, b: 1 });
+    expect(map['c']).toBeUndefined();
+  });
+
+  it('returns empty map when no initialNodeId', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+    });
+    const map = getRelativeDistanceMap(g, null);
+    expect(map).toEqual({});
+  });
+
+  it('handles branching graph', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b' },
+        { id: 'e2', sourceId: 'a', targetId: 'c' },
+        { id: 'e3', sourceId: 'b', targetId: 'd' },
+      ],
+    });
+    const map = getRelativeDistanceMap(g, null);
+    expect(map).toEqual({ a: 0, b: 1, c: 1, d: 2 });
+  });
+
+  it('only includes sibling nodes, not cross-level edges', () => {
+    const g = createGraph({
+      initialNodeId: 'parent',
+      nodes: [
+        { id: 'parent', initialNodeId: 'c1' },
+        { id: 'c1', parentId: 'parent' },
+        { id: 'c2', parentId: 'parent' },
+        { id: 'other' }, // root-level, not a child of parent
+      ],
+      edges: [
+        { id: 'e1', sourceId: 'c1', targetId: 'c2' },
+        { id: 'e2', sourceId: 'c2', targetId: 'other' }, // cross-level
+      ],
+    });
+    const map = getRelativeDistanceMap(g, 'parent');
+    expect(map).toEqual({ c1: 0, c2: 1 });
+  });
+});
+
+describe('getRelativeDistance', () => {
+  it('returns distance for a single node', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b' },
+        { id: 'e2', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+    expect(getRelativeDistance(g, 'a')).toBe(0);
+    expect(getRelativeDistance(g, 'b')).toBe(1);
+    expect(getRelativeDistance(g, 'c')).toBe(2);
+  });
+
+  it('returns undefined for nonexistent node', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }],
+    });
+    expect(getRelativeDistance(g, 'nope')).toBeUndefined();
+  });
+
+  it('returns undefined for unreachable node', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [],
+    });
+    expect(getRelativeDistance(g, 'b')).toBeUndefined();
+  });
+
+  it('uses parent initialNodeId for nested nodes', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'root', initialNodeId: 's1' },
+        { id: 's1', parentId: 'root' },
+        { id: 's2', parentId: 'root' },
+        { id: 's3', parentId: 'root' },
+      ],
+      edges: [
+        { id: 'e1', sourceId: 's1', targetId: 's2' },
+        { id: 'e2', sourceId: 's2', targetId: 's3' },
+      ],
+    });
+    expect(getRelativeDistance(g, 's1')).toBe(0);
+    expect(getRelativeDistance(g, 's2')).toBe(1);
+    expect(getRelativeDistance(g, 's3')).toBe(2);
   });
 });

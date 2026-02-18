@@ -92,8 +92,12 @@ const diagram = createVisualGraph({
 ### Format Conversion
 
 ```ts
-import { toCytoscapeJSON, fromJGF, toD3Graph, toDOT } from '@statelyai/graph';
-import { toGraphML, fromGEXF } from '@statelyai/graph/formats/graphml';
+import { toCytoscapeJSON } from '@statelyai/graph/cytoscape';
+import { fromJGF } from '@statelyai/graph/jgf';
+import { toD3Graph } from '@statelyai/graph/d3';
+import { toDOT } from '@statelyai/graph/dot';
+import { toGraphML } from '@statelyai/graph/graphml';
+import { fromGEXF } from '@statelyai/graph/gexf';
 
 // Export to web visualization libraries
 const cytoData = toCytoscapeJSON(graph); // Cytoscape.js JSON (compound graphs preserved)
@@ -111,7 +115,8 @@ const g2 = fromGEXF(gexfXmlString);      // GEXF (Gephi)
 Each bidirectional format also has a converter object for a unified interface:
 
 ```ts
-import { cytoscapeConverter, createFormatConverter } from '@statelyai/graph';
+import { createFormatConverter } from '@statelyai/graph';
+import { cytoscapeConverter } from '@statelyai/graph/cytoscape';
 
 // Use a built-in converter
 const cyto = cytoscapeConverter.to(graph);
@@ -210,6 +215,8 @@ Generator variants: `genShortestPaths`, `genSimplePaths`, `genCycles`, `genPreor
 
 ### Formats
 
+Import format converters from subpaths (for example, `@statelyai/graph/dot` or `@statelyai/graph/mermaid`).
+
 | Format | Export | Import | Compound? | Notes |
 |--------|--------|--------|-----------|-------|
 | **Cytoscape.js JSON** | `toCytoscapeJSON` | `fromCytoscapeJSON` | Yes | `parent` maps to `parentId` |
@@ -219,11 +226,15 @@ Generator variants: `genShortestPaths`, `genSimplePaths`, `genCycles`, `genPreor
 | **GraphML** | `toGraphML` | `fromGraphML` | Yes | XML standard, requires `fast-xml-parser` |
 | **GML** | `toGML` | `fromGML` | Yes | Nested node blocks for hierarchy |
 | **TGF** | `toTGF` | `fromTGF` | No | Minimal (id + label only) |
-| **DOT** | `toDOT` | — | No | Graphviz export |
+| **DOT** | `toDOT` | `fromDOT` | Yes (subgraphs) | Graphviz DOT (`dotparser` peer dep) |
+| **Mermaid** | `toMermaid*` | `fromMermaid*` | Varies by diagram | Sequence, flowchart, state, class, ER, mindmap, block |
 | **Adjacency list** | `toAdjacencyList` | `fromAdjacencyList` | No | `Record<string, string[]>` |
 | **Edge list** | `toEdgeList` | `fromEdgeList` | No | `[source, target][]` |
 
-GEXF and GraphML require `fast-xml-parser` (optional peer dep). All other formats are dependency-free.
+Optional peer deps by format:
+- `@statelyai/graph/gexf` and `@statelyai/graph/graphml` use `fast-xml-parser`
+- `@statelyai/graph/dot` uses `dotparser`
+- Other formats are dependency-free
 
 ## License
 

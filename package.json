@@ -25,16 +25,18 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./algorithms": "./dist/algorithms.mjs",
-    "./formats/adjacency-list": "./dist/formats/adjacency-list.mjs",
-    "./formats/dot": "./dist/formats/dot.mjs",
-    "./formats/edge-list": "./dist/formats/edge-list.mjs",
-    "./formats/graphml": "./dist/formats/graphml.mjs",
-    "./formats/gexf": "./dist/formats/gexf.mjs",
-    "./formats/jgf": "./dist/formats/jgf.mjs",
-    "./formats/cytoscape": "./dist/formats/cytoscape.mjs",
-    "./formats/d3": "./dist/formats/d3.mjs",
-    "./formats/gml": "./dist/formats/gml.mjs",
-    "./formats/tgf": "./dist/formats/tgf.mjs",
+    "./adjacency-list": "./dist/formats/adjacency-list/index.mjs",
+    "./converter": "./dist/formats/converter/index.mjs",
+    "./cytoscape": "./dist/formats/cytoscape/index.mjs",
+    "./d3": "./dist/formats/d3/index.mjs",
+    "./dot": "./dist/formats/dot/index.mjs",
+    "./edge-list": "./dist/formats/edge-list/index.mjs",
+    "./gexf": "./dist/formats/gexf/index.mjs",
+    "./gml": "./dist/formats/gml/index.mjs",
+    "./graphml": "./dist/formats/graphml/index.mjs",
+    "./jgf": "./dist/formats/jgf/index.mjs",
+    "./mermaid": "./dist/formats/mermaid/index.mjs",
+    "./tgf": "./dist/formats/tgf/index.mjs",
     "./queries": "./dist/queries.mjs",
     "./schemas": "./dist/schemas.mjs",
     "./package.json": "./package.json"
@@ -67,6 +69,7 @@
     "cytoscape": "^3.33.1",
     "d3-array": "^3.2.4",
     "d3-force": "^3.0.0",
+    "dotparser": "^1.1.1",
     "fast-xml-parser": "^5.3.4",
     "tsdown": "^0.18.1",
     "tsx": "^4.21.0",
@@ -78,6 +81,7 @@
   "peerDependencies": {
     "cytoscape": "^3.0.0",
     "d3-force": "^3.0.0",
+    "dotparser": "^1.0.0",
     "fast-xml-parser": "^5.0.0",
     "zod": "^4.0.0"
   },
@@ -86,6 +90,9 @@
       "optional": true
     },
     "d3-force": {
+      "optional": true
+    },
+    "dotparser": {
       "optional": true
     },
     "fast-xml-parser": {
