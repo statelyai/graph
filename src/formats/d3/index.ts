@@ -1,5 +1,5 @@
-import type { Graph, GraphFormatConverter } from '../types';
-import { createFormatConverter } from './converter';
+import type { Graph, GraphFormatConverter } from '../../types';
+import { createFormatConverter } from '../converter';
 
 // --- D3.js force-directed JSON types ---
 

@@ -1,4 +1,4 @@
-import type { Graph } from '../types';
+import type { Graph } from '../../types';
 
 export function toAdjacencyList(graph: Graph): Record<string, string[]> {
   const adj: Record<string, string[]> = {};

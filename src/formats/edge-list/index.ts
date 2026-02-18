@@ -1,4 +1,4 @@
-import type { Graph } from '../types';
+import type { Graph } from '../../types';
 
 export function toEdgeList(graph: Graph): [string, string][] {
   return graph.edges.map((e) => [e.sourceId, e.targetId]);

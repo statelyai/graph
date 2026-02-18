@@ -1,6 +1,6 @@
 import parse from 'dotparser';
-import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../types';
-import { createFormatConverter } from './converter';
+import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
+import { createFormatConverter } from '../converter';
 
 // --- toDOT ---
 
