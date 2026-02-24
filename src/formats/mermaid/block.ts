@@ -54,6 +54,17 @@ function parseBlockNode(text: string): { id: string; label: string; shape?: stri
   return null;
 }
 
+/**
+ * Parses a Mermaid block diagram string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidBlock(`
+ * block-beta
+ *     columns 2
+ *     a["Task A"] b["Task B"]
+ *     a --> b
+ * `);
+ */
 export function fromMermaidBlock(input: string): BlockGraph {
   validateInput(input, 'Mermaid block');
   const { lines } = prepareLines(input);
@@ -178,6 +189,13 @@ export function fromMermaidBlock(input: string): BlockGraph {
 
 // --- Serializer ---
 
+/**
+ * Converts a block diagram Graph to a Mermaid block diagram string.
+ *
+ * @example
+ * const mermaid = toMermaidBlock(graph);
+ * // "block-beta\n    columns 2\n    a[\"Task A\"]\n    ..."
+ */
 export function toMermaidBlock(graph: BlockGraph): string {
   const lines: string[] = ['block-beta'];
 
@@ -225,7 +243,17 @@ export function toMermaidBlock(graph: BlockGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid block diagram format. */
+/**
+ * Bidirectional converter for Mermaid block diagram format.
+ *
+ * @example
+ * const graph = mermaidBlockConverter.from(`
+ * block-beta
+ *     columns 2
+ *     a b
+ * `);
+ * const str = mermaidBlockConverter.to(graph);
+ */
 export const mermaidBlockConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidBlock as (graph: Graph) => string,

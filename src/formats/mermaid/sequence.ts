@@ -99,6 +99,18 @@ const MESSAGE_RE =
 
 // --- Parser ---
 
+/**
+ * Parses a Mermaid sequence diagram string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidSequence(`
+ * sequenceDiagram
+ *     participant Alice
+ *     participant Bob
+ *     Alice->>Bob: Hello
+ *     Bob-->>Alice: Hi back
+ * `);
+ */
 export function fromMermaidSequence(input: string): SequenceGraph {
   validateInput(input, 'Mermaid sequence');
   const { lines } = prepareLines(input);
@@ -476,6 +488,13 @@ const ARROW_MAP: Record<string, Record<string, string>> = {
   },
 };
 
+/**
+ * Converts a sequence diagram Graph to a Mermaid sequence diagram string.
+ *
+ * @example
+ * const mermaid = toMermaidSequence(graph);
+ * // "sequenceDiagram\n    participant Alice\n    ..."
+ */
 export function toMermaidSequence(graph: SequenceGraph): string {
   const lines: string[] = ['sequenceDiagram'];
   const gd = graph.data;
@@ -531,7 +550,16 @@ export function toMermaidSequence(graph: SequenceGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid sequence diagram format. */
+/**
+ * Bidirectional converter for Mermaid sequence diagram format.
+ *
+ * @example
+ * const graph = mermaidSequenceConverter.from(`
+ * sequenceDiagram
+ *     Alice->>Bob: Hello
+ * `);
+ * const str = mermaidSequenceConverter.to(graph);
+ */
 export const mermaidSequenceConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidSequence as (graph: Graph) => string,

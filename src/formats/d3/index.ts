@@ -21,6 +21,23 @@ export interface D3Graph {
 
 // --- Conversion ---
 
+/**
+ * Converts a graph to D3.js force-directed format.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { toD3Graph } from '@statelyai/graph/formats/d3';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const d3 = toD3Graph(graph);
+ * // { nodes: [{ id: 'a' }, { id: 'b' }], links: [{ source: 'a', target: 'b' }] }
+ * ```
+ */
 export function toD3Graph(graph: Graph): D3Graph {
   return {
     nodes: graph.nodes.map((n) => {
@@ -47,6 +64,19 @@ export function toD3Graph(graph: Graph): D3Graph {
   };
 }
 
+/**
+ * Parses a D3.js force-directed JSON object into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromD3Graph } from '@statelyai/graph/formats/d3';
+ *
+ * const graph = fromD3Graph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   links: [{ source: 'a', target: 'b' }],
+ * });
+ * ```
+ */
 export function fromD3Graph(d3: D3Graph): Graph {
   if (!d3 || typeof d3 !== 'object') {
     throw new Error('D3: expected an object');
@@ -86,6 +116,22 @@ export function fromD3Graph(d3: D3Graph): Graph {
   };
 }
 
-/** Bidirectional converter for D3.js force-directed JSON format. */
+/**
+ * Bidirectional converter for D3.js force-directed JSON format.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { d3Converter } from '@statelyai/graph/formats/d3';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const d3 = d3Converter.to(graph);
+ * const roundTripped = d3Converter.from(d3);
+ * ```
+ */
 export const d3Converter: GraphFormatConverter<D3Graph> =
   createFormatConverter(toD3Graph, fromD3Graph);

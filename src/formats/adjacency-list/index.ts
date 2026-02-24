@@ -1,5 +1,21 @@
 import type { Graph } from '../../types';
 
+/**
+ * Converts a graph to an adjacency list representation.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, toAdjacencyList } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: { a: {}, b: {}, c: {} },
+ *   edges: [{ source: 'a', target: 'b' }, { source: 'a', target: 'c' }],
+ * });
+ *
+ * toAdjacencyList(graph);
+ * // { a: ['b', 'c'], b: [], c: [] }
+ * ```
+ */
 export function toAdjacencyList(graph: Graph): Record<string, string[]> {
   const adj: Record<string, string[]> = {};
 
@@ -17,6 +33,23 @@ export function toAdjacencyList(graph: Graph): Record<string, string[]> {
   return adj;
 }
 
+/**
+ * Parses an adjacency list into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromAdjacencyList } from '@statelyai/graph';
+ *
+ * const graph = fromAdjacencyList({
+ *   a: ['b', 'c'],
+ *   b: ['c'],
+ *   c: [],
+ * });
+ *
+ * graph.nodes; // [{id: 'a', ...}, {id: 'b', ...}, {id: 'c', ...}]
+ * graph.edges; // [{sourceId: 'a', targetId: 'b', ...}, ...]
+ * ```
+ */
 export function fromAdjacencyList(
   adj: Record<string, string[]>,
   options?: { directed?: boolean; id?: string },

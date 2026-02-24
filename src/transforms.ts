@@ -9,6 +9,25 @@ import { createGraph } from './graph';
  * - Edges originating from a compound node expand to all leaf descendants.
  * - Only leaf nodes (nodes with no children) appear in the result.
  * - Duplicate edges (same source + target) are deduplicated.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, flatten } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent', initialNodeId: 'child1' },
+ *     { id: 'child1', parentId: 'parent' },
+ *     { id: 'child2', parentId: 'parent' },
+ *     { id: 'other' },
+ *   ],
+ *   edges: [{ id: 'e1', sourceId: 'other', targetId: 'parent' }],
+ * });
+ *
+ * const flat = flatten(graph);
+ * // flat.nodes → [child1, child2, other] (leaf nodes only)
+ * // flat.edges → edge from 'other' → 'child1' (resolved via initialNodeId)
+ * ```
  */
 export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
   const idx = getIndex(graph);

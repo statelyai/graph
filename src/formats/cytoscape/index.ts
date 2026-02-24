@@ -22,6 +22,23 @@ export interface CytoscapeJSON {
 
 // --- Conversion ---
 
+/**
+ * Converts a graph to Cytoscape.js JSON format.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { toCytoscapeJSON } from '@statelyai/graph/formats/cytoscape';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const cyto = toCytoscapeJSON(graph);
+ * // { elements: { nodes: [...], edges: [...] } }
+ * ```
+ */
 export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
   const graphData: Record<string, any> = {};
   if (graph.id) graphData.id = graph.id;
@@ -66,6 +83,21 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
   };
 }
 
+/**
+ * Parses a Cytoscape.js JSON object into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromCytoscapeJSON } from '@statelyai/graph/formats/cytoscape';
+ *
+ * const graph = fromCytoscapeJSON({
+ *   elements: {
+ *     nodes: [{ data: { id: 'a' } }, { data: { id: 'b' } }],
+ *     edges: [{ data: { id: 'e0', source: 'a', target: 'b' } }],
+ *   },
+ * });
+ * ```
+ */
 export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
   if (!cyto || typeof cyto !== 'object') {
     throw new Error('Cytoscape: expected an object');
@@ -110,6 +142,22 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
   };
 }
 
-/** Bidirectional converter for Cytoscape.js JSON format. */
+/**
+ * Bidirectional converter for Cytoscape.js JSON format.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { cytoscapeConverter } from '@statelyai/graph/formats/cytoscape';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const cyto = cytoscapeConverter.to(graph);
+ * const roundTripped = cytoscapeConverter.from(cyto);
+ * ```
+ */
 export const cytoscapeConverter: GraphFormatConverter<CytoscapeJSON> =
   createFormatConverter(toCytoscapeJSON, fromCytoscapeJSON);

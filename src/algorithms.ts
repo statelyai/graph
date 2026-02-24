@@ -15,6 +15,23 @@ import { createGraph } from './graph';
 
 // --- Traversal generators ---
 
+/**
+ * Breadth-first traversal generator yielding nodes level by level.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, bfs } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }, { id: 'bc', sourceId: 'b', targetId: 'c' }],
+ * });
+ *
+ * for (const node of bfs(graph, 'a')) {
+ *   console.log(node.id); // 'a', 'b', 'c'
+ * }
+ * ```
+ */
 export function* bfs<N>(
   graph: Graph<N>,
   startId: string,
@@ -39,6 +56,23 @@ export function* bfs<N>(
   }
 }
 
+/**
+ * Depth-first traversal generator yielding nodes as visited.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, dfs } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }, { id: 'bc', sourceId: 'b', targetId: 'c' }],
+ * });
+ *
+ * for (const node of dfs(graph, 'a')) {
+ *   console.log(node.id); // 'a', 'b', 'c'
+ * }
+ * ```
+ */
 export function* dfs<N>(
   graph: Graph<N>,
   startId: string,
@@ -88,6 +122,21 @@ function getSuccessorIds(graph: Graph, nodeId: string): string[] {
 
 // --- Graph properties ---
 
+/**
+ * Checks whether the graph contains no cycles.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, isAcyclic } from '@statelyai/graph';
+ *
+ * const dag = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * isAcyclic(dag); // true
+ * ```
+ */
 export function isAcyclic(graph: Graph): boolean {
   if (graph.type === 'undirected') {
     return isAcyclicUndirected(graph);
@@ -152,6 +201,23 @@ function isAcyclicUndirected(graph: Graph): boolean {
   return true;
 }
 
+/**
+ * Returns connected components as arrays of nodes.
+ * Treats all edges as undirected for connectivity.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getConnectedComponents } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const components = getConnectedComponents(graph);
+ * // [[nodeA, nodeB], [nodeC]]
+ * ```
+ */
 export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
   const idx = getIndex(graph);
   const visited = new Set<string>();
@@ -195,6 +261,25 @@ export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
   return components;
 }
 
+/**
+ * Returns a topological ordering of nodes, or `null` if the graph is cyclic.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getTopologicalSort } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * const sorted = getTopologicalSort(graph);
+ * // [nodeA, nodeB, nodeC]
+ * ```
+ */
 export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
   const idx = getIndex(graph);
   const inDeg = new Map<string, number>();
@@ -228,6 +313,22 @@ export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
   return result;
 }
 
+/**
+ * Checks whether a path exists between two nodes.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, hasPath } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * hasPath(graph, 'a', 'b'); // true
+ * hasPath(graph, 'a', 'c'); // false
+ * ```
+ */
 export function hasPath(
   graph: Graph,
   sourceId: string,
@@ -236,12 +337,45 @@ export function hasPath(
   return getShortestPaths(graph, { from: sourceId, to: targetId }).length > 0;
 }
 
+/**
+ * Checks whether the graph is connected (all nodes reachable from any node).
+ *
+ * @example
+ * ```ts
+ * import { createGraph, isConnected } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * isConnected(graph); // true
+ * ```
+ */
 export function isConnected(graph: Graph): boolean {
   if (graph.nodes.length === 0) return true;
   const components = getConnectedComponents(graph);
   return components.length <= 1;
 }
 
+/**
+ * Checks whether the graph is a tree (connected and acyclic).
+ *
+ * @example
+ * ```ts
+ * import { createGraph, isTree } from '@statelyai/graph';
+ *
+ * const tree = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * isTree(tree); // true
+ * ```
+ */
 export function isTree(graph: Graph): boolean {
   return isConnected(graph) && isAcyclic(graph);
 }
@@ -403,6 +537,24 @@ function* reconstructPaths<N, E>(
 /**
  * Lazily yields all shortest paths from a source node.
  * Use `getShortestPaths` for the full array.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, genShortestPaths } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * for (const path of genShortestPaths(graph)) {
+ *   console.log(path.steps.map(s => s.node.id));
+ * }
+ * ```
  */
 export function* genShortestPaths<N, E>(
   graph: Graph<N, E>,
@@ -431,6 +583,27 @@ export function* genShortestPaths<N, E>(
   }
 }
 
+/**
+ * Returns all shortest paths from a source node as an array.
+ * Delegates to `genShortestPaths` internally.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getShortestPaths } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const paths = getShortestPaths(graph);
+ * // paths to 'b' and 'c' from 'a'
+ * ```
+ */
 export function getShortestPaths<N, E>(
   graph: Graph<N, E>,
   opts?: PathOptions<E>,
@@ -439,7 +612,24 @@ export function getShortestPaths<N, E>(
 }
 
 /**
- * Returns a single shortest path from source to target, or undefined if unreachable.
+ * Returns a single shortest path from source to target, or `undefined` if unreachable.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getShortestPath } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const path = getShortestPath(graph, { to: 'c' });
+ * // path.steps -> [{node: nodeB, edge: ...}, {node: nodeC, edge: ...}]
+ * ```
  */
 export function getShortestPath<N, E>(
   graph: Graph<N, E>,
@@ -452,8 +642,26 @@ export function getShortestPath<N, E>(
 }
 
 /**
- * Returns all simple (acyclic) paths from a source node.
- * Uses DFS with backtracking.
+ * Returns all simple (acyclic) paths from a source node as an array.
+ * Delegates to `genSimplePaths` internally.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getSimplePaths } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const paths = getSimplePaths(graph, { to: 'c' });
+ * // two paths: a->b->c and a->c
+ * ```
  */
 export function getSimplePaths<N, E>(
   graph: Graph<N, E>,
@@ -463,8 +671,28 @@ export function getSimplePaths<N, E>(
 }
 
 /**
- * Lazily yields all simple (acyclic) paths from a source node.
+ * Lazily yields all simple (acyclic) paths from a source node via DFS backtracking.
  * Use `getSimplePaths` for the full array.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, genSimplePaths } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * for (const path of genSimplePaths(graph, { to: 'c' })) {
+ *   console.log(path.steps.map(s => s.node.id));
+ *   // ['b', 'c'] or ['c']
+ * }
+ * ```
  */
 export function* genSimplePaths<N, E>(
   graph: Graph<N, E>,
@@ -519,7 +747,24 @@ export function* genSimplePaths<N, E>(
 }
 
 /**
- * Returns a single simple (acyclic) path from source to target, or undefined if unreachable.
+ * Returns a single simple (acyclic) path from source to target, or `undefined` if unreachable.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getSimplePath } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const path = getSimplePath(graph, { to: 'c' });
+ * // path.steps -> [{node: nodeB, edge: ...}, {node: nodeC, edge: ...}]
+ * ```
  */
 export function getSimplePath<N, E>(
   graph: Graph<N, E>,
@@ -536,6 +781,27 @@ export function getSimplePath<N, E>(
 // Strongly connected components (Tarjan's)
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns strongly connected components using Tarjan's algorithm.
+ * Only meaningful for directed graphs.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getStronglyConnectedComponents } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ba', sourceId: 'b', targetId: 'a' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * const sccs = getStronglyConnectedComponents(graph);
+ * // [[nodeA, nodeB], [nodeC]]
+ * ```
+ */
 export function getStronglyConnectedComponents<N>(
   graph: Graph<N>,
 ): GraphNode<N>[][] {
@@ -591,13 +857,50 @@ export function getStronglyConnectedComponents<N>(
 // Cycle detection — all elementary cycles
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns all elementary cycles as an array of paths.
+ * Delegates to `genCycles` internally.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getCycles } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ba', sourceId: 'b', targetId: 'a' },
+ *   ],
+ * });
+ *
+ * const cycles = getCycles(graph);
+ * // one cycle: a -> b -> a
+ * ```
+ */
 export function getCycles<N, E>(graph: Graph<N, E>): GraphPath<N, E>[] {
   return [...genCycles(graph)];
 }
 
 /**
- * Lazily yields cycles one at a time.
+ * Lazily yields elementary cycles one at a time.
  * Use `getCycles` for the full array.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, genCycles } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ba', sourceId: 'b', targetId: 'a' },
+ *   ],
+ * });
+ *
+ * for (const cycle of genCycles(graph)) {
+ *   console.log(cycle.steps.map(s => s.node.id)); // ['b', 'a']
+ * }
+ * ```
  */
 export function* genCycles<N, E>(
   graph: Graph<N, E>,
@@ -749,6 +1052,23 @@ function getNeighborEdgesAll(
 /**
  * Returns a single canonical preorder (DFS visit-order) sequence.
  * Visits neighbors in the order they appear in the adjacency list.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPreorder } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const order = getPreorder(graph);
+ * // [nodeA, nodeB, nodeC]
+ * ```
  */
 export function getPreorder<N>(
   graph: Graph<N>,
@@ -784,6 +1104,23 @@ export function getPreorder<N>(
 /**
  * Returns a single canonical postorder (DFS finish-order) sequence.
  * Visits neighbors in the order they appear in the adjacency list.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPostorder } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const order = getPostorder(graph);
+ * // [nodeC, nodeB, nodeA]
+ * ```
  */
 export function getPostorder<N>(
   graph: Graph<N>,
@@ -820,7 +1157,26 @@ export function getPostorder<N>(
 // Traversal order enumeration — all possible DFS orderings (generators)
 // ---------------------------------------------------------------------------
 
-/** Returns all possible preorder sequences as an array. Can be exponential — prefer `genPreorders`. */
+/**
+ * Returns all possible preorder sequences as an array. Can be exponential -- prefer `genPreorders`.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPreorders } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const allOrders = getPreorders(graph);
+ * // [[nodeA, nodeB, nodeC], [nodeA, nodeC, nodeB]]
+ * ```
+ */
 export function getPreorders<N>(
   graph: Graph<N>,
   opts?: TraversalOptions,
@@ -828,7 +1184,26 @@ export function getPreorders<N>(
   return [...genPreorders(graph, opts)];
 }
 
-/** Returns all possible postorder sequences as an array. Can be exponential — prefer `genPostorders`. */
+/**
+ * Returns all possible postorder sequences as an array. Can be exponential -- prefer `genPostorders`.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPostorders } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const allOrders = getPostorders(graph);
+ * // [[nodeB, nodeC, nodeA], [nodeC, nodeB, nodeA]]
+ * ```
+ */
 export function getPostorders<N>(
   graph: Graph<N>,
   opts?: TraversalOptions,
@@ -840,6 +1215,25 @@ export function getPostorders<N>(
  * Lazily yields all possible preorder (DFS visit-order) sequences.
  * Different neighbor exploration orders yield different sequences.
  * Use `getPreorder()` for a single canonical ordering.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, genPreorders } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * for (const order of genPreorders(graph)) {
+ *   console.log(order.map(n => n.id));
+ *   // ['a', 'b', 'c'] or ['a', 'c', 'b']
+ * }
+ * ```
  */
 export function* genPreorders<N>(
   graph: Graph<N>,
@@ -906,6 +1300,25 @@ export function* genPreorders<N>(
  * Lazily yields all possible postorder (DFS finish-order) sequences.
  * Different neighbor exploration orders yield different sequences.
  * Use `getPostorder()` for a single canonical ordering.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, genPostorders } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * for (const order of genPostorders(graph)) {
+ *   console.log(order.map(n => n.id));
+ *   // ['b', 'c', 'a'] or ['c', 'b', 'a']
+ * }
+ * ```
  */
 export function* genPostorders<N>(
   graph: Graph<N>,
@@ -974,6 +1387,26 @@ export function* genPostorders<N>(
  * Returns a minimum spanning tree of the graph.
  * Only meaningful for connected undirected graphs (or the component reachable
  * from an arbitrary start node in directed graphs).
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getMinimumSpanningTree } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   type: 'undirected',
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b', data: { weight: 1 } },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c', data: { weight: 2 } },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c', data: { weight: 3 } },
+ *   ],
+ * });
+ *
+ * const mst = getMinimumSpanningTree(graph, {
+ *   getWeight: (e) => e.data.weight,
+ * });
+ * // mst has edges 'ab' and 'bc' (total weight 3)
+ * ```
  */
 export function getMinimumSpanningTree<N, E>(
   graph: Graph<N, E>,
@@ -1122,7 +1555,23 @@ function kruskalMST<E>(
 /**
  * Returns shortest paths between all pairs of nodes.
  * Algorithm 'dijkstra' (default): runs getShortestPaths per source node.
- * Algorithm 'floyd-warshall': classic O(V³) dynamic programming.
+ * Algorithm 'floyd-warshall': classic O(V^3) dynamic programming.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getAllPairsShortestPaths } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * const allPaths = getAllPairsShortestPaths(graph);
+ * // paths for every reachable (source, target) pair
+ * ```
  */
 export function getAllPairsShortestPaths<N, E>(
   graph: Graph<N, E>,
@@ -1293,6 +1742,25 @@ function fwReconstruct<N, E>(
  *
  * Steps are concatenated: head.steps ++ tail.steps (tail already starts
  * from the overlap node, so no slicing is needed).
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getShortestPath, joinPaths } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ *   initialNodeId: 'a',
+ * });
+ *
+ * const ab = getShortestPath(graph, { to: 'b' })!;
+ * const bc = getShortestPath(graph, { from: 'b', to: 'c' })!;
+ * const ac = joinPaths(ab, bc);
+ * // ac: a -> b -> c
+ * ```
  */
 export function joinPaths<N, E>(
   headPath: GraphPath<N, E>,

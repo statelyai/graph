@@ -1,9 +1,41 @@
 import type { Graph } from '../../types';
 
+/**
+ * Converts a graph to an edge list of `[source, target]` tuples.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, toEdgeList } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: { a: {}, b: {}, c: {} },
+ *   edges: [{ source: 'a', target: 'b' }, { source: 'b', target: 'c' }],
+ * });
+ *
+ * toEdgeList(graph);
+ * // [['a', 'b'], ['b', 'c']]
+ * ```
+ */
 export function toEdgeList(graph: Graph): [string, string][] {
   return graph.edges.map((e) => [e.sourceId, e.targetId]);
 }
 
+/**
+ * Parses an edge list of `[source, target]` tuples into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromEdgeList } from '@statelyai/graph';
+ *
+ * const graph = fromEdgeList([
+ *   ['a', 'b'],
+ *   ['b', 'c'],
+ * ]);
+ *
+ * graph.nodes; // [{id: 'a', ...}, {id: 'b', ...}, {id: 'c', ...}]
+ * graph.edges; // [{sourceId: 'a', targetId: 'b', ...}, ...]
+ * ```
+ */
 export function fromEdgeList(
   edges: [string, string][],
   options?: { directed?: boolean; id?: string },
