@@ -31,6 +31,17 @@ type StateEdge = GraphEdge<StateEdgeData>;
 
 // --- Parser ---
 
+/**
+ * Parses a Mermaid state diagram string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidState(`
+ * stateDiagram-v2
+ *     [*] --> Idle
+ *     Idle --> Running : start
+ *     Running --> [*]
+ * `);
+ */
 export function fromMermaidState(input: string): StateGraph {
   validateInput(input, 'Mermaid state');
   const { lines } = prepareLines(input);
@@ -210,6 +221,13 @@ export function fromMermaidState(input: string): StateGraph {
 
 // --- Serializer ---
 
+/**
+ * Converts a state diagram Graph to a Mermaid state diagram string.
+ *
+ * @example
+ * const mermaid = toMermaidState(graph);
+ * // "stateDiagram-v2\n    [*] --> Idle\n    ..."
+ */
 export function toMermaidState(graph: StateGraph): string {
   const lines: string[] = ['stateDiagram-v2'];
 
@@ -281,7 +299,16 @@ export function toMermaidState(graph: StateGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid state diagram format. */
+/**
+ * Bidirectional converter for Mermaid state diagram format.
+ *
+ * @example
+ * const graph = mermaidStateConverter.from(`
+ * stateDiagram-v2
+ *     [*] --> Active
+ * `);
+ * const str = mermaidStateConverter.to(graph);
+ */
 export const mermaidStateConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidState as (graph: Graph) => string,

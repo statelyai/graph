@@ -185,6 +185,19 @@ function parseMember(line: string): {
 
 // --- Parser ---
 
+/**
+ * Parses a Mermaid class diagram string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidClass(`
+ * classDiagram
+ *     class Animal {
+ *         +String name
+ *         +eat() void
+ *     }
+ *     Animal <|-- Dog
+ * `);
+ */
 export function fromMermaidClass(input: string): ClassGraph {
   validateInput(input, 'Mermaid class');
   const { lines } = prepareLines(input);
@@ -339,6 +352,13 @@ const VISIBILITY_SYMBOLS: Record<string, string> = {
   '~': '~',
 };
 
+/**
+ * Converts a class diagram Graph to a Mermaid class diagram string.
+ *
+ * @example
+ * const mermaid = toMermaidClass(graph);
+ * // "classDiagram\n    class Animal {\n    ..."
+ */
 export function toMermaidClass(graph: ClassGraph): string {
   const lines: string[] = ['classDiagram'];
 
@@ -388,7 +408,16 @@ export function toMermaidClass(graph: ClassGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid class diagram format. */
+/**
+ * Bidirectional converter for Mermaid class diagram format.
+ *
+ * @example
+ * const graph = mermaidClassConverter.from(`
+ * classDiagram
+ *     Animal <|-- Dog
+ * `);
+ * const str = mermaidClassConverter.to(graph);
+ */
 export const mermaidClassConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidClass as (graph: Graph) => string,

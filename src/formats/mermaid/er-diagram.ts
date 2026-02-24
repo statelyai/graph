@@ -100,6 +100,16 @@ function parseERRelationship(symbol: string): {
 const ER_LINE_RE =
   /^(\S+)\s+([|}{o.][|}{o.][-.][-.][|}{o.][|}{o.])\s+(\S+)\s*:\s*"?([^"]*)"?\s*$/;
 
+/**
+ * Parses a Mermaid ER diagram string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidER(`
+ * erDiagram
+ *     CUSTOMER ||--o{ ORDER : places
+ *     ORDER ||--|{ LINE_ITEM : contains
+ * `);
+ */
 export function fromMermaidER(input: string): ERGraph {
   validateInput(input, 'Mermaid ER');
   const { lines } = prepareLines(input);
@@ -211,6 +221,13 @@ export function fromMermaidER(input: string): ERGraph {
 
 // --- Serializer ---
 
+/**
+ * Converts an ER diagram Graph to a Mermaid ER diagram string.
+ *
+ * @example
+ * const mermaid = toMermaidER(graph);
+ * // "erDiagram\n    CUSTOMER ||--o{ ORDER : \"places\"\n    ..."
+ */
 export function toMermaidER(graph: ERGraph): string {
   const lines: string[] = ['erDiagram'];
 
@@ -243,7 +260,16 @@ export function toMermaidER(graph: ERGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid ER diagram format. */
+/**
+ * Bidirectional converter for Mermaid ER diagram format.
+ *
+ * @example
+ * const graph = mermaidERConverter.from(`
+ * erDiagram
+ *     CUSTOMER ||--o{ ORDER : places
+ * `);
+ * const str = mermaidERConverter.to(graph);
+ */
 export const mermaidERConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidER as (graph: Graph) => string,

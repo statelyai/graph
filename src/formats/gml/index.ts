@@ -3,6 +3,28 @@ import { createFormatConverter } from '../converter';
 
 // --- GML serializer ---
 
+/**
+ * Converts a graph to GML (Graph Modelling Language) string.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { toGML } from '@statelyai/graph/formats/gml';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const gml = toGML(graph);
+ * // graph [
+ * //   directed 1
+ * //   node [ id "a" ]
+ * //   node [ id "b" ]
+ * //   edge [ id "e0" source "a" target "b" ]
+ * // ]
+ * ```
+ */
 export function toGML(graph: Graph): string {
   const lines: string[] = [];
   lines.push('graph [');
@@ -80,6 +102,23 @@ function gmlString(s: string): string {
 
 // --- GML parser ---
 
+/**
+ * Parses a GML (Graph Modelling Language) string into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromGML } from '@statelyai/graph/formats/gml';
+ *
+ * const graph = fromGML(`
+ *   graph [
+ *     directed 1
+ *     node [ id "a" ]
+ *     node [ id "b" ]
+ *     edge [ source "a" target "b" ]
+ *   ]
+ * `);
+ * ```
+ */
 export function fromGML(gml: string): Graph {
   if (typeof gml !== 'string') {
     throw new Error('GML: expected a string');
@@ -292,6 +331,22 @@ function tryParseJSON(str: any): any {
   }
 }
 
-/** Bidirectional converter for GML (Graph Modelling Language) format. */
+/**
+ * Bidirectional converter for GML (Graph Modelling Language) format.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { gmlConverter } from '@statelyai/graph/formats/gml';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const gml = gmlConverter.to(graph);
+ * const roundTripped = gmlConverter.from(gml);
+ * ```
+ */
 export const gmlConverter: GraphFormatConverter<string> =
   createFormatConverter(toGML, fromGML);

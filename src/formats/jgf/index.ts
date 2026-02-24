@@ -29,6 +29,23 @@ export interface JGFGraph {
 
 // --- Conversion ---
 
+/**
+ * Converts a graph to JSON Graph Format (JGF).
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { toJGF } from '@statelyai/graph/formats/jgf';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const jgf = toJGF(graph);
+ * // { graph: { directed: true, nodes: [...], edges: [...] } }
+ * ```
+ */
 export function toJGF(graph: Graph): JGFGraph {
   const metadata: Record<string, any> = {};
   if (graph.initialNodeId !== null) metadata.initialNodeId = graph.initialNodeId;
@@ -73,6 +90,22 @@ export function toJGF(graph: Graph): JGFGraph {
   };
 }
 
+/**
+ * Parses a JSON Graph Format (JGF) object into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromJGF } from '@statelyai/graph/formats/jgf';
+ *
+ * const graph = fromJGF({
+ *   graph: {
+ *     directed: true,
+ *     nodes: [{ id: 'a' }, { id: 'b' }],
+ *     edges: [{ source: 'a', target: 'b' }],
+ *   },
+ * });
+ * ```
+ */
 export function fromJGF(jgf: JGFGraph): Graph {
   if (!jgf || typeof jgf !== 'object') {
     throw new Error('JGF: expected an object');
@@ -119,6 +152,22 @@ export function fromJGF(jgf: JGFGraph): Graph {
   };
 }
 
-/** Bidirectional converter for JSON Graph Format. */
+/**
+ * Bidirectional converter for JSON Graph Format.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { jgfConverter } from '@statelyai/graph/formats/jgf';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const jgf = jgfConverter.to(graph);
+ * const roundTripped = jgfConverter.from(jgf);
+ * ```
+ */
 export const jgfConverter: GraphFormatConverter<JGFGraph> =
   createFormatConverter(toJGF, fromJGF);

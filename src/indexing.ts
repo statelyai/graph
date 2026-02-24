@@ -30,7 +30,24 @@ const indexes = new WeakMap<Graph, GraphIndex>();
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Get or lazily build the index for a graph. */
+/**
+ * Get or lazily build the index for a graph.
+ * Auto-rebuilds when node/edge count changes.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getIndex } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const idx = getIndex(graph);
+ * idx.nodeById.get('a'); // 0
+ * idx.outEdges.get('a'); // ['e1']
+ * ```
+ */
 export function getIndex(graph: Graph): GraphIndex {
   let idx = indexes.get(graph);
   if (
@@ -44,7 +61,19 @@ export function getIndex(graph: Graph): GraphIndex {
   return idx;
 }
 
-/** Clear the cached index. Call this if you mutate graph.nodes/edges directly. */
+/**
+ * Clear the cached index. Call this if you mutate graph.nodes/edges directly.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, invalidateIndex, getIndex } from '@statelyai/graph';
+ *
+ * const graph = createGraph({ nodes: [{ id: 'a' }], edges: [] });
+ * // manually mutate nodes array
+ * graph.nodes.push({ type: 'node', id: 'b', parentId: null, initialNodeId: null, label: '', data: undefined });
+ * invalidateIndex(graph); // forces rebuild on next getIndex()
+ * ```
+ */
 export function invalidateIndex(graph: Graph): void {
   indexes.delete(graph);
 }

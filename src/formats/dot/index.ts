@@ -32,6 +32,26 @@ const SHAPE_TO_DOT: Record<string, string> = {
   parallelogram: 'parallelogram',
 };
 
+/**
+ * Converts a graph to a DOT (Graphviz) format string.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, toDOT } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: { a: {}, b: {} },
+ *   edges: [{ source: 'a', target: 'b' }],
+ * });
+ *
+ * const dot = toDOT(graph);
+ * // digraph "" {
+ * //   a;
+ * //   b;
+ * //   a -> b;
+ * // }
+ * ```
+ */
 export function toDOT(graph: Graph): string {
   const isDirected = graph.type === 'directed';
   const keyword = isDirected ? 'digraph' : 'graph';
@@ -130,6 +150,24 @@ function nodeFromAttrs(
   };
 }
 
+/**
+ * Parses a DOT (Graphviz) format string into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromDOT } from '@statelyai/graph';
+ *
+ * const graph = fromDOT(`
+ *   digraph {
+ *     a -> b;
+ *     b -> c;
+ *   }
+ * `);
+ *
+ * graph.nodes; // [{id: 'a', ...}, {id: 'b', ...}, {id: 'c', ...}]
+ * graph.edges; // [{sourceId: 'a', targetId: 'b', ...}, ...]
+ * ```
+ */
 export function fromDOT(dot: string): Graph {
   if (typeof dot !== 'string') {
     throw new Error('DOT: expected a string');
@@ -326,6 +364,21 @@ export function fromDOT(dot: string): Graph {
   };
 }
 
-/** Bidirectional converter for DOT (Graphviz) format. */
+/**
+ * Bidirectional converter for DOT (Graphviz) format.
+ *
+ * @example
+ * ```ts
+ * import { dotConverter, createGraph } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: { a: {}, b: {} },
+ *   edges: [{ source: 'a', target: 'b' }],
+ * });
+ *
+ * const dot = dotConverter.to(graph);
+ * const roundTripped = dotConverter.from(dot);
+ * ```
+ */
 export const dotConverter: GraphFormatConverter<string> =
   createFormatConverter(toDOT, fromDOT);

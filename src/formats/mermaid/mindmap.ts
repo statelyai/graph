@@ -54,6 +54,18 @@ function parseNodeText(text: string): { label: string; shape?: string } {
 
 // --- Parser ---
 
+/**
+ * Parses a Mermaid mindmap string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidMindmap(`
+ * mindmap
+ *   Root
+ *     Child A
+ *       Grandchild
+ *     Child B
+ * `);
+ */
 export function fromMermaidMindmap(input: string): MindmapGraph {
   validateInput(input, 'Mermaid mindmap');
   const { lines } = prepareLines(input);
@@ -140,6 +152,13 @@ export function fromMermaidMindmap(input: string): MindmapGraph {
 
 // --- Serializer ---
 
+/**
+ * Converts a mindmap Graph to a Mermaid mindmap string.
+ *
+ * @example
+ * const mermaid = toMermaidMindmap(graph);
+ * // "mindmap\n  Root\n    Child A\n    ..."
+ */
 export function toMermaidMindmap(graph: MindmapGraph): string {
   const lines: string[] = ['mindmap'];
 
@@ -177,7 +196,17 @@ export function toMermaidMindmap(graph: MindmapGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid mindmap format. */
+/**
+ * Bidirectional converter for Mermaid mindmap format.
+ *
+ * @example
+ * const graph = mermaidMindmapConverter.from(`
+ * mindmap
+ *   Root
+ *     Branch
+ * `);
+ * const str = mermaidMindmapConverter.to(graph);
+ */
 export const mermaidMindmapConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidMindmap as (graph: Graph) => string,

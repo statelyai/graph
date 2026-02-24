@@ -196,6 +196,16 @@ function findEdge(line: string): {
 
 // --- Parser ---
 
+/**
+ * Parses a Mermaid flowchart string into a Graph.
+ *
+ * @example
+ * const graph = fromMermaidFlowchart(`
+ * flowchart TD
+ *     A[Start] --> B{Decision}
+ *     B -->|Yes| C[End]
+ * `);
+ */
 export function fromMermaidFlowchart(input: string): FlowchartGraph {
   validateInput(input, 'Mermaid flowchart');
   const { lines } = prepareLines(input);
@@ -452,6 +462,13 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
 
 // --- Serializer ---
 
+/**
+ * Converts a flowchart Graph to a Mermaid flowchart string.
+ *
+ * @example
+ * const mermaid = toMermaidFlowchart(graph);
+ * // "flowchart TD\n    A[Start] --> B{Decision}\n    ..."
+ */
 export function toMermaidFlowchart(graph: FlowchartGraph): string {
   const dir = DIRECTION_TO_MERMAID[graph.direction ?? 'down'] ?? 'TD';
   const lines: string[] = [`flowchart ${dir}`];
@@ -561,7 +578,16 @@ export function toMermaidFlowchart(graph: FlowchartGraph): string {
   return lines.join('\n');
 }
 
-/** Bidirectional converter for Mermaid flowchart format. */
+/**
+ * Bidirectional converter for Mermaid flowchart format.
+ *
+ * @example
+ * const graph = mermaidFlowchartConverter.from(`
+ * flowchart TD
+ *     A --> B
+ * `);
+ * const str = mermaidFlowchartConverter.to(graph);
+ */
 export const mermaidFlowchartConverter: GraphFormatConverter<string> =
   createFormatConverter(
     toMermaidFlowchart as (graph: Graph) => string,

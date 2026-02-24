@@ -3,6 +3,22 @@ import { getIndex } from './indexing';
 
 // --- Edge queries ---
 
+/**
+ * Returns all edges (incoming + outgoing) connected to a node.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'c', targetId: 'b' },
+ *   ],
+ * });
+ * getEdgesOf(graph, 'b');
+ * // => [edge e1, edge e2]
+ * ```
+ */
 export function getEdgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const outIds = idx.outEdges.get(nodeId) ?? [];
@@ -23,18 +39,64 @@ export function getEdgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E
   return result;
 }
 
+/**
+ * Returns incoming edges to a node.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ * getInEdges(graph, 'b');
+ * // => [edge e1]
+ * getInEdges(graph, 'a');
+ * // => []
+ * ```
+ */
 export function getInEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.inEdges.get(nodeId) ?? [];
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!]);
 }
 
+/**
+ * Returns outgoing edges from a node.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ * getOutEdges(graph, 'a');
+ * // => [edge e1]
+ * getOutEdges(graph, 'b');
+ * // => []
+ * ```
+ */
 export function getOutEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.outEdges.get(nodeId) ?? [];
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!]);
 }
 
+/**
+ * Returns the edge from `sourceId` to `targetId`, or `undefined` if none exists.
+ * For undirected graphs, checks both directions.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ * getEdgeBetween(graph, 'a', 'b');
+ * // => edge e1
+ * getEdgeBetween(graph, 'b', 'a');
+ * // => undefined (directed graph)
+ * ```
+ */
 export function getEdgeBetween<E>(
   graph: Graph<any, E>,
   sourceId: string,
@@ -60,6 +122,22 @@ export function getEdgeBetween<E>(
 
 // --- Neighbor queries ---
 
+/**
+ * Returns direct successor nodes (targets of outgoing edges).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'a', targetId: 'c' },
+ *   ],
+ * });
+ * getSuccessors(graph, 'a');
+ * // => [node b, node c]
+ * ```
+ */
 export function getSuccessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.outEdges.get(nodeId) ?? [];
@@ -76,6 +154,22 @@ export function getSuccessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[
   return result;
 }
 
+/**
+ * Returns direct predecessor nodes (sources of incoming edges).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'c' },
+ *     { id: 'e2', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ * getPredecessors(graph, 'c');
+ * // => [node a, node b]
+ * ```
+ */
 export function getPredecessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.inEdges.get(nodeId) ?? [];
@@ -92,6 +186,22 @@ export function getPredecessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N
   return result;
 }
 
+/**
+ * Returns all neighbor nodes (successors + predecessors).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'c', targetId: 'b' },
+ *   ],
+ * });
+ * getNeighbors(graph, 'b');
+ * // => [node a, node c]
+ * ```
+ */
 export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
   const ids = new Set<string>();
@@ -106,6 +216,23 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
 
 // --- Degree queries ---
 
+/**
+ * Returns the total degree of a node (inDegree + outDegree).
+ * For undirected graphs, each edge is counted once.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'c', targetId: 'b' },
+ *   ],
+ * });
+ * getDegree(graph, 'b'); // => 2
+ * getDegree(graph, 'a'); // => 1
+ * ```
+ */
 export function getDegree(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
   if (graph.type === 'undirected') {
@@ -118,16 +245,61 @@ export function getDegree(graph: Graph, nodeId: string): number {
   return (idx.inEdges.get(nodeId)?.length ?? 0) + (idx.outEdges.get(nodeId)?.length ?? 0);
 }
 
+/**
+ * Returns the in-degree of a node (number of incoming edges).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ * getInDegree(graph, 'b'); // => 1
+ * getInDegree(graph, 'a'); // => 0
+ * ```
+ */
 export function getInDegree(graph: Graph, nodeId: string): number {
   return getIndex(graph).inEdges.get(nodeId)?.length ?? 0;
 }
 
+/**
+ * Returns the out-degree of a node (number of outgoing edges).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ * getOutDegree(graph, 'a'); // => 1
+ * getOutDegree(graph, 'b'); // => 0
+ * ```
+ */
 export function getOutDegree(graph: Graph, nodeId: string): number {
   return getIndex(graph).outEdges.get(nodeId)?.length ?? 0;
 }
 
 // --- Hierarchy queries ---
 
+/**
+ * Returns direct children of a node in the hierarchy.
+ * Pass `null` to get root-level nodes.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent' },
+ *     { id: 'child1', parentId: 'parent' },
+ *     { id: 'child2', parentId: 'parent' },
+ *   ],
+ * });
+ * getChildren(graph, 'parent');
+ * // => [node child1, node child2]
+ * getChildren(graph, null);
+ * // => [node parent]
+ * ```
+ */
 export function getChildren<N>(
   graph: Graph<N>,
   nodeId: string | null,
@@ -137,6 +309,23 @@ export function getChildren<N>(
   return childIds.map((id) => graph.nodes[idx.nodeById.get(id)!]).filter(Boolean);
 }
 
+/**
+ * Returns the parent node in the hierarchy, or `undefined` if root-level.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent' },
+ *     { id: 'child', parentId: 'parent' },
+ *   ],
+ * });
+ * getParent(graph, 'child');
+ * // => node parent
+ * getParent(graph, 'parent');
+ * // => undefined
+ * ```
+ */
 export function getParent<N>(
   graph: Graph<N>,
   nodeId: string,
@@ -150,6 +339,22 @@ export function getParent<N>(
   return pi !== undefined ? graph.nodes[pi] : undefined;
 }
 
+/**
+ * Returns all ancestors from the node up to the root (nearest parent first).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'root' },
+ *     { id: 'mid', parentId: 'root' },
+ *     { id: 'leaf', parentId: 'mid' },
+ *   ],
+ * });
+ * getAncestors(graph, 'leaf');
+ * // => [node mid, node root]
+ * ```
+ */
 export function getAncestors<N>(
   graph: Graph<N>,
   nodeId: string,
@@ -169,6 +374,22 @@ export function getAncestors<N>(
   return result;
 }
 
+/**
+ * Returns all descendants recursively (depth-first).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'root' },
+ *     { id: 'child', parentId: 'root' },
+ *     { id: 'grandchild', parentId: 'child' },
+ *   ],
+ * });
+ * getDescendants(graph, 'root');
+ * // => [node child, node grandchild]
+ * ```
+ */
 export function getDescendants<N>(
   graph: Graph<N>,
   nodeId: string,
@@ -189,24 +410,85 @@ export function getDescendants<N>(
   return result;
 }
 
+/**
+ * Returns all root nodes (nodes with no parent, i.e. `parentId === null`).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'root1' },
+ *     { id: 'root2' },
+ *     { id: 'child', parentId: 'root1' },
+ *   ],
+ * });
+ * getRoots(graph);
+ * // => [node root1, node root2]
+ * ```
+ */
 export function getRoots<N>(graph: Graph<N>): GraphNode<N>[] {
   const idx = getIndex(graph);
   return idx.childNodes.get(null)?.map((id) => graph.nodes[idx.nodeById.get(id)!]).filter(Boolean) ?? [];
 }
 
-/** Whether a node has children (is a compound/group node). */
+/**
+ * Whether a node has children (is a compound/group node).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent' },
+ *     { id: 'child', parentId: 'parent' },
+ *   ],
+ * });
+ * isCompound(graph, 'parent'); // => true
+ * isCompound(graph, 'child');  // => false
+ * ```
+ */
 export function isCompound(graph: Graph, nodeId: string): boolean {
   const idx = getIndex(graph);
   const childIds = idx.childNodes.get(nodeId) ?? [];
   return childIds.length > 0;
 }
 
-/** Whether a node has no children (is a leaf/atomic node). */
+/**
+ * Whether a node has no children (is a leaf/atomic node).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent' },
+ *     { id: 'child', parentId: 'parent' },
+ *   ],
+ * });
+ * isLeaf(graph, 'child');  // => true
+ * isLeaf(graph, 'parent'); // => false
+ * ```
+ */
 export function isLeaf(graph: Graph, nodeId: string): boolean {
   return !isCompound(graph, nodeId);
 }
 
-/** Depth of a node in the hierarchy (root = 0). */
+/**
+ * Depth of a node in the hierarchy (root = 0).
+ * Returns -1 if the node is not found.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'root' },
+ *     { id: 'child', parentId: 'root' },
+ *     { id: 'grandchild', parentId: 'child' },
+ *   ],
+ * });
+ * getDepth(graph, 'root');       // => 0
+ * getDepth(graph, 'child');      // => 1
+ * getDepth(graph, 'grandchild'); // => 2
+ * ```
+ */
 export function getDepth(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
   let d = 0;
@@ -222,7 +504,23 @@ export function getDepth(graph: Graph, nodeId: string): number {
   return d;
 }
 
-/** Sibling nodes (same parentId, excluding the node itself). */
+/**
+ * Sibling nodes (same parentId, excluding the node itself).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'parent' },
+ *     { id: 'a', parentId: 'parent' },
+ *     { id: 'b', parentId: 'parent' },
+ *     { id: 'c', parentId: 'parent' },
+ *   ],
+ * });
+ * getSiblings(graph, 'a');
+ * // => [node b, node c]
+ * ```
+ */
 export function getSiblings<N>(
   graph: Graph<N>,
   nodeId: string,
@@ -239,8 +537,24 @@ export function getSiblings<N>(
 }
 
 /**
- * Least Common Ancestor — deepest proper ancestor of all given nodes.
+ * Least Common Ancestor -- deepest proper ancestor of all given nodes.
  * A proper ancestor excludes the input nodes themselves.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'root' },
+ *     { id: 'a', parentId: 'root' },
+ *     { id: 'b', parentId: 'root' },
+ *     { id: 'a1', parentId: 'a' },
+ *   ],
+ * });
+ * getLCA(graph, 'a1', 'b');
+ * // => node root
+ * getLCA(graph, 'a', 'b');
+ * // => node root
+ * ```
  */
 export function getLCA<N>(
   graph: Graph<N>,
@@ -428,13 +742,43 @@ export function getRelativeDistance(
 
 // --- Graph-level queries ---
 
-/** Nodes with no incoming edges (inDegree 0). */
+/**
+ * Nodes with no incoming edges (inDegree 0).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ * getSources(graph);
+ * // => [node a]
+ * ```
+ */
 export function getSources<N>(graph: Graph<N>): GraphNode<N>[] {
   const idx = getIndex(graph);
   return graph.nodes.filter((n) => (idx.inEdges.get(n.id)?.length ?? 0) === 0);
 }
 
-/** Nodes with no outgoing edges (outDegree 0). */
+/**
+ * Nodes with no outgoing edges (outDegree 0).
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'e1', sourceId: 'a', targetId: 'b' },
+ *     { id: 'e2', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ * getSinks(graph);
+ * // => [node c]
+ * ```
+ */
 export function getSinks<N>(graph: Graph<N>): GraphNode<N>[] {
   const idx = getIndex(graph);
   return graph.nodes.filter((n) => (idx.outEdges.get(n.id)?.length ?? 0) === 0);

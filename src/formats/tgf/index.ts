@@ -3,6 +3,23 @@ import { createFormatConverter } from '../converter';
 
 // --- TGF (Trivial Graph Format) ---
 
+/**
+ * Converts a graph to TGF (Trivial Graph Format) string.
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { toTGF } from '@statelyai/graph/formats/tgf';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b', label: 'go' }],
+ * });
+ *
+ * const tgf = toTGF(graph);
+ * // "a A\nb B\n#\na b go"
+ * ```
+ */
 export function toTGF(graph: Graph): string {
   const lines: string[] = [];
 
@@ -21,6 +38,17 @@ export function toTGF(graph: Graph): string {
   return lines.join('\n');
 }
 
+/**
+ * Parses a TGF (Trivial Graph Format) string into a graph.
+ *
+ * @example
+ * ```ts
+ * import { fromTGF } from '@statelyai/graph/formats/tgf';
+ *
+ * const graph = fromTGF('a A\nb B\n#\na b go');
+ * // graph.nodes = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]
+ * ```
+ */
 export function fromTGF(tgf: string): Graph {
   if (typeof tgf !== 'string') {
     throw new Error('TGF: expected a string');
@@ -75,6 +103,22 @@ export function fromTGF(tgf: string): Graph {
   };
 }
 
-/** Bidirectional converter for TGF (Trivial Graph Format). */
+/**
+ * Bidirectional converter for TGF (Trivial Graph Format).
+ *
+ * @example
+ * ```ts
+ * import { createGraph } from '@statelyai/graph';
+ * import { tgfConverter } from '@statelyai/graph/formats/tgf';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
+ * });
+ *
+ * const tgf = tgfConverter.to(graph);
+ * const roundTripped = tgfConverter.from(tgf);
+ * ```
+ */
 export const tgfConverter: GraphFormatConverter<string> =
   createFormatConverter(toTGF, fromTGF);

@@ -94,7 +94,21 @@ const EDGE_COMPARE_KEYS = [
 // Diff functions
 // ---------------------------------------------------------------------------
 
-/** Compute a structured diff from graph `a` to graph `b` by matching IDs. */
+/**
+ * Compute a structured diff from graph `a` to graph `b` by matching IDs.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getDiff } from '@statelyai/graph';
+ *
+ * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const b = createGraph({ nodes: [{ id: 'n1', label: 'hello' }, { id: 'n2' }], edges: [] });
+ *
+ * const diff = getDiff(a, b);
+ * // diff.nodes.added → [{ id: 'n2' }]
+ * // diff.nodes.updated → [{ id: 'n1', old: { label: '' }, new: { label: 'hello' } }]
+ * ```
+ */
 export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   const aNodeMap = new Map(a.nodes.map((n) => [n.id, n]));
   const bNodeMap = new Map(b.nodes.map((n) => [n.id, n]));
@@ -159,7 +173,18 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   return diff;
 }
 
-/** Check if a diff has zero changes. */
+/**
+ * Check if a diff has zero changes.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getDiff, isEmptyDiff } from '@statelyai/graph';
+ *
+ * const g = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const diff = getDiff(g, g);
+ * isEmptyDiff(diff); // true
+ * ```
+ */
 export function isEmptyDiff(diff: GraphDiff): boolean {
   return (
     diff.nodes.added.length === 0 &&
@@ -171,7 +196,22 @@ export function isEmptyDiff(diff: GraphDiff): boolean {
   );
 }
 
-/** Invert a diff: swap added↔removed, swap old↔new in updates. */
+/**
+ * Invert a diff: swap added/removed, swap old/new in updates.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getDiff, invertDiff } from '@statelyai/graph';
+ *
+ * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const b = createGraph({ nodes: [{ id: 'n2' }], edges: [] });
+ *
+ * const diff = getDiff(a, b);
+ * const inv = invertDiff(diff);
+ * // inv.nodes.added contains n1 (was removed)
+ * // inv.nodes.removed contains n2 (was added)
+ * ```
+ */
 export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
   return {
     nodes: {
@@ -202,6 +242,17 @@ export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
 /**
  * Compute an ordered patch list from graph `a` to graph `b`.
  * Order: delete edges → delete nodes → add nodes → add edges → update nodes → update edges.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPatches } from '@statelyai/graph';
+ *
+ * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const b = createGraph({ nodes: [{ id: 'n1' }, { id: 'n2' }], edges: [] });
+ *
+ * const patches = getPatches(a, b);
+ * // patches → [{ op: 'addNode', node: { id: 'n2' } }]
+ * ```
  */
 export function getPatches<N, E>(
   a: Graph<N, E>,
@@ -214,6 +265,18 @@ export function getPatches<N, E>(
 /**
  * **Mutable.** Apply patches to a graph in order.
  * Delegates to addNode/deleteNode/updateNode/addEdge/deleteEdge/updateEdge.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPatches, applyPatches } from '@statelyai/graph';
+ *
+ * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const b = createGraph({ nodes: [{ id: 'n1' }, { id: 'n2' }], edges: [] });
+ *
+ * const patches = getPatches(a, b);
+ * applyPatches(a, patches);
+ * // a now contains both n1 and n2
+ * ```
  */
 export function applyPatches<N, E>(
   graph: Graph<N, E>,
@@ -253,6 +316,18 @@ export function applyPatches<N, E>(
  * Order: add nodes → update edges → delete edges → delete nodes → add edges → update nodes.
  * This avoids cascading deletes removing edges that are being updated,
  * and ensures new nodes exist before edges reference them.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getDiff, toPatches } from '@statelyai/graph';
+ *
+ * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const b = createGraph({ nodes: [{ id: 'n2' }], edges: [] });
+ *
+ * const diff = getDiff(a, b);
+ * const patches = toPatches(diff);
+ * // patches → [{ op: 'addNode', ... }, { op: 'deleteNode', ... }]
+ * ```
  */
 export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
   const patches: GraphPatch<N, E>[] = [];
@@ -298,7 +373,21 @@ export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
   return patches;
 }
 
-/** Group a patch list into a structured diff. */
+/**
+ * Group a patch list into a structured diff.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getPatches, toDiff } from '@statelyai/graph';
+ *
+ * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
+ * const b = createGraph({ nodes: [{ id: 'n1' }, { id: 'n2' }], edges: [] });
+ *
+ * const patches = getPatches(a, b);
+ * const diff = toDiff(patches);
+ * // diff.nodes.added → [{ id: 'n2' }]
+ * ```
+ */
 export function toDiff<N, E>(patches: GraphPatch<N, E>[]): GraphDiff<N, E> {
   const diff: GraphDiff<N, E> = {
     nodes: { added: [], removed: [], updated: [] },
