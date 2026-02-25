@@ -16,6 +16,8 @@ export {
 export type { CytoscapeJSON, CytoscapeNode, CytoscapeEdge } from './cytoscape';
 export { toD3Graph, fromD3Graph, d3Converter } from './d3';
 export type { D3Graph, D3Node, D3Link } from './d3';
+export { toXYFlow, fromXYFlow, xyflowConverter } from './xyflow';
+export type { XYFlow, XYFlowNode, XYFlowEdge } from './xyflow';
 export { toGML, fromGML, gmlConverter } from './gml';
 export { toTGF, fromTGF, tgfConverter } from './tgf';
 

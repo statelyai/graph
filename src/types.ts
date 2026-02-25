@@ -277,6 +277,18 @@ export interface GraphFormatConverter<TSerial> {
   from(input: TSerial): Graph;
 }
 
+/**
+ * A bidirectional converter between `VisualGraph` and a serialized format.
+ *
+ * Use this for formats that carry position/size data (e.g. xyflow, cytoscape).
+ */
+export interface VisualGraphFormatConverter<TSerial> {
+  /** Convert a VisualGraph to the serialized format. */
+  to(graph: VisualGraph): TSerial;
+  /** Convert from the serialized format to a VisualGraph. */
+  from(input: TSerial): VisualGraph;
+}
+
 // --- Transition exploration options ---
 
 export interface TransitionOptions<TState, TEvent> {
