@@ -1,5 +1,15 @@
 # @statelyai/graph
 
+## 0.4.0
+
+### Minor Changes
+
+- [`e268990`](https://github.com/statelyai/graph/commit/e268990dde29ff0e6cb89d10c8ddbdf142bec69b) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Make `parentId`, `initialNodeId`, and `shape` optional on `GraphNode`. These fields are no longer defaulted to `null`/`'rectangle'` by `createGraph`/`createVisualGraph`, they are simply omitted when not provided.
+
+  Add empty string validation for node/edge IDs, `parentId`, `sourceId`, and `targetId`.
+
+- [`55462e6`](https://github.com/statelyai/graph/commit/55462e68902f6241d23d689971ce2cbd756624b5) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add xyflow (React Flow / Svelte Flow) format converter with `toXYFlow()` and `fromXYFlow()` for converting between `VisualGraph` and xyflow node/edge structures. Uses `@xyflow/system` as an optional peer dependency for types. Also adds `VisualGraphFormatConverter` type for visual-first format converters.
+
 ## 0.3.1
 
 ### Patch Changes
