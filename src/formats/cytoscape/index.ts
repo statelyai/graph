@@ -43,7 +43,7 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
   const graphData: Record<string, any> = {};
   if (graph.id) graphData.id = graph.id;
   graphData.type = graph.type;
-  if (graph.initialNodeId !== null)
+  if (graph.initialNodeId)
     graphData.initialNodeId = graph.initialNodeId;
   if (graph.data !== undefined) graphData.graphData = graph.data;
   if (graph.direction) graphData.direction = graph.direction;
@@ -53,9 +53,9 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
     elements: {
       nodes: graph.nodes.map((n) => {
         const data: CytoscapeNode['data'] = { id: n.id };
-        if (n.parentId !== null) data.parent = n.parentId;
+        if (n.parentId) data.parent = n.parentId;
         if (n.label) data.label = n.label;
-        if (n.initialNodeId !== null) data.initialNodeId = n.initialNodeId;
+        if (n.initialNodeId) data.initialNodeId = n.initialNodeId;
         if (n.data !== undefined) data.nodeData = n.data;
         if (n.width !== undefined) data.width = n.width;
         if (n.height !== undefined) data.height = n.height;

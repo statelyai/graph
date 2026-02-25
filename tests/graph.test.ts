@@ -41,8 +41,6 @@ describe('createGraph', () => {
     expect(g.nodes[0]).toEqual({
       type: 'node',
       id: 'a',
-      parentId: null,
-      initialNodeId: null,
       label: 'A',
       data: undefined,
     });
@@ -54,9 +52,42 @@ describe('createGraph', () => {
       nodes: [{ id: 'n1' }],
       edges: [],
     });
-    expect(g.nodes[0].parentId).toBe(null);
+    expect(g.nodes[0].parentId).toBeUndefined();
     expect(g.nodes[0].label).toBe('');
     expect(g.nodes[0].type).toBe('node');
+  });
+
+  it('rejects empty string node id', () => {
+    expect(() => createGraph({ nodes: [{ id: '' }] })).toThrow(
+      'non-empty string',
+    );
+  });
+
+  it('rejects empty string edge ids', () => {
+    expect(() =>
+      createGraph({
+        nodes: [{ id: 'a' }],
+        edges: [{ id: '', sourceId: 'a', targetId: 'a' }],
+      }),
+    ).toThrow('non-empty string');
+    expect(() =>
+      createGraph({
+        nodes: [{ id: 'a' }],
+        edges: [{ id: 'e1', sourceId: '', targetId: 'a' }],
+      }),
+    ).toThrow('non-empty string');
+    expect(() =>
+      createGraph({
+        nodes: [{ id: 'a' }],
+        edges: [{ id: 'e1', sourceId: 'a', targetId: '' }],
+      }),
+    ).toThrow('non-empty string');
+  });
+
+  it('rejects empty string parentId', () => {
+    expect(() =>
+      createGraph({ nodes: [{ id: 'a', parentId: '' }] }),
+    ).toThrow('non-empty string');
   });
 
   it('supports plain object literal via satisfies', () => {
@@ -139,11 +170,36 @@ describe('Mutable: addNode / addEdge', () => {
     );
   });
 
+  it('addNode() throws on empty string id', () => {
+    const g = createGraph();
+    expect(() => addNode(g, { id: '' })).toThrow('non-empty string');
+  });
+
+  it('addNode() throws on empty string parentId', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }] });
+    expect(() => addNode(g, { id: 'b', parentId: '' })).toThrow(
+      'non-empty string',
+    );
+  });
+
   it('addEdge() mutates in place', () => {
     const g = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }] });
     const edge = addEdge(g, { id: 'e1', sourceId: 'a', targetId: 'b' });
     expect(edge.type).toBe('edge');
     expect(g.edges).toHaveLength(1);
+  });
+
+  it('addEdge() throws on empty string ids', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }] });
+    expect(() =>
+      addEdge(g, { id: '', sourceId: 'a', targetId: 'b' }),
+    ).toThrow('non-empty string');
+    expect(() =>
+      addEdge(g, { id: 'e1', sourceId: '', targetId: 'b' }),
+    ).toThrow('non-empty string');
+    expect(() =>
+      addEdge(g, { id: 'e1', sourceId: 'a', targetId: '' }),
+    ).toThrow('non-empty string');
   });
 
   it('addEdge() throws on missing source/target', () => {

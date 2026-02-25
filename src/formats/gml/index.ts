@@ -34,7 +34,7 @@ export function toGML(graph: Graph): string {
   // Build children map for hierarchical nesting
   const childrenMap = new Map<string | null, GraphNode[]>();
   for (const node of graph.nodes) {
-    const pid = node.parentId;
+    const pid = node.parentId ?? null;
     if (!childrenMap.has(pid)) childrenMap.set(pid, []);
     childrenMap.get(pid)!.push(node);
   }
@@ -44,7 +44,7 @@ export function toGML(graph: Graph): string {
     lines.push(`${indent}node [`);
     lines.push(`${indent}  id ${gmlString(node.id)}`);
     if (node.label) lines.push(`${indent}  label ${gmlString(node.label)}`);
-    if (node.initialNodeId !== null)
+    if (node.initialNodeId)
       lines.push(`${indent}  initialNodeId ${gmlString(node.initialNodeId)}`);
     if (node.data !== undefined)
       lines.push(`${indent}  data ${gmlString(JSON.stringify(node.data))}`);

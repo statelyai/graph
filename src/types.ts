@@ -81,8 +81,8 @@ export interface Graph<TNodeData = any, TEdgeData = any, TGraphData = any> {
 export interface GraphNode<TNodeData = any> {
   type: 'node';
   id: string;
-  parentId: string | null;
-  initialNodeId: string | null;
+  parentId?: string | null;
+  initialNodeId?: string | null;
   label: string;
   data: TNodeData;
   x?: number;

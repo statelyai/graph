@@ -21,7 +21,7 @@ export function toGraphML(graph: Graph): string {
   const nodes = graph.nodes.map((n) => {
     const data: any[] = [];
     if (n.label) data.push({ '@_key': 'label', '#text': n.label });
-    if (n.parentId !== null) data.push({ '@_key': 'parentId', '#text': n.parentId });
+    if (n.parentId) data.push({ '@_key': 'parentId', '#text': n.parentId });
     if (n.data !== undefined) data.push({ '@_key': 'data', '#text': JSON.stringify(n.data) });
     if (n.x !== undefined) data.push({ '@_key': 'x', '#text': n.x });
     if (n.y !== undefined) data.push({ '@_key': 'y', '#text': n.y });

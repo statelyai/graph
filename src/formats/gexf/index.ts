@@ -19,9 +19,9 @@ export function toGEXF(graph: Graph): string {
 
   const nodes = graph.nodes.map((n) => {
     const attvalues: any[] = [];
-    if (n.parentId !== null)
+    if (n.parentId)
       attvalues.push({ '@_for': 'a_parentId', '@_value': n.parentId });
-    if (n.initialNodeId !== null)
+    if (n.initialNodeId)
       attvalues.push({
         '@_for': 'a_initialNodeId',
         '@_value': n.initialNodeId,
@@ -38,7 +38,7 @@ export function toGEXF(graph: Graph): string {
       '@_id': n.id,
       '@_label': n.label || n.id,
     };
-    if (n.parentId !== null) node['@_pid'] = n.parentId;
+    if (n.parentId) node['@_pid'] = n.parentId;
     if (attvalues.length > 0) node.attvalues = { attvalue: attvalues };
 
     // Viz module
@@ -93,7 +93,7 @@ export function toGEXF(graph: Graph): string {
   });
 
   const graphData: any[] = [];
-  if (graph.initialNodeId !== null) {
+  if (graph.initialNodeId) {
     graphData.push({
       '@_for': 'a_initialNodeId',
       '@_value': graph.initialNodeId,

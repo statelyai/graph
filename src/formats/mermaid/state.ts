@@ -234,7 +234,7 @@ export function toMermaidState(graph: StateGraph): string {
   // Build children map
   const childrenMap = new Map<string | null, StateNode[]>();
   for (const node of graph.nodes) {
-    const pid = node.parentId;
+    const pid = node.parentId ?? null;
     if (!childrenMap.has(pid)) childrenMap.set(pid, []);
     childrenMap.get(pid)!.push(node);
   }

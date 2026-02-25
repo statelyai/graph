@@ -95,7 +95,7 @@ function buildIndex(graph: Graph): GraphIndex {
     outEdges.set(n.id, []);
     inEdges.set(n.id, []);
 
-    const parent = n.parentId;
+    const parent = n.parentId ?? null;
     if (!childNodes.has(parent)) childNodes.set(parent, []);
     childNodes.get(parent)!.push(n.id);
   }
@@ -127,7 +127,7 @@ export function indexAddNode(idx: GraphIndex, node: GraphNode, arrayIndex: numbe
   idx.outEdges.set(node.id, []);
   idx.inEdges.set(node.id, []);
 
-  const parent = node.parentId;
+  const parent = node.parentId ?? null;
   if (!idx.childNodes.has(parent)) idx.childNodes.set(parent, []);
   idx.childNodes.get(parent)!.push(node.id);
 
@@ -140,7 +140,7 @@ export function indexRemoveNode(idx: GraphIndex, node: GraphNode, arrayIndex: nu
   idx.inEdges.delete(node.id);
 
   // Remove from parent's children list
-  const siblings = idx.childNodes.get(node.parentId);
+  const siblings = idx.childNodes.get(node.parentId ?? null);
   if (siblings) {
     const pos = siblings.indexOf(node.id);
     if (pos !== -1) siblings.splice(pos, 1);
@@ -191,18 +191,19 @@ export function indexRemoveEdge(idx: GraphIndex, edge: GraphEdge, arrayIndex: nu
 export function indexReparentNode(
   idx: GraphIndex,
   nodeId: string,
-  oldParentId: string | null,
-  newParentId: string | null,
+  oldParentId: string | null | undefined,
+  newParentId: string | null | undefined,
 ): void {
   // Remove from old parent
-  const oldSiblings = idx.childNodes.get(oldParentId);
+  const oldSiblings = idx.childNodes.get(oldParentId ?? null);
   if (oldSiblings) {
     const pos = oldSiblings.indexOf(nodeId);
     if (pos !== -1) oldSiblings.splice(pos, 1);
   }
   // Add to new parent
-  if (!idx.childNodes.has(newParentId)) idx.childNodes.set(newParentId, []);
-  idx.childNodes.get(newParentId)!.push(nodeId);
+  const np = newParentId ?? null;
+  if (!idx.childNodes.has(np)) idx.childNodes.set(np, []);
+  idx.childNodes.get(np)!.push(nodeId);
 }
 
 /** Update adjacency lists when an edge's sourceId/targetId changes. */

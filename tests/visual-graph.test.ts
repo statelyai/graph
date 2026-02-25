@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import {
-  createGraph,
-  createVisualGraph,
-} from '../src/graph';
+import { createGraph, createVisualGraph } from '../src/graph';
 import { toDOT } from '../src/formats/dot';
 import { toGraphML } from '../src/formats/graphml';
 import { hasPath } from '../src/algorithms';
-import type { VisualGraph, VisualNode, VisualEdge } from '../src/types';
 
 describe('createVisualGraph', () => {
   it('defaults position/size to 0 on nodes and edges', () => {
@@ -30,7 +26,17 @@ describe('createVisualGraph', () => {
   it('preserves provided position/size values', () => {
     const g = createVisualGraph({
       nodes: [{ id: 'a', x: 10, y: 20, width: 100, height: 50 }],
-      edges: [{ id: 'e1', sourceId: 'a', targetId: 'a', x: 5, y: 15, width: 30, height: 10 }],
+      edges: [
+        {
+          id: 'e1',
+          sourceId: 'a',
+          targetId: 'a',
+          x: 5,
+          y: 15,
+          width: 30,
+          height: 10,
+        },
+      ],
     });
 
     expect(g.nodes[0].x).toBe(10);
@@ -73,7 +79,9 @@ describe('createVisualGraph', () => {
   it('preserves style on nodes and edges', () => {
     const g = createVisualGraph({
       nodes: [{ id: 'a', style: { 'font-size': 14 } }, { id: 'b' }],
-      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', style: { opacity: 0.5 } }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', style: { opacity: 0.5 } },
+      ],
     });
     expect(g.nodes[0].style).toEqual({ 'font-size': 14 });
     expect(g.edges[0].style).toEqual({ opacity: 0.5 });
@@ -197,7 +205,11 @@ describe('toDOT with visual properties', () => {
       ['left', 'RL'],
       ['right', 'LR'],
     ] as const) {
-      const g = createGraph({ id: 'test', direction: dir, nodes: [{ id: 'a' }] });
+      const g = createGraph({
+        id: 'test',
+        direction: dir,
+        nodes: [{ id: 'a' }],
+      });
       expect(toDOT(g)).toContain(`rankdir=${rankdir}`);
     }
   });

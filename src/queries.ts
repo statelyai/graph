@@ -334,7 +334,7 @@ export function getParent<N>(
   const ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return undefined;
   const node = graph.nodes[ni];
-  if (node.parentId === null) return undefined;
+  if (!node.parentId) return undefined;
   const pi = idx.nodeById.get(node.parentId);
   return pi !== undefined ? graph.nodes[pi] : undefined;
 }
@@ -364,7 +364,7 @@ export function getAncestors<N>(
   let ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return result;
   let current = graph.nodes[ni];
-  while (current && current.parentId !== null) {
+  while (current && current.parentId) {
     const pi = idx.nodeById.get(current.parentId);
     if (pi === undefined) break;
     const p = graph.nodes[pi];
@@ -411,7 +411,7 @@ export function getDescendants<N>(
 }
 
 /**
- * Returns all root nodes (nodes with no parent, i.e. `parentId === null`).
+ * Returns all root nodes (nodes with no parent).
  *
  * @example
  * ```ts
@@ -495,7 +495,7 @@ export function getDepth(graph: Graph, nodeId: string): number {
   let ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return -1;
   let current = graph.nodes[ni];
-  while (current.parentId !== null) {
+  while (current.parentId) {
     d++;
     const pi = idx.nodeById.get(current.parentId);
     if (pi === undefined) break;
@@ -529,7 +529,7 @@ export function getSiblings<N>(
   const ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return [];
   const node = graph.nodes[ni];
-  const childIds = idx.childNodes.get(node.parentId) ?? [];
+  const childIds = idx.childNodes.get(node.parentId ?? null) ?? [];
   return childIds
     .filter((id) => id !== nodeId)
     .map((id) => graph.nodes[idx.nodeById.get(id)!])
@@ -568,7 +568,7 @@ export function getLCA<N>(
     let ni = idx.nodeById.get(id);
     if (ni === undefined) return result;
     let current = graph.nodes[ni];
-    while (current.parentId !== null) {
+    while (current.parentId) {
       result.push(current.parentId);
       const pi = idx.nodeById.get(current.parentId);
       if (pi === undefined) break;
@@ -645,7 +645,7 @@ export function getRelativeDistanceMap(
   if (parentId !== null) {
     const pi = idx.nodeById.get(parentId);
     if (pi !== undefined) {
-      sourceId = graph.nodes[pi].initialNodeId;
+      sourceId = graph.nodes[pi].initialNodeId ?? null;
     }
   } else {
     sourceId = graph.initialNodeId;
@@ -736,7 +736,7 @@ export function getRelativeDistance(
   const ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return undefined;
   const node = graph.nodes[ni];
-  const map = getRelativeDistanceMap(graph, node.parentId);
+  const map = getRelativeDistanceMap(graph, node.parentId ?? null);
   return map[nodeId];
 }
 

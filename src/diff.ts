@@ -22,8 +22,8 @@ import {
 
 function nodeToConfig<N>(node: GraphNode<N>): NodeConfig<N> {
   const config: NodeConfig<N> = { id: node.id };
-  if (node.parentId !== null) config.parentId = node.parentId;
-  if (node.initialNodeId !== null) config.initialNodeId = node.initialNodeId;
+  if (node.parentId) config.parentId = node.parentId;
+  if (node.initialNodeId) config.initialNodeId = node.initialNodeId;
   if (node.label !== '') config.label = node.label;
   if (node.data !== undefined) config.data = node.data;
   if (node.x !== undefined) config.x = node.x;

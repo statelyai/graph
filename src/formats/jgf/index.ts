@@ -48,7 +48,7 @@ export interface JGFGraph {
  */
 export function toJGF(graph: Graph): JGFGraph {
   const metadata: Record<string, any> = {};
-  if (graph.initialNodeId !== null) metadata.initialNodeId = graph.initialNodeId;
+  if (graph.initialNodeId) metadata.initialNodeId = graph.initialNodeId;
   if (graph.data !== undefined) metadata.data = graph.data;
   if (graph.direction) metadata.direction = graph.direction;
 
@@ -59,8 +59,8 @@ export function toJGF(graph: Graph): JGFGraph {
       ...(Object.keys(metadata).length > 0 && { metadata }),
       nodes: graph.nodes.map((n) => {
         const meta: Record<string, any> = {};
-        if (n.parentId !== null) meta.parentId = n.parentId;
-        if (n.initialNodeId !== null) meta.initialNodeId = n.initialNodeId;
+        if (n.parentId) meta.parentId = n.parentId;
+        if (n.initialNodeId) meta.initialNodeId = n.initialNodeId;
         if (n.data !== undefined) meta.data = n.data;
         if (n.x !== undefined) meta.x = n.x;
         if (n.y !== undefined) meta.y = n.y;

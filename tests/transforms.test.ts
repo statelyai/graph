@@ -32,7 +32,7 @@ describe('flatten', () => {
     expect(nodeIds).toEqual(['a', 'b1', 'b2', 'c']);
 
     // No hierarchy
-    expect(flat.nodes.every((n) => n.parentId === null)).toBe(true);
+    expect(flat.nodes.every((n) => n.parentId == null)).toBe(true);
 
     // Edges: a→b1, b1→b2, b1→c, b2→c
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
