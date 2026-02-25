@@ -515,36 +515,194 @@ export function toMermaidSequence(graph: SequenceGraph): string {
     }
   }
 
-  // TODO: blocks are serialized in order but nesting is not reconstructed
-  // For now, emit edges in order. Block reconstruction would need edge ordering.
+  // Build edge-to-block index for reconstructing block nesting
+  const blocks = gd?.blocks ?? [];
+  // Collect all edgeIds claimed by blocks (in order) so we can interleave
+  // block open/close markers with edge emission.
+  const edgeIdSet = new Set(graph.edges.map((e) => e.id));
+
+  // Build an ordered schedule: for each edge, track which blocks open before
+  // it and which blocks close after it.
+  interface BlockEvent {
+    type: 'open' | 'close' | 'branch';
+    block: SequenceBlock;
+    branchIndex?: number;
+    label?: string;
+  }
+  // Map edgeId → events that fire *before* that edge is emitted
+  const beforeEdge = new Map<string, BlockEvent[]>();
+  // Map edgeId → events that fire *after* that edge is emitted
+  const afterEdge = new Map<string, BlockEvent[]>();
+
+  for (const block of blocks) {
+    if (block.type === 'alt') {
+      // First branch opens the alt
+      const firstEdge = block.branches[0]?.edgeIds[0];
+      if (firstEdge && edgeIdSet.has(firstEdge)) {
+        const events = beforeEdge.get(firstEdge) ?? [];
+        events.push({ type: 'open', block });
+        beforeEdge.set(firstEdge, events);
+      }
+      // Subsequent branches emit "else"
+      for (let bi = 1; bi < block.branches.length; bi++) {
+        const branchFirstEdge = block.branches[bi]?.edgeIds[0];
+        if (branchFirstEdge && edgeIdSet.has(branchFirstEdge)) {
+          const events = beforeEdge.get(branchFirstEdge) ?? [];
+          events.push({ type: 'branch', block, branchIndex: bi, label: block.branches[bi].label });
+          beforeEdge.set(branchFirstEdge, events);
+        }
+      }
+      // Close after last edge of last branch
+      const lastBranch = block.branches[block.branches.length - 1];
+      const lastEdge = lastBranch?.edgeIds[lastBranch.edgeIds.length - 1];
+      if (lastEdge && edgeIdSet.has(lastEdge)) {
+        const events = afterEdge.get(lastEdge) ?? [];
+        events.push({ type: 'close', block });
+        afterEdge.set(lastEdge, events);
+      }
+    } else if (block.type === 'par') {
+      // First branch opens the par
+      const firstEdge = block.branches[0]?.edgeIds[0];
+      if (firstEdge && edgeIdSet.has(firstEdge)) {
+        const events = beforeEdge.get(firstEdge) ?? [];
+        events.push({ type: 'open', block });
+        beforeEdge.set(firstEdge, events);
+      }
+      // Subsequent branches emit "and"
+      for (let bi = 1; bi < block.branches.length; bi++) {
+        const branchFirstEdge = block.branches[bi]?.edgeIds[0];
+        if (branchFirstEdge && edgeIdSet.has(branchFirstEdge)) {
+          const events = beforeEdge.get(branchFirstEdge) ?? [];
+          events.push({ type: 'branch', block, branchIndex: bi, label: block.branches[bi].label });
+          beforeEdge.set(branchFirstEdge, events);
+        }
+      }
+      // Close after last edge of last branch
+      const lastBranch = block.branches[block.branches.length - 1];
+      const lastEdge = lastBranch?.edgeIds[lastBranch.edgeIds.length - 1];
+      if (lastEdge && edgeIdSet.has(lastEdge)) {
+        const events = afterEdge.get(lastEdge) ?? [];
+        events.push({ type: 'close', block });
+        afterEdge.set(lastEdge, events);
+      }
+    } else if (block.type === 'critical') {
+      // Open before first edge
+      const firstEdge = block.edgeIds[0];
+      if (firstEdge && edgeIdSet.has(firstEdge)) {
+        const events = beforeEdge.get(firstEdge) ?? [];
+        events.push({ type: 'open', block });
+        beforeEdge.set(firstEdge, events);
+      }
+      // Options emit "option" before their first edge
+      if (block.options) {
+        for (const opt of block.options) {
+          const optFirstEdge = opt.edgeIds[0];
+          if (optFirstEdge && edgeIdSet.has(optFirstEdge)) {
+            const events = beforeEdge.get(optFirstEdge) ?? [];
+            events.push({ type: 'branch', block, label: opt.label });
+            beforeEdge.set(optFirstEdge, events);
+          }
+        }
+      }
+      // Close after last edge (of options if present, else of main edgeIds)
+      const allEdgeIds = [
+        ...block.edgeIds,
+        ...(block.options?.flatMap((o) => o.edgeIds) ?? []),
+      ];
+      const lastEdge = allEdgeIds[allEdgeIds.length - 1];
+      if (lastEdge && edgeIdSet.has(lastEdge)) {
+        const events = afterEdge.get(lastEdge) ?? [];
+        events.push({ type: 'close', block });
+        afterEdge.set(lastEdge, events);
+      }
+    } else {
+      // Simple blocks: loop, opt, break, rect
+      const edgeIds = block.edgeIds;
+      const firstEdge = edgeIds[0];
+      const lastEdge = edgeIds[edgeIds.length - 1];
+      if (firstEdge && edgeIdSet.has(firstEdge)) {
+        const events = beforeEdge.get(firstEdge) ?? [];
+        events.push({ type: 'open', block });
+        beforeEdge.set(firstEdge, events);
+      }
+      if (lastEdge && edgeIdSet.has(lastEdge)) {
+        const events = afterEdge.get(lastEdge) ?? [];
+        events.push({ type: 'close', block });
+        afterEdge.set(lastEdge, events);
+      }
+    }
+  }
+
+  // Track indent depth for nested blocks
+  let depth = 1;
+  const indent = () => '    '.repeat(depth);
 
   for (const edge of graph.edges) {
+    // Emit block-open / branch events before this edge
+    const befores = beforeEdge.get(edge.id);
+    if (befores) {
+      for (const ev of befores) {
+        if (ev.type === 'open') {
+          const b = ev.block;
+          if (b.type === 'alt') {
+            lines.push(`${indent()}alt ${b.label}`);
+          } else if (b.type === 'par') {
+            lines.push(`${indent()}par ${b.branches[0].label}`);
+          } else if (b.type === 'critical') {
+            lines.push(`${indent()}critical ${b.label}`);
+          } else if (b.type === 'rect') {
+            lines.push(`${indent()}rect ${b.color}`);
+          } else if (b.type === 'loop' || b.type === 'opt' || b.type === 'break') {
+            lines.push(`${indent()}${b.type} ${b.label}`);
+          }
+          depth++;
+        } else if (ev.type === 'branch') {
+          depth--;
+          const b = ev.block;
+          if (b.type === 'alt') {
+            lines.push(`${indent()}else${ev.label ? ` ${ev.label}` : ''}`);
+          } else if (b.type === 'par') {
+            lines.push(`${indent()}and ${ev.label ?? ''}`);
+          } else if (b.type === 'critical') {
+            lines.push(`${indent()}option ${ev.label ?? ''}`);
+          }
+          depth++;
+        }
+      }
+    }
+
     const d = edge.data;
     if (!d) continue;
 
     if (d.kind === 'activation') {
-      lines.push(`    activate ${edge.sourceId}`);
-      continue;
-    }
-    if (d.kind === 'deactivation') {
-      lines.push(`    deactivate ${edge.sourceId}`);
-      continue;
-    }
-
-    // Message
-    const stroke = d.stroke ?? 'solid';
-    const arrowType = d.arrowType ?? 'filled';
-    let arrow: string;
-    if (d.bidirectional) {
-      arrow = stroke === 'dotted' ? '<<-->>' : '<<->>';
+      lines.push(`${indent()}activate ${edge.sourceId}`);
+    } else if (d.kind === 'deactivation') {
+      lines.push(`${indent()}deactivate ${edge.sourceId}`);
     } else {
-      arrow = ARROW_MAP[stroke]?.[arrowType] ?? '->>';
+      // Message
+      const stroke = d.stroke ?? 'solid';
+      const arrowType = d.arrowType ?? 'filled';
+      let arrow: string;
+      if (d.bidirectional) {
+        arrow = stroke === 'dotted' ? '<<-->>' : '<<->>';
+      } else {
+        arrow = ARROW_MAP[stroke]?.[arrowType] ?? '->>';
+      }
+
+      const label = edge.label ? `: ${escapeMermaidLabel(edge.label)}` : ':';
+      lines.push(
+        `${indent()}${edge.sourceId}${arrow}${edge.targetId}${label}`,
+      );
     }
 
-    const label = edge.label ? `: ${escapeMermaidLabel(edge.label)}` : ':';
-    lines.push(
-      `    ${edge.sourceId}${arrow}${edge.targetId}${label}`,
-    );
+    // Emit block-close events after this edge
+    const afters = afterEdge.get(edge.id);
+    if (afters) {
+      for (const _ev of afters) {
+        depth--;
+        lines.push(`${indent()}end`);
+      }
+    }
   }
 
   return lines.join('\n');
