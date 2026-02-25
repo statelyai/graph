@@ -296,10 +296,12 @@ sequenceDiagram
         ],
         data: { diagramType: 'sequence' },
       });
-      expect(output).toContain('sequenceDiagram');
-      expect(output).toContain('participant Alice');
-      expect(output).toContain('participant Bob');
-      expect(output).toContain('Alice->>Bob: Hello');
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            Alice->>Bob: Hello"
+      `);
     });
 
     it('serializes actor type', () => {
@@ -320,7 +322,10 @@ sequenceDiagram
         edges: [],
         data: { diagramType: 'sequence' },
       });
-      expect(output).toContain('actor Alice');
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            actor Alice"
+      `);
     });
 
     it('serializes aliases', () => {
@@ -341,7 +346,10 @@ sequenceDiagram
         edges: [],
         data: { diagramType: 'sequence' },
       });
-      expect(output).toContain('participant A as Alice');
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant A as Alice"
+      `);
     });
 
     it('serializes all arrow types', () => {
@@ -412,8 +420,12 @@ sequenceDiagram
         ],
         data: { diagramType: 'sequence' },
       });
-      expect(output).toContain('activate Alice');
-      expect(output).toContain('deactivate Alice');
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            activate Alice
+            deactivate Alice"
+      `);
     });
 
     it('serializes autonumber', () => {
@@ -425,7 +437,10 @@ sequenceDiagram
         edges: [],
         data: { diagramType: 'sequence', autonumber: true },
       });
-      expect(output).toContain('autonumber');
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            autonumber"
+      `);
     });
 
     it('serializes create participant', () => {
@@ -446,7 +461,10 @@ sequenceDiagram
         edges: [],
         data: { diagramType: 'sequence' },
       });
-      expect(output).toContain('create participant B');
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            create participant B"
+      `);
     });
   });
 
@@ -460,23 +478,19 @@ sequenceDiagram
 
       const graph = fromMermaidSequence(input);
       const output = toMermaidSequence(graph);
-      const graph2 = fromMermaidSequence(output);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            Alice->>Bob: Hello Bob
+            Bob-->>Alice: Hi Alice"
+      `);
 
-      expect(graph2.nodes).toHaveLength(graph.nodes.length);
-      expect(graph2.edges).toHaveLength(graph.edges.length);
-      expect(graph2.nodes.map((n) => n.id)).toEqual(
-        graph.nodes.map((n) => n.id),
+      const graph2 = fromMermaidSequence(output);
+      expect(graph2.nodes.map((n) => n.id)).toEqual(graph.nodes.map((n) => n.id));
+      expect(graph2.edges.map((e) => ({ s: e.sourceId, t: e.targetId, l: e.label }))).toEqual(
+        graph.edges.map((e) => ({ s: e.sourceId, t: e.targetId, l: e.label })),
       );
-      for (let i = 0; i < graph.edges.length; i++) {
-        expect(graph2.edges[i].sourceId).toBe(graph.edges[i].sourceId);
-        expect(graph2.edges[i].targetId).toBe(graph.edges[i].targetId);
-        expect(graph2.edges[i].label).toBe(graph.edges[i].label);
-        expect(graph2.edges[i].data.kind).toBe(graph.edges[i].data.kind);
-        expect(graph2.edges[i].data.stroke).toBe(graph.edges[i].data.stroke);
-        expect(graph2.edges[i].data.arrowType).toBe(
-          graph.edges[i].data.arrowType,
-        );
-      }
     });
 
     it('round-trips activation/deactivation', () => {
@@ -489,13 +503,236 @@ sequenceDiagram
 
       const graph = fromMermaidSequence(input);
       const output = toMermaidSequence(graph);
-      const graph2 = fromMermaidSequence(output);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            activate Alice
+            Alice->>Bob: Hello
+            deactivate Alice"
+      `);
 
-      const selfEdges1 = graph.edges.filter((e) => e.sourceId === e.targetId);
-      const selfEdges2 = graph2.edges.filter((e) => e.sourceId === e.targetId);
-      expect(selfEdges2).toHaveLength(selfEdges1.length);
-      expect(selfEdges2[0].data.kind).toBe(selfEdges1[0].data.kind);
-      expect(selfEdges2[1].data.kind).toBe(selfEdges1[1].data.kind);
+      const graph2 = fromMermaidSequence(output);
+      const selfEdges = graph2.edges.filter((e) => e.sourceId === e.targetId);
+      expect(selfEdges.map((e) => e.data.kind)).toEqual(['activation', 'deactivation']);
+    });
+
+    it('round-trips loop blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>Bob: Hello
+    loop Every minute
+        Bob->>Alice: Ping
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            Alice->>Bob: Hello
+            loop Every minute
+                Bob->>Alice: Ping
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      expect(graph2.data.blocks).toHaveLength(1);
+      expect(graph2.data.blocks![0].type).toBe('loop');
+      expect((graph2.data.blocks![0] as any).edgeIds).toHaveLength(1);
+    });
+
+    it('round-trips alt/else blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>Bob: How are you?
+    alt Is happy
+        Bob->>Alice: Great!
+    else Is sad
+        Bob->>Alice: Oh no
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            Alice->>Bob: How are you?
+            alt Is happy
+                Bob->>Alice: Great!
+            else Is sad
+                Bob->>Alice: Oh no
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      const block = graph2.data.blocks![0] as any;
+      expect(block.type).toBe('alt');
+      expect(block.branches).toHaveLength(2);
+      expect(block.branches[0].edgeIds).toHaveLength(1);
+      expect(block.branches[1].edgeIds).toHaveLength(1);
+    });
+
+    it('round-trips par blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    participant Charlie
+    par Action 1
+        Alice->>Bob: Hello
+    and Action 2
+        Alice->>Charlie: Hi
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            participant Charlie
+            par Action 1
+                Alice->>Bob: Hello
+            and Action 2
+                Alice->>Charlie: Hi
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      const block = graph2.data.blocks![0] as any;
+      expect(block.type).toBe('par');
+      expect(block.branches).toHaveLength(2);
+    });
+
+    it('round-trips mixed blocks and bare edges', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>Bob: Before
+    loop Retry
+        Bob->>Alice: Attempt
+    end
+    Alice->>Bob: After`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            Alice->>Bob: Before
+            loop Retry
+                Bob->>Alice: Attempt
+            end
+            Alice->>Bob: After"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      expect(graph2.edges.map((e) => e.label)).toEqual(['Before', 'Attempt', 'After']);
+      expect(graph2.data.blocks).toHaveLength(1);
+    });
+
+    it('round-trips opt blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    opt Extra greeting
+        Alice->>Bob: Bonus hello
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            opt Extra greeting
+                Alice->>Bob: Bonus hello
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      expect(graph2.data.blocks![0].type).toBe('opt');
+    });
+
+    it('round-trips critical blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    critical Establish connection
+        Alice->>Bob: Connect
+    option Timeout
+        Alice->>Bob: Retry
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            critical Establish connection
+                Alice->>Bob: Connect
+            option Timeout
+                Alice->>Bob: Retry
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      const block = graph2.data.blocks![0] as any;
+      expect(block.type).toBe('critical');
+      expect(block.options).toHaveLength(1);
+    });
+
+    it('round-trips break blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    break When error
+        Alice->>Bob: Error notification
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            break When error
+                Alice->>Bob: Error notification
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      expect(graph2.data.blocks![0].type).toBe('break');
+    });
+
+    it('round-trips rect blocks', () => {
+      const input = `sequenceDiagram
+    participant Alice
+    participant Bob
+    rect rgb(200, 220, 255)
+        Alice->>Bob: Inside rect
+    end`;
+
+      const graph = fromMermaidSequence(input);
+      const output = toMermaidSequence(graph);
+      expect(output).toMatchInlineSnapshot(`
+        "sequenceDiagram
+            participant Alice
+            participant Bob
+            rect rgb(200, 220, 255)
+                Alice->>Bob: Inside rect
+            end"
+      `);
+
+      const graph2 = fromMermaidSequence(output);
+      expect(graph2.data.blocks![0].type).toBe('rect');
+      expect((graph2.data.blocks![0] as any).color).toBe('rgb(200, 220, 255)');
     });
   });
 });
