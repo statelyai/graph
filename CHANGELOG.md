@@ -1,5 +1,15 @@
 # @statelyai/graph
 
+## 0.3.1
+
+### Patch Changes
+
+- [#6](https://github.com/statelyai/graph/pull/6) [`c186c2a`](https://github.com/statelyai/graph/commit/c186c2afb4eb7772855f41a03102892ecb97c9b1) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add JSDoc with usage examples to all exported functions
+
+- [`83b3c66`](https://github.com/statelyai/graph/commit/83b3c66a9e5f740442e6e29bc6bfc78f86f61805) Thanks [@davidkpiano](https://github.com/davidkpiano)! - `VisualNode['shape']` is now optional
+
+- [#8](https://github.com/statelyai/graph/pull/8) [`27f3f7f`](https://github.com/statelyai/graph/commit/27f3f7fe744ec5d12c401a372439f85b0f2ca0f3) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Mermaid: reconstruct sequence diagram blocks
+
 ## 0.3.0
 
 ### Minor Changes
