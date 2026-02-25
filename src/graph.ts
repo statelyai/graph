@@ -101,7 +101,6 @@ export function createGraph<N = any, E = any, G = any>(
  *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'a', x: 0, y: 0, width: 0, height: 0 }],
  * });
  * // graph.nodes[0].x === 0
- * // graph.nodes[0].shape === 'rectangle'
  * ```
  */
 export function createVisualGraph<N = any, E = any, G = any>(
@@ -118,7 +117,7 @@ export function createVisualGraph<N = any, E = any, G = any>(
         y: n.y ?? 0,
         width: n.width ?? 0,
         height: n.height ?? 0,
-        shape: n.shape ?? 'rectangle',
+        ...(n.shape !== undefined && { shape: n.shape }),
       }),
     ),
     edges: base.edges.map(

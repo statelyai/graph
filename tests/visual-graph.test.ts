@@ -19,7 +19,7 @@ describe('createVisualGraph', () => {
     expect(g.nodes[0].y).toBe(0);
     expect(g.nodes[0].width).toBe(0);
     expect(g.nodes[0].height).toBe(0);
-    expect(g.nodes[0].shape).toBe('rectangle');
+    expect(g.nodes[0].shape).toBeUndefined();
 
     expect(g.edges[0].x).toBe(0);
     expect(g.edges[0].y).toBe(0);
@@ -89,12 +89,10 @@ describe('createVisualGraph', () => {
     const y: number = g.nodes[0].y;
     const w: number = g.nodes[0].width;
     const h: number = g.nodes[0].height;
-    const shape: string = g.nodes[0].shape;
     expect(x).toBe(0);
     expect(y).toBe(0);
     expect(w).toBe(0);
     expect(h).toBe(0);
-    expect(shape).toBe('rectangle');
   });
 });
 

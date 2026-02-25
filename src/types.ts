@@ -113,7 +113,7 @@ export interface GraphEdge<TEdgeData = any> {
 
 export interface VisualNode<TNodeData = any>
   extends Omit<GraphNode<TNodeData>, keyof EntityRect>, EntityRect {
-  shape: string;
+  shape?: string;
 }
 
 export interface VisualEdge<TEdgeData = any>
