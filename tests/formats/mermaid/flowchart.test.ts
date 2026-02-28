@@ -229,6 +229,63 @@ flowchart TD
       expect(() => fromMermaidFlowchart(null as any)).toThrow('expected a string');
     });
 
+    it('parses subgraph direction', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    subgraph sub1[My Sub]
+        direction LR
+        A --> B
+    end
+      `);
+      const sub = graph.nodes.find((n) => n.id === 'sub1')!;
+      expect(sub.data.direction).toBe('right');
+    });
+
+    it('parses ::: inline class on bare node', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A:::highlight
+      `);
+      expect(graph.nodes[0].data.classes).toEqual(['highlight']);
+    });
+
+    it('parses ::: inline class on node with shape', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A[Label]:::myClass
+      `);
+      expect(graph.nodes[0].data.classes).toEqual(['myClass']);
+      expect(graph.nodes[0].label).toBe('Label');
+    });
+
+    it('parses ::: inline class on edge source', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A:::cls --> B
+      `);
+      expect(graph.nodes.find((n) => n.id === 'A')!.data.classes).toEqual(['cls']);
+    });
+
+    it('parses invisible links ~~~', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A ~~~ B
+      `);
+      expect(graph.edges).toHaveLength(1);
+      expect(graph.edges[0].data.stroke).toBe('invisible');
+      expect(graph.edges[0].data.arrowType).toBe('none');
+    });
+
+    it('parses @{ shape } expanded syntax', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A@{ shape: hexagon, label: "My Label" }
+      `);
+      expect(graph.nodes[0].id).toBe('A');
+      expect((graph.nodes[0] as any).shape).toBe('hexagon');
+      expect(graph.nodes[0].label).toBe('My Label');
+    });
+
     it('throws on wrong header', () => {
       expect(() => fromMermaidFlowchart('sequenceDiagram\n  A->>B: hi')).toThrow(
         'expected "graph <direction>" or "flowchart <direction>" header',
@@ -319,6 +376,55 @@ flowchart TD
       expect(output).toContain('end');
     });
 
+    it('serializes subgraph direction', () => {
+      const output = toMermaidFlowchart({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'sub1', parentId: null, initialNodeId: null, label: 'Sub', data: { direction: 'right' as const } },
+          { type: 'node', id: 'A', parentId: 'sub1', initialNodeId: null, label: 'Inside', data: {} },
+        ],
+        edges: [],
+        data: { diagramType: 'flowchart' },
+      });
+      expect(output).toContain('direction LR');
+    });
+
+    it('serializes invisible links', () => {
+      const output = toMermaidFlowchart({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: '', data: {} },
+          { type: 'node', id: 'B', parentId: null, initialNodeId: null, label: '', data: {} },
+        ],
+        edges: [
+          { type: 'edge', id: 'e0', sourceId: 'A', targetId: 'B', label: '', data: { stroke: 'invisible' as const, arrowType: 'none' as const } },
+        ],
+        data: { diagramType: 'flowchart' },
+      });
+      expect(output).toContain('A ~~~ B');
+    });
+
+    it('serializes startMarker', () => {
+      const output = toMermaidFlowchart({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: '', data: {} },
+          { type: 'node', id: 'B', parentId: null, initialNodeId: null, label: '', data: {} },
+        ],
+        edges: [
+          { type: 'edge', id: 'e0', sourceId: 'A', targetId: 'B', label: '', data: { stroke: 'normal' as const, arrowType: 'arrow' as const, startMarker: 'circle' as const } },
+        ],
+        data: { diagramType: 'flowchart' },
+      });
+      expect(output).toContain('o-->');
+    });
+
     it('serializes different edge types', () => {
       const tests: Array<{ data: any; expected: string }> = [
         { data: { stroke: 'normal', arrowType: 'arrow' }, expected: '-->' },
@@ -364,6 +470,39 @@ flowchart TD
         expect(graph2.edges[i].sourceId).toBe(graph.edges[i].sourceId);
         expect(graph2.edges[i].targetId).toBe(graph.edges[i].targetId);
       }
+    });
+
+    it('round-trips subgraph direction', () => {
+      const input = `flowchart TD
+    subgraph sub1[Group]
+        direction LR
+        A[Inside]
+    end`;
+
+      const graph = fromMermaidFlowchart(input);
+      const sub = graph.nodes.find((n) => n.id === 'sub1')!;
+      expect(sub.data.direction).toBe('right');
+
+      const output = toMermaidFlowchart(graph);
+      expect(output).toContain('direction LR');
+
+      const graph2 = fromMermaidFlowchart(output);
+      const sub2 = graph2.nodes.find((n) => n.id === 'sub1')!;
+      expect(sub2.data.direction).toBe('right');
+    });
+
+    it('round-trips invisible links', () => {
+      const input = `flowchart TD
+    A ~~~ B`;
+
+      const graph = fromMermaidFlowchart(input);
+      expect(graph.edges[0].data.stroke).toBe('invisible');
+
+      const output = toMermaidFlowchart(graph);
+      expect(output).toContain('~~~');
+
+      const graph2 = fromMermaidFlowchart(output);
+      expect(graph2.edges[0].data.stroke).toBe('invisible');
     });
 
     it('round-trips flowchart with subgraphs', () => {

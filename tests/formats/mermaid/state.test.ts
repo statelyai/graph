@@ -142,6 +142,151 @@ stateDiagram-v2
       });
     });
 
+    it('parses concurrent states with -- separator', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    [*] --> Active
+    state Active {
+        [*] --> NumLockOff
+        NumLockOff --> NumLockOn : EvNumLockPressed
+        NumLockOn --> NumLockOff : EvNumLockPressed
+        --
+        [*] --> CapsLockOff
+        CapsLockOff --> CapsLockOn : EvCapsLockPressed
+        CapsLockOn --> CapsLockOff : EvCapsLockPressed
+        --
+        [*] --> ScrollLockOff
+        ScrollLockOff --> ScrollLockOn : EvScrollLockPressed
+        ScrollLockOn --> ScrollLockOff : EvScrollLockPressed
+    }
+      `);
+
+      // Active should be marked as parallel
+      const active = graph.nodes.find((n) => n.id === 'Active')!;
+      expect(active.data.stateType).toBe('parallel');
+
+      // Should have 3 region child nodes
+      const regions = graph.nodes.filter(
+        (n) => n.parentId === 'Active' && n.id.includes('_region_'),
+      );
+      expect(regions).toHaveLength(3);
+
+      // NumLock states should be in region_0
+      expect(graph.nodes.find((n) => n.id === 'NumLockOff')!.parentId).toBe(
+        'Active_region_0',
+      );
+      expect(graph.nodes.find((n) => n.id === 'NumLockOn')!.parentId).toBe(
+        'Active_region_0',
+      );
+
+      // CapsLock states should be in region_1
+      expect(graph.nodes.find((n) => n.id === 'CapsLockOff')!.parentId).toBe(
+        'Active_region_1',
+      );
+      expect(graph.nodes.find((n) => n.id === 'CapsLockOn')!.parentId).toBe(
+        'Active_region_1',
+      );
+
+      // ScrollLock states should be in region_2
+      expect(graph.nodes.find((n) => n.id === 'ScrollLockOff')!.parentId).toBe(
+        'Active_region_2',
+      );
+      expect(graph.nodes.find((n) => n.id === 'ScrollLockOn')!.parentId).toBe(
+        'Active_region_2',
+      );
+    });
+
+    it('parses concurrent states with [*] pseudo-nodes in each region', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    state Active {
+        [*] --> A
+        --
+        [*] --> B
+    }
+      `);
+
+      const startNodes = graph.nodes.filter((n) => n.data.isStart);
+      expect(startNodes).toHaveLength(2);
+      // Each start node should be in its respective region
+      expect(startNodes[0].parentId).toBe('Active_region_0');
+      expect(startNodes[1].parentId).toBe('Active_region_1');
+    });
+
+    it('parses top-level direction', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    direction LR
+    Idle --> Active
+      `);
+      expect(graph.direction).toBe('right');
+    });
+
+    it('parses direction inside composite state', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    state Parent {
+        direction BT
+        Child1
+        Child2
+    }
+      `);
+      const parent = graph.nodes.find((n) => n.id === 'Parent')!;
+      expect(parent.data.direction).toBe('up');
+    });
+
+    it('parses classDef definitions', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle
+    classDef badEvent fill:#f00,stroke:#333
+      `);
+      expect(graph.data.classDefs).toEqual({
+        badEvent: { fill: '#f00', stroke: '#333' },
+      });
+    });
+
+    it('parses class statement', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle
+    Active
+    classDef highlight fill:#ff0
+    class Idle,Active highlight
+      `);
+      expect(graph.nodes.find((n) => n.id === 'Idle')!.data.classes).toEqual(['highlight']);
+      expect(graph.nodes.find((n) => n.id === 'Active')!.data.classes).toEqual(['highlight']);
+    });
+
+    it('applies classDef styles to node.style and node.color', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle
+    classDef red fill:#f00,stroke:#333
+    class Idle red
+      `);
+      const node = graph.nodes.find((n) => n.id === 'Idle')! as any;
+      expect(node.color).toBe('#f00');
+      expect(node.style).toEqual({ fill: '#f00', stroke: '#333' });
+    });
+
+    it('parses ::: inline class on bare state', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle:::highlight
+    classDef highlight fill:#ff0
+      `);
+      expect(graph.nodes.find((n) => n.id === 'Idle')!.data.classes).toEqual(['highlight']);
+    });
+
+    it('parses ::: inline class on transition source', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle:::red --> Active
+      `);
+      expect(graph.nodes.find((n) => n.id === 'Idle')!.data.classes).toEqual(['red']);
+    });
+
     it('throws on empty input', () => {
       expect(() => fromMermaidState('')).toThrow('input is empty');
     });
@@ -221,6 +366,58 @@ stateDiagram-v2
       });
       expect(output).toContain('state "Loading data" as s1');
     });
+
+    it('serializes parallel states with -- separator', () => {
+      const output = toMermaidState({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'Active', parentId: null, initialNodeId: null, label: 'Active', data: { stateType: 'parallel' as const } },
+          { type: 'node', id: 'Active_region_0', parentId: 'Active', initialNodeId: null, label: 'Active_region_0', data: {} },
+          { type: 'node', id: 'Active_region_1', parentId: 'Active', initialNodeId: null, label: 'Active_region_1', data: {} },
+          { type: 'node', id: 'A', parentId: 'Active_region_0', initialNodeId: null, label: 'A', data: {} },
+          { type: 'node', id: 'B', parentId: 'Active_region_1', initialNodeId: null, label: 'B', data: {} },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('state Active {');
+      expect(output).toContain('--');
+      // Should not emit region node names
+      expect(output).not.toContain('Active_region_0');
+      expect(output).not.toContain('Active_region_1');
+    });
+
+    it('serializes direction', () => {
+      const output = toMermaidState({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        direction: 'right',
+        nodes: [
+          { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: 'A', data: {} },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('direction LR');
+    });
+
+    it('serializes classDefs and class assignments', () => {
+      const output = toMermaidState({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'Idle', parentId: null, initialNodeId: null, label: 'Idle', data: { classes: ['red'] } },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram', classDefs: { red: { fill: '#f00', stroke: '#333' } } },
+      });
+      expect(output).toContain('classDef red fill:#f00,stroke:#333');
+      expect(output).toContain('class Idle red');
+    });
   });
 
   describe('round-trip', () => {
@@ -239,6 +436,40 @@ stateDiagram-v2
       // Check non-pseudo nodes
       const real1 = graph.nodes.filter((n) => !n.data.isStart && !n.data.isEnd);
       const real2 = graph2.nodes.filter((n) => !n.data.isStart && !n.data.isEnd);
+      expect(real2.map((n) => n.id).sort()).toEqual(real1.map((n) => n.id).sort());
+    });
+
+    it('round-trips concurrent state diagram', () => {
+      const input = `stateDiagram-v2
+    state Active {
+        [*] --> NumLockOff
+        NumLockOff --> NumLockOn : EvNumLockPressed
+        NumLockOn --> NumLockOff : EvNumLockPressed
+        --
+        [*] --> CapsLockOff
+        CapsLockOff --> CapsLockOn : EvCapsLockPressed
+        CapsLockOn --> CapsLockOff : EvCapsLockPressed
+    }`;
+
+      const graph = fromMermaidState(input);
+      const output = toMermaidState(graph);
+      const graph2 = fromMermaidState(output);
+
+      // Same number of regions
+      const regions1 = graph.nodes.filter((n) => n.id.includes('_region_'));
+      const regions2 = graph2.nodes.filter((n) => n.id.includes('_region_'));
+      expect(regions2).toHaveLength(regions1.length);
+
+      // Active is still parallel
+      expect(graph2.nodes.find((n) => n.id === 'Active')!.data.stateType).toBe('parallel');
+
+      // Same real nodes
+      const real1 = graph.nodes.filter(
+        (n) => !n.data.isStart && !n.data.isEnd && !n.id.includes('_region_'),
+      );
+      const real2 = graph2.nodes.filter(
+        (n) => !n.data.isStart && !n.data.isEnd && !n.id.includes('_region_'),
+      );
       expect(real2.map((n) => n.id).sort()).toEqual(real1.map((n) => n.id).sort());
     });
   });

@@ -11,11 +11,12 @@ import {
 // --- Types ---
 
 export interface SequenceNodeData {
-  actorType: 'participant' | 'actor';
+  actorType: 'participant' | 'actor' | 'boundary' | 'control' | 'entity' | 'database' | 'collections' | 'queue';
   alias?: string;
-  // TODO: created/destroyed mid-sequence not yet mapped to graph lifecycle
   created?: boolean;
   destroyed?: boolean;
+  notes?: Array<{ position: 'left' | 'right' | 'over'; text: string; over?: string[] }>;
+  box?: { title?: string; color?: string };
 }
 
 export interface SequenceEdgeData {
@@ -127,6 +128,7 @@ export function fromMermaidSequence(input: string): SequenceGraph {
   let autonumber = false;
   let edgeCounter = 0;
   let seqNum = 0;
+  let currentBox: { title?: string; color?: string } | null = null;
 
   // Block nesting stack
   const blockStack: {
@@ -140,7 +142,7 @@ export function fromMermaidSequence(input: string): SequenceGraph {
 
   function ensureNode(
     id: string,
-    actorType: 'participant' | 'actor' = 'participant',
+    actorType: SequenceNodeData['actorType'] = 'participant',
   ): void {
     if (!nodeMap.has(id)) {
       nodeMap.set(id, {
@@ -179,12 +181,12 @@ export function fromMermaidSequence(input: string): SequenceGraph {
       continue;
     }
 
-    // participant / actor declaration
+    // participant / actor / boundary / control / entity / database / collections / queue declaration
     const participantMatch = line.match(
-      /^(participant|actor)\s+(\S+?)(?:\s+as\s+(.+))?$/,
+      /^(participant|actor|boundary|control|entity|database|collections|queue)\s+(\S+?)(?:\s+as\s+(.+))?$/,
     );
     if (participantMatch) {
-      const actorType = participantMatch[1] as 'participant' | 'actor';
+      const actorType = participantMatch[1] as SequenceNodeData['actorType'];
       const id = participantMatch[2];
       const alias = participantMatch[3]?.trim();
       ensureNode(id, actorType);
@@ -194,13 +196,16 @@ export function fromMermaidSequence(input: string): SequenceGraph {
         node.data.alias = alias;
         node.label = alias;
       }
+      // Apply current box if inside one
+      if (currentBox) {
+        node.data.box = { ...currentBox };
+      }
       continue;
     }
 
-    // TODO: `create participant` / `destroy` — mark node as created/destroyed
-    const createMatch = line.match(/^create\s+(participant|actor)\s+(\S+?)(?:\s+as\s+(.+))?$/);
+    const createMatch = line.match(/^create\s+(participant|actor|boundary|control|entity|database|collections|queue)\s+(\S+?)(?:\s+as\s+(.+))?$/);
     if (createMatch) {
-      const actorType = createMatch[1] as 'participant' | 'actor';
+      const actorType = createMatch[1] as SequenceNodeData['actorType'];
       const id = createMatch[2];
       const alias = createMatch[3]?.trim();
       ensureNode(id, actorType);
@@ -242,8 +247,24 @@ export function fromMermaidSequence(input: string): SequenceGraph {
       continue;
     }
 
+    // Box grouping: box [color] [title] ... end
+    const boxMatch = line.match(/^box\s*(.*)?$/);
+    if (boxMatch) {
+      const rest = (boxMatch[1] ?? '').trim();
+      // Parse optional color (e.g. "rgb(200,200,200)" or "#hex" or named color) and title
+      let color: string | undefined;
+      let title: string | undefined;
+      // Color can be: rgb(...), #hex, or a known CSS color name
+      const colorTitleMatch = rest.match(/^(rgb\([^)]*\)|#[a-fA-F0-9]+|[a-zA-Z]+)?\s*(.*)$/);
+      if (colorTitleMatch) {
+        color = colorTitleMatch[1]?.trim() || undefined;
+        title = colorTitleMatch[2]?.trim() || undefined;
+      }
+      currentBox = { ...(color && { color }), ...(title && { title }) };
+      continue;
+    }
+
     // Block keywords: loop, alt, else, opt, par, and, critical, option, break, rect, end
-    // TODO: box grouping → parentId for actors inside box
     if (/^(loop|alt|opt|par|critical|break)\s+/.test(line) || line.startsWith('rect ')) {
       const spaceIdx = line.indexOf(' ');
       const keyword = line.slice(0, spaceIdx);
@@ -301,6 +322,11 @@ export function fromMermaidSequence(input: string): SequenceGraph {
     }
 
     if (line === 'end') {
+      // Close box if inside one and no block is open
+      if (currentBox && blockStack.length === 0) {
+        currentBox = null;
+        continue;
+      }
       if (blockStack.length > 0) {
         const finished = blockStack.pop()!;
         const block = buildBlock(finished);
@@ -321,8 +347,29 @@ export function fromMermaidSequence(input: string): SequenceGraph {
       continue;
     }
 
-    // Note → skip (notes are not nodes/edges)
-    // TODO: store notes on actor nodeData
+    // Note → store on actor node data
+    const noteMatch = line.match(/^Note\s+(left of|right of|over)\s+([^:]+):\s*(.*)$/i);
+    if (noteMatch) {
+      const posRaw = noteMatch[1].toLowerCase();
+      const position: 'left' | 'right' | 'over' = posRaw === 'left of' ? 'left' : posRaw === 'right of' ? 'right' : 'over';
+      const actorsPart = noteMatch[2].trim();
+      const text = noteMatch[3].trim();
+      const actorIds = actorsPart.split(',').map((s) => s.trim());
+
+      // Store note on each referenced actor
+      for (const actorId of actorIds) {
+        ensureNode(actorId);
+        const node = nodeMap.get(actorId)!;
+        if (!node.data.notes) node.data.notes = [];
+        node.data.notes.push({
+          position,
+          text,
+          ...(position === 'over' && actorIds.length > 1 ? { over: actorIds } : {}),
+        });
+      }
+      continue;
+    }
+    // Also handle Note without colon (skip, no inline text)
     if (/^Note\s+(left|right|over)\s+/i.test(line)) {
       continue;
     }
@@ -503,15 +550,56 @@ export function toMermaidSequence(graph: SequenceGraph): string {
     lines.push('    autonumber');
   }
 
-  // Emit participant/actor declarations
+  // Group nodes by box for emission
+  const boxGroups = new Map<string, { box: NonNullable<SequenceNodeData['box']>; nodes: typeof graph.nodes }>();
+  const noBoxNodes: typeof graph.nodes = [];
   for (const node of graph.nodes) {
+    const box = node.data?.box;
+    if (box) {
+      const key = JSON.stringify(box);
+      if (!boxGroups.has(key)) boxGroups.set(key, { box, nodes: [] });
+      boxGroups.get(key)!.nodes.push(node);
+    } else {
+      noBoxNodes.push(node);
+    }
+  }
+
+  function emitParticipant(node: typeof graph.nodes[0], indent: string) {
     const d = node.data;
-    const keyword = d?.actorType === 'actor' ? 'actor' : 'participant';
+    const keyword = d?.actorType ?? 'participant';
     const alias = d?.alias ? ` as ${escapeMermaidLabel(d.alias)}` : '';
     if (d?.created) {
-      lines.push(`    create ${keyword} ${node.id}${alias}`);
+      lines.push(`${indent}create ${keyword} ${node.id}${alias}`);
     } else {
-      lines.push(`    ${keyword} ${node.id}${alias}`);
+      lines.push(`${indent}${keyword} ${node.id}${alias}`);
+    }
+  }
+
+  // Emit boxed participants first, then unboxed
+  for (const { box, nodes: boxNodes } of boxGroups.values()) {
+    const colorStr = box.color ? ` ${box.color}` : '';
+    const titleStr = box.title ? ` ${box.title}` : '';
+    lines.push(`    box${colorStr}${titleStr}`);
+    for (const node of boxNodes) {
+      emitParticipant(node, '        ');
+    }
+    lines.push('    end');
+  }
+  for (const node of noBoxNodes) {
+    emitParticipant(node, '    ');
+  }
+
+  // Emit notes after participant declarations
+  for (const node of graph.nodes) {
+    if (node.data?.notes) {
+      for (const note of node.data.notes) {
+        if (note.position === 'over' && note.over && note.over.length > 1) {
+          lines.push(`    Note over ${note.over.join(',')}: ${escapeMermaidLabel(note.text)}`);
+        } else {
+          const posStr = note.position === 'left' ? 'left of' : note.position === 'right' ? 'right of' : 'over';
+          lines.push(`    Note ${posStr} ${node.id}: ${escapeMermaidLabel(note.text)}`);
+        }
+      }
     }
   }
 

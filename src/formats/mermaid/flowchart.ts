@@ -16,10 +16,11 @@ export interface FlowchartNodeData {
   classes?: string[];
   link?: string;
   tooltip?: string;
+  direction?: 'up' | 'down' | 'left' | 'right';
 }
 
 export interface FlowchartEdgeData {
-  stroke: 'normal' | 'dotted' | 'thick';
+  stroke: 'normal' | 'dotted' | 'thick' | 'invisible';
   arrowType: 'arrow' | 'none';
   endMarker?: 'arrow' | 'circle' | 'cross';
   startMarker?: 'arrow' | 'circle' | 'cross';
@@ -69,7 +70,34 @@ function parseNodeDecl(text: string): {
   id: string;
   label: string;
   shape: string;
+  className?: string;
 } | null {
+  // Strip :::className suffix
+  let className: string | undefined;
+  const classIdx = text.indexOf(':::');
+  if (classIdx >= 0) {
+    className = text.slice(classIdx + 3).trim();
+    text = text.slice(0, classIdx);
+  }
+
+  // Try @{ shape: ..., label: ... } expanded syntax
+  const atMatch = text.match(/^([a-zA-Z_][\w]*)@\{(.+)\}$/s);
+  if (atMatch) {
+    const id = atMatch[1];
+    const body = atMatch[2].trim();
+    let shape = 'rectangle';
+    let label = '';
+    // Parse key: value pairs (simple, no nested objects)
+    for (const line of body.split(',')) {
+      const kv = line.match(/^\s*(\w+)\s*:\s*"?([^"]*)"?\s*$/);
+      if (kv) {
+        if (kv[1] === 'shape') shape = kv[2].trim();
+        else if (kv[1] === 'label') label = kv[2].trim();
+      }
+    }
+    return { id, label, shape, ...(className && { className }) };
+  }
+
   // Try each shape pattern
   for (const [opener, closer, shapeName] of SHAPE_OPENERS) {
     const opIdx = text.indexOf(opener);
@@ -79,11 +107,11 @@ function parseNodeDecl(text: string): {
     // Find matching closer from end
     if (!text.endsWith(closer)) continue;
     const label = text.slice(opIdx + opener.length, text.length - closer.length);
-    return { id, label: label.trim(), shape: shapeName };
+    return { id, label: label.trim(), shape: shapeName, ...(className && { className }) };
   }
   // Bare node ID (no brackets)
   if (/^[a-zA-Z_][\w]*$/.test(text)) {
-    return { id: text, label: '', shape: 'rectangle' };
+    return { id: text, label: '', shape: 'rectangle', ...(className && { className }) };
   }
   return null;
 }
@@ -91,7 +119,7 @@ function parseNodeDecl(text: string): {
 // --- Edge parsing ---
 
 interface EdgeArrowInfo {
-  stroke: 'normal' | 'dotted' | 'thick';
+  stroke: 'normal' | 'dotted' | 'thick' | 'invisible';
   arrowType: 'arrow' | 'none';
   endMarker: 'arrow' | 'circle' | 'cross';
   startMarker?: 'arrow' | 'circle' | 'cross';
@@ -124,6 +152,8 @@ const EDGE_ARROWS: [RegExp, Omit<EdgeArrowInfo, 'label'>][] = [
   [/^-->$/,  { stroke: 'normal', arrowType: 'arrow', endMarker: 'arrow', bidirectional: false }],
   [/^---$/,  { stroke: 'normal', arrowType: 'none', endMarker: 'arrow', bidirectional: false }],
   [/^--$/,   { stroke: 'normal', arrowType: 'none', endMarker: 'arrow', bidirectional: false }],
+  // Invisible
+  [/^~~~$/, { stroke: 'invisible', arrowType: 'none', endMarker: 'arrow', bidirectional: false }],
 ];
 
 // Match an edge expression from a line and return the parsed components.
@@ -229,7 +259,7 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
   // Subgraph stack for tracking parentId
   const parentStack: (string | null)[] = [null];
 
-  function ensureNode(id: string, label?: string, shape?: string): FlowchartNode {
+  function ensureNode(id: string, label?: string, shape?: string, className?: string): FlowchartNode {
     if (!nodeMap.has(id)) {
       nodeMap.set(id, {
         type: 'node',
@@ -245,6 +275,11 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
     // Update label/shape if provided and node was auto-created
     if (label && !node.label) node.label = label;
     if (shape && shape !== 'rectangle' && !node.shape) (node as any).shape = shape;
+    // Apply ::: inline class
+    if (className) {
+      if (!classAssignments[id]) classAssignments[id] = [];
+      if (!classAssignments[id].includes(className)) classAssignments[id].push(className);
+    }
     return node;
   }
 
@@ -262,9 +297,17 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
       continue;
     }
 
-    // direction inside subgraph
-    if (/^direction\s+(TD|TB|BT|LR|RL)\s*$/.test(line)) {
-      continue; // Subgraph direction — skip (not stored per-subgraph)
+    // direction inside subgraph — store on parent node
+    const dirMatch = line.match(/^direction\s+(TD|TB|BT|LR|RL)\s*$/);
+    if (dirMatch) {
+      const parentId = parentStack[parentStack.length - 1];
+      if (parentId) {
+        const parentNode = nodeMap.get(parentId);
+        if (parentNode) {
+          parentNode.data.direction = MERMAID_TO_DIRECTION[dirMatch[1]];
+        }
+      }
+      continue;
     }
 
     if (line === 'end') {
@@ -352,14 +395,14 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
       // Parse source node
       const sourceDecl = parseNodeDecl(edgeResult.sourceText);
       if (sourceDecl) {
-        ensureNode(sourceDecl.id, sourceDecl.label, sourceDecl.shape);
+        ensureNode(sourceDecl.id, sourceDecl.label, sourceDecl.shape, sourceDecl.className);
       }
 
       // Parse target — might have more edges chained
       const targetDecl = parseNodeDecl(edgeResult.targetText);
       let targetId: string;
       if (targetDecl) {
-        ensureNode(targetDecl.id, targetDecl.label, targetDecl.shape);
+        ensureNode(targetDecl.id, targetDecl.label, targetDecl.shape, targetDecl.className);
         targetId = targetDecl.id;
         remaining = ''; // consumed
       } else {
@@ -368,7 +411,7 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
         if (nextEdge) {
           const tDecl = parseNodeDecl(nextEdge.sourceText);
           if (tDecl) {
-            ensureNode(tDecl.id, tDecl.label, tDecl.shape);
+            ensureNode(tDecl.id, tDecl.label, tDecl.shape, tDecl.className);
             targetId = tDecl.id;
           } else {
             targetId = nextEdge.sourceText;
@@ -408,7 +451,7 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
     // Standalone node declaration
     const nodeDecl = parseNodeDecl(line);
     if (nodeDecl) {
-      ensureNode(nodeDecl.id, nodeDecl.label, nodeDecl.shape);
+      ensureNode(nodeDecl.id, nodeDecl.label, nodeDecl.shape, nodeDecl.className);
       continue;
     }
 
@@ -507,6 +550,11 @@ export function toMermaidFlowchart(graph: FlowchartGraph): string {
         // Emit as subgraph
         const label = node.label ? `[${escapeMermaidLabel(node.label)}]` : '';
         lines.push(`${indent}subgraph ${node.id}${label}`);
+        // Emit direction if set on this subgraph
+        if (node.data?.direction) {
+          const subDir = DIRECTION_TO_MERMAID[node.data.direction] ?? 'TD';
+          lines.push(`${indent}    direction ${subDir}`);
+        }
         writeNodes(node.id, indent + '    ');
         lines.push(`${indent}end`);
       } else {
@@ -527,7 +575,9 @@ export function toMermaidFlowchart(graph: FlowchartGraph): string {
   for (const edge of graph.edges) {
     const d = edge.data;
     let arrow: string;
-    if (d?.bidirectional) {
+    if (d?.stroke === 'invisible') {
+      arrow = '~~~';
+    } else if (d?.bidirectional) {
       arrow =
         d.stroke === 'thick'
           ? '<==>'
@@ -539,9 +589,14 @@ export function toMermaidFlowchart(graph: FlowchartGraph): string {
     } else if (d?.stroke === 'dotted') {
       arrow = d.arrowType === 'none' ? '-.-' : '-.->';
     } else {
-      if (d?.endMarker === 'circle') arrow = '--o';
-      else if (d?.endMarker === 'cross') arrow = '--x';
-      else arrow = d?.arrowType === 'none' ? '---' : '-->';
+      // Start marker prefix
+      let prefix = '';
+      if (d?.startMarker === 'circle') prefix = 'o';
+      else if (d?.startMarker === 'cross') prefix = 'x';
+
+      if (d?.endMarker === 'circle') arrow = `${prefix}--o`;
+      else if (d?.endMarker === 'cross') arrow = `${prefix}--x`;
+      else arrow = d?.arrowType === 'none' ? `${prefix}---` : `${prefix}-->`;
     }
 
     let labelStr = '';

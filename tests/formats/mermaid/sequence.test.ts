@@ -224,7 +224,7 @@ sequenceDiagram
       expect(nodeB.data.destroyed).toBe(true);
     });
 
-    it('ignores Note lines', () => {
+    it('parses Note right of actor', () => {
       const graph = fromMermaidSequence(`
 sequenceDiagram
     Alice->>Bob: Hello
@@ -232,6 +232,79 @@ sequenceDiagram
     Bob->>Alice: Hi
       `);
       expect(graph.edges).toHaveLength(2);
+      const bob = graph.nodes.find((n) => n.id === 'Bob')!;
+      expect(bob.data.notes).toHaveLength(1);
+      expect(bob.data.notes![0]).toEqual({ position: 'right', text: 'Bob thinks' });
+    });
+
+    it('parses Note left of actor', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    participant Alice
+    Note left of Alice: Thinking
+      `);
+      const alice = graph.nodes.find((n) => n.id === 'Alice')!;
+      expect(alice.data.notes).toHaveLength(1);
+      expect(alice.data.notes![0].position).toBe('left');
+    });
+
+    it('parses Note over multiple actors', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    participant Alice
+    participant Bob
+    Note over Alice,Bob: Shared note
+      `);
+      const alice = graph.nodes.find((n) => n.id === 'Alice')!;
+      expect(alice.data.notes).toHaveLength(1);
+      expect(alice.data.notes![0].position).toBe('over');
+      expect(alice.data.notes![0].over).toEqual(['Alice', 'Bob']);
+    });
+
+    it('parses database participant type', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    database DB
+    participant App
+    App->>DB: Query
+      `);
+      const db = graph.nodes.find((n) => n.id === 'DB')!;
+      expect(db.data.actorType).toBe('database');
+    });
+
+    it('parses all extended participant types', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    boundary B1
+    control C1
+    entity E1
+    database D1
+    collections CO1
+    queue Q1
+      `);
+      expect(graph.nodes.find((n) => n.id === 'B1')!.data.actorType).toBe('boundary');
+      expect(graph.nodes.find((n) => n.id === 'C1')!.data.actorType).toBe('control');
+      expect(graph.nodes.find((n) => n.id === 'E1')!.data.actorType).toBe('entity');
+      expect(graph.nodes.find((n) => n.id === 'D1')!.data.actorType).toBe('database');
+      expect(graph.nodes.find((n) => n.id === 'CO1')!.data.actorType).toBe('collections');
+      expect(graph.nodes.find((n) => n.id === 'Q1')!.data.actorType).toBe('queue');
+    });
+
+    it('parses box grouping', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    box rgb(200,200,200) My Group
+        participant Alice
+        participant Bob
+    end
+    participant Charlie
+      `);
+      const alice = graph.nodes.find((n) => n.id === 'Alice')!;
+      expect(alice.data.box).toEqual({ color: 'rgb(200,200,200)', title: 'My Group' });
+      const bob = graph.nodes.find((n) => n.id === 'Bob')!;
+      expect(bob.data.box).toEqual({ color: 'rgb(200,200,200)', title: 'My Group' });
+      const charlie = graph.nodes.find((n) => n.id === 'Charlie')!;
+      expect(charlie.data.box).toBeUndefined();
     });
 
     it('strips comments', () => {
@@ -441,6 +514,52 @@ sequenceDiagram
         "sequenceDiagram
             autonumber"
       `);
+    });
+
+    it('serializes database participant type', () => {
+      const output = toMermaidSequence({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'DB', parentId: null, initialNodeId: null, label: 'DB', data: { actorType: 'database' } },
+        ],
+        edges: [],
+        data: { diagramType: 'sequence' },
+      });
+      expect(output).toContain('database DB');
+    });
+
+    it('serializes notes', () => {
+      const output = toMermaidSequence({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'Alice', parentId: null, initialNodeId: null, label: 'Alice', data: { actorType: 'participant', notes: [{ position: 'right' as const, text: 'Thinking' }] } },
+        ],
+        edges: [],
+        data: { diagramType: 'sequence' },
+      });
+      expect(output).toContain('Note right of Alice: Thinking');
+    });
+
+    it('serializes box grouping', () => {
+      const output = toMermaidSequence({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'Alice', parentId: null, initialNodeId: null, label: 'Alice', data: { actorType: 'participant', box: { color: 'rgb(200,200,200)', title: 'My Group' } } },
+          { type: 'node', id: 'Bob', parentId: null, initialNodeId: null, label: 'Bob', data: { actorType: 'participant', box: { color: 'rgb(200,200,200)', title: 'My Group' } } },
+          { type: 'node', id: 'Charlie', parentId: null, initialNodeId: null, label: 'Charlie', data: { actorType: 'participant' } },
+        ],
+        edges: [],
+        data: { diagramType: 'sequence' },
+      });
+      expect(output).toContain('box rgb(200,200,200) My Group');
+      expect(output).toContain('end');
+      expect(output).toContain('participant Charlie');
     });
 
     it('serializes create participant', () => {
