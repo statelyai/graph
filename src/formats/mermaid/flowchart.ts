@@ -35,7 +35,7 @@ export interface FlowchartGraphData {
   // TODO: %%{init:...}%% directives not fully preserved
 }
 
-type FlowchartGraph = Graph<FlowchartNodeData, FlowchartEdgeData, FlowchartGraphData>;
+export type MermaidFlowchartGraph = Graph<FlowchartNodeData, FlowchartEdgeData, FlowchartGraphData>;
 type FlowchartNode = GraphNode<FlowchartNodeData>;
 type FlowchartEdge = GraphEdge<FlowchartEdgeData>;
 
@@ -236,7 +236,7 @@ function findEdge(line: string): {
  *     B -->|Yes| C[End]
  * `);
  */
-export function fromMermaidFlowchart(input: string): FlowchartGraph {
+export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
   validateInput(input, 'Mermaid flowchart');
   const { lines } = prepareLines(input);
 
@@ -512,7 +512,7 @@ export function fromMermaidFlowchart(input: string): FlowchartGraph {
  * const mermaid = toMermaidFlowchart(graph);
  * // "flowchart TD\n    A[Start] --> B{Decision}\n    ..."
  */
-export function toMermaidFlowchart(graph: FlowchartGraph): string {
+export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
   const dir = DIRECTION_TO_MERMAID[graph.direction ?? 'down'] ?? 'TD';
   const lines: string[] = [`flowchart ${dir}`];
 
@@ -643,8 +643,6 @@ export function toMermaidFlowchart(graph: FlowchartGraph): string {
  * `);
  * const str = mermaidFlowchartConverter.to(graph);
  */
-export const mermaidFlowchartConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidFlowchart as (graph: Graph) => string,
-    fromMermaidFlowchart,
-  );
+export const mermaidFlowchartConverter: GraphFormatConverter<
+  string, FlowchartNodeData, FlowchartEdgeData, FlowchartGraphData
+> = createFormatConverter(toMermaidFlowchart, fromMermaidFlowchart);

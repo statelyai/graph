@@ -23,7 +23,7 @@ export interface BlockGraphData {
   columns?: number;
 }
 
-type BlockGraph = Graph<BlockNodeData, BlockEdgeData, BlockGraphData>;
+export type MermaidBlockGraph = Graph<BlockNodeData, BlockEdgeData, BlockGraphData>;
 type BlockNode = GraphNode<BlockNodeData>;
 
 // --- Parser ---
@@ -65,7 +65,7 @@ function parseBlockNode(text: string): { id: string; label: string; shape?: stri
  *     a --> b
  * `);
  */
-export function fromMermaidBlock(input: string): BlockGraph {
+export function fromMermaidBlock(input: string): MermaidBlockGraph {
   validateInput(input, 'Mermaid block');
   const { lines } = prepareLines(input);
 
@@ -196,7 +196,7 @@ export function fromMermaidBlock(input: string): BlockGraph {
  * const mermaid = toMermaidBlock(graph);
  * // "block-beta\n    columns 2\n    a[\"Task A\"]\n    ..."
  */
-export function toMermaidBlock(graph: BlockGraph): string {
+export function toMermaidBlock(graph: MermaidBlockGraph): string {
   const lines: string[] = ['block-beta'];
 
   if (graph.data?.columns) {
@@ -254,8 +254,6 @@ export function toMermaidBlock(graph: BlockGraph): string {
  * `);
  * const str = mermaidBlockConverter.to(graph);
  */
-export const mermaidBlockConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidBlock as (graph: Graph) => string,
-    fromMermaidBlock,
-  );
+export const mermaidBlockConverter: GraphFormatConverter<
+  string, BlockNodeData, BlockEdgeData, BlockGraphData
+> = createFormatConverter(toMermaidBlock, fromMermaidBlock);

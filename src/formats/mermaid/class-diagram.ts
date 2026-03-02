@@ -40,7 +40,7 @@ export interface ClassGraphData {
   diagramType: 'classDiagram';
 }
 
-type ClassGraph = Graph<ClassNodeData, ClassEdgeData, ClassGraphData>;
+export type MermaidClassGraph = Graph<ClassNodeData, ClassEdgeData, ClassGraphData>;
 type ClassNode = GraphNode<ClassNodeData>;
 type ClassEdge = GraphEdge<ClassEdgeData>;
 
@@ -198,7 +198,7 @@ function parseMember(line: string): {
  *     Animal <|-- Dog
  * `);
  */
-export function fromMermaidClass(input: string): ClassGraph {
+export function fromMermaidClass(input: string): MermaidClassGraph {
   validateInput(input, 'Mermaid class');
   const { lines } = prepareLines(input);
 
@@ -359,7 +359,7 @@ const VISIBILITY_SYMBOLS: Record<string, string> = {
  * const mermaid = toMermaidClass(graph);
  * // "classDiagram\n    class Animal {\n    ..."
  */
-export function toMermaidClass(graph: ClassGraph): string {
+export function toMermaidClass(graph: MermaidClassGraph): string {
   const lines: string[] = ['classDiagram'];
 
   // Emit classes with members
@@ -418,8 +418,6 @@ export function toMermaidClass(graph: ClassGraph): string {
  * `);
  * const str = mermaidClassConverter.to(graph);
  */
-export const mermaidClassConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidClass as (graph: Graph) => string,
-    fromMermaidClass,
-  );
+export const mermaidClassConverter: GraphFormatConverter<
+  string, ClassNodeData, ClassEdgeData, ClassGraphData
+> = createFormatConverter(toMermaidClass, fromMermaidClass);

@@ -20,7 +20,7 @@ export interface MindmapGraphData {
   diagramType: 'mindmap';
 }
 
-type MindmapGraph = Graph<MindmapNodeData, MindmapEdgeData, MindmapGraphData>;
+export type MermaidMindmapGraph = Graph<MindmapNodeData, MindmapEdgeData, MindmapGraphData>;
 type MindmapNode = GraphNode<MindmapNodeData>;
 
 // --- Shape parsing (same bracket syntax as flowchart) ---
@@ -66,7 +66,7 @@ function parseNodeText(text: string): { label: string; shape?: string } {
  *     Child B
  * `);
  */
-export function fromMermaidMindmap(input: string): MindmapGraph {
+export function fromMermaidMindmap(input: string): MermaidMindmapGraph {
   validateInput(input, 'Mermaid mindmap');
   const { lines } = prepareLines(input);
 
@@ -159,7 +159,7 @@ export function fromMermaidMindmap(input: string): MindmapGraph {
  * const mermaid = toMermaidMindmap(graph);
  * // "mindmap\n  Root\n    Child A\n    ..."
  */
-export function toMermaidMindmap(graph: MindmapGraph): string {
+export function toMermaidMindmap(graph: MermaidMindmapGraph): string {
   const lines: string[] = ['mindmap'];
 
   // Build children map
@@ -207,8 +207,6 @@ export function toMermaidMindmap(graph: MindmapGraph): string {
  * `);
  * const str = mermaidMindmapConverter.to(graph);
  */
-export const mermaidMindmapConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidMindmap as (graph: Graph) => string,
-    fromMermaidMindmap,
-  );
+export const mermaidMindmapConverter: GraphFormatConverter<
+  string, MindmapNodeData, MindmapEdgeData, MindmapGraphData
+> = createFormatConverter(toMermaidMindmap, fromMermaidMindmap);

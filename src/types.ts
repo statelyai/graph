@@ -270,11 +270,11 @@ export type GraphPatch<TNodeData = any, TEdgeData = any> =
  * };
  * ```
  */
-export interface GraphFormatConverter<TSerial> {
+export interface GraphFormatConverter<TSerial, N = any, E = any, G = any> {
   /** Convert a Graph to the serialized format. */
-  to(graph: Graph): TSerial;
+  to(graph: Graph<N, E, G>): TSerial;
   /** Convert from the serialized format to a Graph. */
-  from(input: TSerial): Graph;
+  from(input: TSerial): Graph<N, E, G>;
 }
 
 /**
@@ -282,11 +282,11 @@ export interface GraphFormatConverter<TSerial> {
  *
  * Use this for formats that carry position/size data (e.g. xyflow, cytoscape).
  */
-export interface VisualGraphFormatConverter<TSerial> {
+export interface VisualGraphFormatConverter<TSerial, N = any, E = any, G = any> {
   /** Convert a VisualGraph to the serialized format. */
-  to(graph: VisualGraph): TSerial;
+  to(graph: VisualGraph<N, E, G>): TSerial;
   /** Convert from the serialized format to a VisualGraph. */
-  from(input: TSerial): VisualGraph;
+  from(input: TSerial): VisualGraph<N, E, G>;
 }
 
 // --- Transition exploration options ---

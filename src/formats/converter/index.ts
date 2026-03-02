@@ -18,10 +18,10 @@ import { toEdgeList, fromEdgeList } from '../edge-list';
  * const graph = yamlConverter.from(yaml);
  * ```
  */
-export function createFormatConverter<TSerial>(
-  to: (graph: Graph) => TSerial,
-  from: (input: TSerial) => Graph,
-): GraphFormatConverter<TSerial> {
+export function createFormatConverter<TSerial, N = any, E = any, G = any>(
+  to: (graph: Graph<N, E, G>) => TSerial,
+  from: (input: TSerial) => Graph<N, E, G>,
+): GraphFormatConverter<TSerial, N, E, G> {
   return { to, from };
 }
 

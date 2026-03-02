@@ -30,7 +30,7 @@ export interface StateGraphData {
   classDefs?: Record<string, Record<string, string>>;
 }
 
-type StateGraph = Graph<StateNodeData, StateEdgeData, StateGraphData>;
+export type MermaidStateGraph = Graph<StateNodeData, StateEdgeData, StateGraphData>;
 type StateNode = GraphNode<StateNodeData>;
 type StateEdge = GraphEdge<StateEdgeData>;
 
@@ -47,7 +47,7 @@ type StateEdge = GraphEdge<StateEdgeData>;
  *     Running --> [*]
  * `);
  */
-export function fromMermaidState(input: string): StateGraph {
+export function fromMermaidState(input: string): MermaidStateGraph {
   validateInput(input, 'Mermaid state');
   const { lines } = prepareLines(input);
 
@@ -67,7 +67,7 @@ export function fromMermaidState(input: string): StateGraph {
   let startCounter = 0;
   let endCounter = 0;
 
-  let graphDirection: StateGraph['direction'] | undefined;
+  let graphDirection: MermaidStateGraph['direction'] | undefined;
   const classDefs: Record<string, Record<string, string>> = {};
   const classAssignments: Record<string, string[]> = {};
 
@@ -408,7 +408,7 @@ export function fromMermaidState(input: string): StateGraph {
  * const mermaid = toMermaidState(graph);
  * // "stateDiagram-v2\n    [*] --> Idle\n    ..."
  */
-export function toMermaidState(graph: StateGraph): string {
+export function toMermaidState(graph: MermaidStateGraph): string {
   const lines: string[] = ['stateDiagram-v2'];
 
   // Top-level direction
@@ -538,8 +538,6 @@ export function toMermaidState(graph: StateGraph): string {
  * `);
  * const str = mermaidStateConverter.to(graph);
  */
-export const mermaidStateConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidState as (graph: Graph) => string,
-    fromMermaidState,
-  );
+export const mermaidStateConverter: GraphFormatConverter<
+  string, StateNodeData, StateEdgeData, StateGraphData
+> = createFormatConverter(toMermaidState, fromMermaidState);

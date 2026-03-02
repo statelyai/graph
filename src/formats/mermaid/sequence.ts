@@ -60,7 +60,7 @@ export interface SequenceGraphData {
   // TODO: rect background highlighting partially supported via blocks
 }
 
-type SequenceGraph = Graph<SequenceNodeData, SequenceEdgeData, SequenceGraphData>;
+export type MermaidSequenceGraph = Graph<SequenceNodeData, SequenceEdgeData, SequenceGraphData>;
 type SequenceNode = GraphNode<SequenceNodeData>;
 type SequenceEdge = GraphEdge<SequenceEdgeData>;
 
@@ -112,7 +112,7 @@ const MESSAGE_RE =
  *     Bob-->>Alice: Hi back
  * `);
  */
-export function fromMermaidSequence(input: string): SequenceGraph {
+export function fromMermaidSequence(input: string): MermaidSequenceGraph {
   validateInput(input, 'Mermaid sequence');
   const { lines } = prepareLines(input);
 
@@ -542,7 +542,7 @@ const ARROW_MAP: Record<string, Record<string, string>> = {
  * const mermaid = toMermaidSequence(graph);
  * // "sequenceDiagram\n    participant Alice\n    ..."
  */
-export function toMermaidSequence(graph: SequenceGraph): string {
+export function toMermaidSequence(graph: MermaidSequenceGraph): string {
   const lines: string[] = ['sequenceDiagram'];
   const gd = graph.data;
 
@@ -806,8 +806,6 @@ export function toMermaidSequence(graph: SequenceGraph): string {
  * `);
  * const str = mermaidSequenceConverter.to(graph);
  */
-export const mermaidSequenceConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidSequence as (graph: Graph) => string,
-    fromMermaidSequence,
-  );
+export const mermaidSequenceConverter: GraphFormatConverter<
+  string, SequenceNodeData, SequenceEdgeData, SequenceGraphData
+> = createFormatConverter(toMermaidSequence, fromMermaidSequence);

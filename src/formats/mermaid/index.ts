@@ -5,6 +5,7 @@ export {
   mermaidSequenceConverter,
 } from './sequence';
 export type {
+  MermaidSequenceGraph,
   SequenceNodeData,
   SequenceEdgeData,
   SequenceGraphData,
@@ -18,6 +19,7 @@ export {
   mermaidFlowchartConverter,
 } from './flowchart';
 export type {
+  MermaidFlowchartGraph,
   FlowchartNodeData,
   FlowchartEdgeData,
   FlowchartGraphData,
@@ -30,6 +32,7 @@ export {
   mermaidStateConverter,
 } from './state';
 export type {
+  MermaidStateGraph,
   StateNodeData,
   StateEdgeData,
   StateGraphData,
@@ -42,6 +45,7 @@ export {
   mermaidClassConverter,
 } from './class-diagram';
 export type {
+  MermaidClassGraph,
   ClassNodeData,
   ClassEdgeData,
   ClassGraphData,
@@ -54,6 +58,7 @@ export {
   mermaidERConverter,
 } from './er-diagram';
 export type {
+  MermaidERGraph,
   ERNodeData,
   EREdgeData,
   ERGraphData,
@@ -66,6 +71,7 @@ export {
   mermaidMindmapConverter,
 } from './mindmap';
 export type {
+  MermaidMindmapGraph,
   MindmapNodeData,
   MindmapEdgeData,
   MindmapGraphData,
@@ -78,6 +84,7 @@ export {
   mermaidBlockConverter,
 } from './block';
 export type {
+  MermaidBlockGraph,
   BlockNodeData,
   BlockEdgeData,
   BlockGraphData,

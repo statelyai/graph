@@ -29,7 +29,7 @@ export interface ERGraphData {
   diagramType: 'erDiagram';
 }
 
-type ERGraph = Graph<ERNodeData, EREdgeData, ERGraphData>;
+export type MermaidERGraph = Graph<ERNodeData, EREdgeData, ERGraphData>;
 type ERNode = GraphNode<ERNodeData>;
 type EREdge = GraphEdge<EREdgeData>;
 
@@ -110,7 +110,7 @@ const ER_LINE_RE =
  *     ORDER ||--|{ LINE_ITEM : contains
  * `);
  */
-export function fromMermaidER(input: string): ERGraph {
+export function fromMermaidER(input: string): MermaidERGraph {
   validateInput(input, 'Mermaid ER');
   const { lines } = prepareLines(input);
 
@@ -228,7 +228,7 @@ export function fromMermaidER(input: string): ERGraph {
  * const mermaid = toMermaidER(graph);
  * // "erDiagram\n    CUSTOMER ||--o{ ORDER : \"places\"\n    ..."
  */
-export function toMermaidER(graph: ERGraph): string {
+export function toMermaidER(graph: MermaidERGraph): string {
   const lines: string[] = ['erDiagram'];
 
   // Emit entities with attributes
@@ -270,8 +270,6 @@ export function toMermaidER(graph: ERGraph): string {
  * `);
  * const str = mermaidERConverter.to(graph);
  */
-export const mermaidERConverter: GraphFormatConverter<string> =
-  createFormatConverter(
-    toMermaidER as (graph: Graph) => string,
-    fromMermaidER,
-  );
+export const mermaidERConverter: GraphFormatConverter<
+  string, ERNodeData, EREdgeData, ERGraphData
+> = createFormatConverter(toMermaidER, fromMermaidER);
