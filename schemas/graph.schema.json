@@ -12,6 +12,16 @@
         "undirected"
       ]
     },
+    "initialNodeId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "nodes": {
       "type": "array",
       "items": {
@@ -34,15 +44,58 @@
               }
             ]
           },
+          "initialNodeId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "label": {
             "type": "string"
           },
-          "data": {}
+          "data": {},
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "shape": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "style": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
         },
         "required": [
           "type",
           "id",
-          "parentId",
           "label",
           "data"
         ],
@@ -70,7 +123,38 @@
           "label": {
             "type": "string"
           },
-          "data": {}
+          "data": {},
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "style": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
         },
         "required": [
           "type",
@@ -83,11 +167,37 @@
         "additionalProperties": false
       }
     },
-    "data": {}
+    "data": {},
+    "direction": {
+      "type": "string",
+      "enum": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ]
+    },
+    "style": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          }
+        ]
+      }
+    }
   },
   "required": [
     "id",
     "type",
+    "initialNodeId",
     "nodes",
     "edges",
     "data"

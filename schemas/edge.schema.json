@@ -18,7 +18,38 @@
     "label": {
       "type": "string"
     },
-    "data": {}
+    "data": {},
+    "x": {
+      "type": "number"
+    },
+    "y": {
+      "type": "number"
+    },
+    "width": {
+      "type": "number"
+    },
+    "height": {
+      "type": "number"
+    },
+    "color": {
+      "type": "string"
+    },
+    "style": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          }
+        ]
+      }
+    }
   },
   "required": [
     "type",

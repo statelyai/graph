@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import * as z from 'zod';
 import { GraphSchema, NodeSchema, EdgeSchema } from '../src/schemas';
+import type { GraphNode, GraphEdge, Graph } from '../src/types';
 
 describe('Zod schemas', () => {
   it('NodeSchema validates a valid node', () => {
@@ -58,6 +59,21 @@ describe('Zod schemas', () => {
       edges: [],
     });
     expect(result.success).toBe(false);
+  });
+
+  it('NodeSchema stays in sync with GraphNode type', () => {
+    expectTypeOf<z.infer<typeof NodeSchema>>().toMatchTypeOf<GraphNode>();
+    expectTypeOf<GraphNode>().toMatchTypeOf<z.infer<typeof NodeSchema>>();
+  });
+
+  it('EdgeSchema stays in sync with GraphEdge type', () => {
+    expectTypeOf<z.infer<typeof EdgeSchema>>().toMatchTypeOf<GraphEdge>();
+    expectTypeOf<GraphEdge>().toMatchTypeOf<z.infer<typeof EdgeSchema>>();
+  });
+
+  it('GraphSchema stays in sync with Graph type', () => {
+    expectTypeOf<z.infer<typeof GraphSchema>>().toMatchTypeOf<Graph>();
+    expectTypeOf<Graph>().toMatchTypeOf<z.infer<typeof GraphSchema>>();
   });
 
   it('produces JSON Schema via z.toJSONSchema()', () => {

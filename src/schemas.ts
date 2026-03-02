@@ -1,12 +1,21 @@
 import * as z from 'zod';
 
+const StyleSchema = z.record(z.string(), z.union([z.string(), z.number()]));
+
 export const NodeSchema = z.object({
   type: z.literal('node'),
   id: z.string(),
-  parentId: z.string().nullable(),
-  initialNodeId: z.string().nullable(),
+  parentId: z.string().nullable().optional(),
+  initialNodeId: z.string().nullable().optional(),
   label: z.string(),
   data: z.any(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  shape: z.string().optional(),
+  color: z.string().optional(),
+  style: StyleSchema.optional(),
 });
 
 export const EdgeSchema = z.object({
@@ -16,6 +25,12 @@ export const EdgeSchema = z.object({
   targetId: z.string(),
   label: z.string(),
   data: z.any(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  color: z.string().optional(),
+  style: StyleSchema.optional(),
 });
 
 export const GraphSchema = z.object({
@@ -25,4 +40,6 @@ export const GraphSchema = z.object({
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),
   data: z.any(),
+  direction: z.enum(['up', 'down', 'left', 'right']).optional(),
+  style: StyleSchema.optional(),
 });
