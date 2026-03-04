@@ -20,6 +20,20 @@ export { toXYFlow, fromXYFlow, xyflowConverter } from './xyflow';
 export type { XYFlow, XYFlowNode, XYFlowEdge } from './xyflow';
 export { toGML, fromGML, gmlConverter } from './gml';
 export { toTGF, fromTGF, tgfConverter } from './tgf';
+export { toELK, fromELK, elkConverter } from './elk';
+export type {
+  ElkNode,
+  ElkExtendedEdge,
+  ElkEdge,
+  ElkEdgeSection,
+  ElkLabel,
+  ElkPort,
+  ElkPoint,
+  ElkShape,
+  ElkGraphElement,
+  ElkPrimitiveEdge,
+  LayoutOptions,
+} from './elk';
 
 // Mermaid diagram converters
 export {

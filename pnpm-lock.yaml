@@ -41,6 +41,9 @@ importers:
       dotparser:
         specifier: ^1.1.1
         version: 1.1.1
+      elkjs:
+        specifier: ^0.11.1
+        version: 0.11.1
       fast-xml-parser:
         specifier: ^5.3.4
         version: 5.3.4
@@ -934,6 +937,9 @@ packages:
     peerDependenciesMeta:
       oxc-resolver:
         optional: true
+
+  elkjs@0.11.1:
+    resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==, tarball: https://registry.npmjs.org/elkjs/-/elkjs-0.11.1.tgz}
 
   empathic@2.0.0:
     resolution: {integrity: sha512-i6UzDscO/XfAcNYD75CfICkmfLedpyPDdozrLMmQc5ORaQcdMoc21OnlEylMIqI7U8eniKrPMxxtj8k0vhmJhA==}
@@ -2298,6 +2304,8 @@ snapshots:
   dotparser@1.1.1: {}
 
   dts-resolver@2.1.3: {}
+
+  elkjs@0.11.1: {}
 
   empathic@2.0.0: {}
 

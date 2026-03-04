@@ -31,6 +31,7 @@
     "./d3": "./dist/formats/d3/index.mjs",
     "./dot": "./dist/formats/dot/index.mjs",
     "./edge-list": "./dist/formats/edge-list/index.mjs",
+    "./elk": "./dist/formats/elk/index.mjs",
     "./gexf": "./dist/formats/gexf/index.mjs",
     "./gml": "./dist/formats/gml/index.mjs",
     "./graphml": "./dist/formats/graphml/index.mjs",
@@ -72,6 +73,7 @@
     "d3-array": "^3.2.4",
     "d3-force": "^3.0.0",
     "dotparser": "^1.1.1",
+    "elkjs": "^0.11.1",
     "fast-xml-parser": "^5.3.4",
     "tsdown": "^0.18.1",
     "tsx": "^4.21.0",
@@ -84,6 +86,7 @@
     "cytoscape": "^3.0.0",
     "d3-force": "^3.0.0",
     "dotparser": "^1.0.0",
+    "elkjs": "^0.9.0 || ^0.10.0 || ^0.11.0",
     "fast-xml-parser": "^5.0.0",
     "zod": "^4.0.0"
   },
@@ -95,6 +98,9 @@
       "optional": true
     },
     "dotparser": {
+      "optional": true
+    },
+    "elkjs": {
       "optional": true
     },
     "fast-xml-parser": {

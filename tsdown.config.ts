@@ -18,6 +18,7 @@ export default defineConfig({
     'src/formats/graphml/index.ts',
     'src/formats/jgf/index.ts',
     'src/formats/tgf/index.ts',
+    'src/formats/elk/index.ts',
     'src/formats/xyflow/index.ts',
     'src/formats/mermaid/index.ts',
   ],
