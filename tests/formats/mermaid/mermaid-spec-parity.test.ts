@@ -188,6 +188,206 @@ flowchart TD
       expect(graph.nodes).toHaveLength(3);
       expect(graph.edges).toHaveLength(2);
     });
+
+    // From Mermaid's flow.spec.ts: each of these characters has caused parser issues
+    const SPECIAL_CHAR_LABELS: Array<{ char: string; name: string }> = [
+      { char: '.', name: 'period' },
+      { char: ':', name: 'colon' },
+      { char: ',', name: 'comma' },
+      { char: '+', name: 'plus' },
+      { char: '*', name: 'asterisk' },
+      { char: '-', name: 'hyphen' },
+      { char: '/', name: 'slash' },
+      { char: '\\', name: 'backslash' },
+      { char: '_', name: 'underscore' },
+      { char: '#', name: 'hash' },
+      { char: '&', name: 'ampersand' },
+      { char: '!', name: 'exclamation' },
+      { char: '?', name: 'question mark' },
+      { char: '@', name: 'at sign' },
+      { char: '=', name: 'equals' },
+      { char: ';', name: 'semicolon' },
+    ];
+
+    for (const { char, name } of SPECIAL_CHAR_LABELS) {
+      it(`handles "${name}" (${char}) in quoted labels`, () => {
+        const graph = fromMermaidFlowchart(
+          `flowchart TD\n    A["Label with ${char} inside"]`,
+        );
+        expect(graph.nodes).toHaveLength(1);
+        expect(graph.nodes[0].label).toContain(char);
+      });
+    }
+
+    it('handles HTML entities in quoted labels', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A["Cats &amp; Dogs"]
+    B["x &lt; y"]
+    C["a &gt; b"]
+      `);
+      expect(graph.nodes).toHaveLength(3);
+      // Parser may or may not decode entities — just verify nodes are created
+      expect(graph.nodes[0].label).toBeTruthy();
+      expect(graph.nodes[1].label).toBeTruthy();
+      expect(graph.nodes[2].label).toBeTruthy();
+    });
+
+    it('handles unicode characters in labels', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A["日本語テスト"]
+    B["Ñoño"]
+    C["Ümlauts"]
+    A --> B --> C
+      `);
+      expect(graph.nodes).toHaveLength(3);
+      expect(graph.nodes[0].label).toContain('日本語');
+      expect(graph.nodes[1].label).toContain('Ñoño');
+      expect(graph.nodes[2].label).toContain('Ümlauts');
+    });
+
+    it('handles emoji in quoted labels', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A["🚀 Launch"]
+    B["✅ Done"]
+    A --> B
+      `);
+      expect(graph.nodes).toHaveLength(2);
+      expect(graph.edges).toHaveLength(1);
+    });
+
+    it('handles labels with embedded double quotes via escaping', () => {
+      // Mermaid uses #quot; for embedded quotes
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A["She said #quot;hello#quot;"]
+      `);
+      expect(graph.nodes).toHaveLength(1);
+      expect(graph.nodes[0].label).toBeTruthy();
+    });
+
+    it('handles labels with line breaks', () => {
+      // Mermaid supports <br/> for line breaks in labels
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A["Line 1<br/>Line 2"]
+    B["Multi<br>line<br/>text"]
+      `);
+      expect(graph.nodes).toHaveLength(2);
+    });
+
+    it('handles edge labels with special characters', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A -->|"yes/no"| B
+    B -->|count > 0| C
+      `);
+      expect(graph.edges).toHaveLength(2);
+      expect(graph.edges[0].label).toBeTruthy();
+      expect(graph.edges[1].label).toBeTruthy();
+    });
+
+    it('handles empty labels gracefully', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A[""] --> B
+      `);
+      expect(graph.nodes.find(n => n.id === 'A')).toBeDefined();
+      expect(graph.edges).toHaveLength(1);
+    });
+
+    it('handles labels with only whitespace', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A["   "] --> B
+      `);
+      expect(graph.nodes.find(n => n.id === 'A')).toBeDefined();
+    });
+
+    it('handles multiple consecutive edges on separate lines', () => {
+      const graph = fromMermaidFlowchart(`
+flowchart TD
+    A --> B
+    A --> C
+    A --> D
+      `);
+      expect(graph.nodes).toHaveLength(4);
+      expect(graph.edges).toHaveLength(3);
+      expect(graph.edges.every(e => e.sourceId === 'A')).toBe(true);
+    });
+
+    it('handles trailing whitespace after statements', () => {
+      const graph = fromMermaidFlowchart('flowchart TD\n    A --> B   \n    B --> C\t\n');
+      expect(graph.nodes).toHaveLength(3);
+      expect(graph.edges).toHaveLength(2);
+    });
+
+    it('handles mixed indentation (tabs and spaces)', () => {
+      const graph = fromMermaidFlowchart('flowchart TD\n\tA --> B\n    B --> C');
+      expect(graph.nodes).toHaveLength(3);
+      expect(graph.edges).toHaveLength(2);
+    });
+  });
+
+  describe('special characters in state diagrams', () => {
+    it('handles transition labels with special characters', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle --> Active : user.click
+    Active --> Error : timeout/retry
+    Error --> Idle : reset & clear
+      `);
+      expect(graph.edges).toHaveLength(3);
+      expect(graph.edges[0].label).toBe('user.click');
+      expect(graph.edges[1].label).toContain('timeout');
+      expect(graph.edges[2].label).toContain('reset');
+    });
+
+    it('handles state descriptions with special characters', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    state "Loading (phase 1/3)" as s1
+    state "Error: connection failed" as s2
+      `);
+      expect(graph.nodes[0].data.description).toContain('phase 1/3');
+      expect(graph.nodes[1].data.description).toContain('Error:');
+    });
+
+    it('handles unicode state names', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    待機 --> 実行中
+      `);
+      expect(graph.nodes.find(n => n.id === '待機')).toBeDefined();
+      expect(graph.nodes.find(n => n.id === '実行中')).toBeDefined();
+    });
+  });
+
+  describe('special characters in sequence diagrams', () => {
+    it('handles messages with special characters', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    participant A
+    participant B
+    A->>B: GET /api/users?page=1&limit=10
+    B-->>A: 200 OK (JSON)
+      `);
+      expect(graph.edges).toHaveLength(2);
+      const msg1 = graph.edges.find(e => e.data.kind === 'message' && e.sourceId === 'A');
+      expect(msg1!.label).toContain('/api/users');
+    });
+
+    it('handles participant aliases with special characters', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    participant A as Auth Service (v2)
+    participant B as DB/Cache
+    A->>B: query
+      `);
+      expect(graph.nodes).toHaveLength(2);
+    });
   });
 
   describe('subgraph features (from Mermaid flow.spec.ts)', () => {
