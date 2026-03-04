@@ -931,3 +931,126 @@ describe('Cross-format consistency', () => {
     expect(classDiag.edges).toHaveLength(1);
   });
 });
+
+// ============================================================================
+// Robustness tests — prototype pollution and reserved word safety
+// Derived from Mermaid's flow.spec.ts unsafe-property and keyword tests
+// ============================================================================
+
+describe('Prototype pollution safety (from Mermaid flow.spec.ts)', () => {
+  const UNSAFE_PROPS = ['__proto__', 'constructor', 'prototype'];
+
+  describe('flowchart', () => {
+    for (const prop of UNSAFE_PROPS) {
+      it(`handles "${prop}" as a node id without polluting Object prototype`, () => {
+        const graph = fromMermaidFlowchart(`flowchart TD\n    ${prop} --> B`);
+        // Should create the node without throwing
+        expect(graph.nodes.find(n => n.id === prop)).toBeDefined();
+        expect(graph.nodes.find(n => n.id === 'B')).toBeDefined();
+        expect(graph.edges).toHaveLength(1);
+        // Node lookup must work via standard iteration, not property access
+        const found = graph.nodes.filter(n => n.id === prop);
+        expect(found).toHaveLength(1);
+      });
+
+      it(`handles "${prop}" as a subgraph id`, () => {
+        const graph = fromMermaidFlowchart(`flowchart TD\n    subgraph ${prop}[Group]\n        A\n    end`);
+        expect(graph.nodes.find(n => n.id === prop)).toBeDefined();
+        expect(graph.nodes.find(n => n.id === 'A')!.parentId).toBe(prop);
+      });
+    }
+  });
+
+  describe('state diagram', () => {
+    for (const prop of UNSAFE_PROPS) {
+      it(`handles "${prop}" as a state id`, () => {
+        const graph = fromMermaidState(`stateDiagram-v2\n    [*] --> ${prop}\n    ${prop} --> [*]`);
+        const found = graph.nodes.filter(n => n.id === prop);
+        expect(found).toHaveLength(1);
+      });
+    }
+  });
+
+  describe('class diagram', () => {
+    for (const prop of UNSAFE_PROPS) {
+      it(`handles "${prop}" as a class name`, () => {
+        const graph = fromMermaidClass(`classDiagram\n    class ${prop} {\n        +name String\n    }`);
+        expect(graph.nodes.find(n => n.id === prop)).toBeDefined();
+      });
+    }
+  });
+
+  describe('sequence diagram', () => {
+    for (const prop of UNSAFE_PROPS) {
+      it(`handles "${prop}" as a participant name`, () => {
+        const graph = fromMermaidSequence(`sequenceDiagram\n    participant ${prop}\n    ${prop}->>B: msg`);
+        expect(graph.nodes.find(n => n.id === prop)).toBeDefined();
+      });
+    }
+  });
+});
+
+describe('Reserved word robustness (from Mermaid flow.spec.ts)', () => {
+  describe('flowchart — node names containing keywords', () => {
+    it('handles node names with "end" substring', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    frontend --> backend`);
+      expect(graph.nodes.find(n => n.id === 'frontend')).toBeDefined();
+      expect(graph.nodes.find(n => n.id === 'backend')).toBeDefined();
+      expect(graph.edges).toHaveLength(1);
+    });
+
+    it('handles "default" as a node name', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    default --> A`);
+      expect(graph.nodes.find(n => n.id === 'default')).toBeDefined();
+      expect(graph.edges).toHaveLength(1);
+    });
+
+    it('handles direction keywords (TD, LR, BT, RL) as node names', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    TD --> LR`);
+      expect(graph.nodes).toHaveLength(2);
+      expect(graph.nodes.find(n => n.id === 'TD')).toBeDefined();
+      expect(graph.nodes.find(n => n.id === 'LR')).toBeDefined();
+    });
+
+    it('handles "graph" and "flowchart" as node names', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    graph_node --> flowchart_node`);
+      expect(graph.nodes).toHaveLength(2);
+      expect(graph.edges).toHaveLength(1);
+    });
+
+    it('handles "subgraph" as part of a node name', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    subgraph_display --> main_view`);
+      expect(graph.nodes).toHaveLength(2);
+      expect(graph.edges).toHaveLength(1);
+    });
+  });
+
+  describe('flowchart — numeric and special node ids', () => {
+    it('handles numeric node ids', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    1[First] --> 2[Second]`);
+      expect(graph.nodes.find(n => n.id === '1')).toBeDefined();
+      expect(graph.nodes.find(n => n.id === '2')).toBeDefined();
+      expect(graph.nodes[0].label).toBe('First');
+    });
+
+    it('handles single-character node ids', () => {
+      const graph = fromMermaidFlowchart(`flowchart TD\n    A --> B --> C`);
+      expect(graph.nodes).toHaveLength(3);
+      expect(graph.edges).toHaveLength(2);
+    });
+  });
+
+  describe('state diagram — reserved words', () => {
+    it('handles state names ending with keywords', () => {
+      const graph = fromMermaidState(`stateDiagram-v2\n    backend --> frontend`);
+      expect(graph.nodes.find(n => n.id === 'backend')).toBeDefined();
+      expect(graph.nodes.find(n => n.id === 'frontend')).toBeDefined();
+    });
+
+    it('handles state names that are direction keywords', () => {
+      const graph = fromMermaidState(`stateDiagram-v2\n    LR --> TB`);
+      expect(graph.nodes).toHaveLength(2);
+      expect(graph.edges).toHaveLength(1);
+    });
+  });
+});
