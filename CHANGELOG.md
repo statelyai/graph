@@ -1,5 +1,19 @@
 # @statelyai/graph
 
+## 0.5.0
+
+### Minor Changes
+
+- [`371133c`](https://github.com/statelyai/graph/commit/371133c89e54a16cc0ed2c5ca5c12cfd2819d3df) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add ELK formatter
+
+- [`9e596d6`](https://github.com/statelyai/graph/commit/9e596d655b3e0479a57a9a41a3f1cb41991ab8c5) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Generate schemas
+
+### Patch Changes
+
+- [`166b695`](https://github.com/statelyai/graph/commit/166b69583728792f20c3051db015d1b2a6e5a375) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Fix Mermaid types
+
+- [`49ffd94`](https://github.com/statelyai/graph/commit/49ffd942eea0173ec99b03beb1cbd5b226e0e509) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Improve Mermaid parity
+
 ## 0.4.0
 
 ### Minor Changes
