@@ -1,9 +1,8 @@
 # @statelyai/graph
 
-A TypeScript graph library built on plain JSON objects. Supports directed/undirected graphs, hierarchical nodes, graph algorithms, visual properties, and serialization to DOT, GraphML, and more.
+A TypeScript graph library built on plain JSON objects. Supports directed/undirected graphs, hierarchical nodes, graph algorithms, visual properties, and serialization to DOT, GraphML, Mermaid, and more.
 
 Made from our experience at [stately.ai](https://stately.ai), where we build visual tools for complex systems.
-
 
 ## Install
 
@@ -12,6 +11,8 @@ npm install @statelyai/graph
 ```
 
 ## Quick Start
+
+Graphs are plain JSON-serializable objects. All operations are standalone functions — no classes, no DOM, no rendering engine.
 
 ```ts
 import { createGraph, addNode, addEdge, getShortestPath } from '@statelyai/graph';
@@ -36,12 +37,27 @@ addEdge(graph, { id: 'e3', sourceId: 'a', targetId: 'd' });
 const path = getShortestPath(graph, { from: 'a', to: 'c' });
 ```
 
-### Hierarchical Graphs
+## Graph Manipulation
 
-Nodes support parent-child relationships. Use `flatten()` to decompose compound nodes into a flat graph.
+Look up, add, delete, and update nodes and edges. Query neighbors, predecessors, successors, degree, and more.
 
 ```ts
-import { createGraph, flatten } from '@statelyai/graph';
+import { getNode, deleteNode, getNeighbors, getSources } from '@statelyai/graph';
+
+const node = getNode(graph, 'a');       // lookup by id
+deleteNode(graph, 'd');                 // removes node + connected edges
+const neighbors = getNeighbors(graph, 'a'); // adjacent nodes
+const roots = getSources(graph);        // nodes with no incoming edges
+```
+
+Batch operations (`addEntities`, `deleteEntities`, `updateEntities`) let you apply multiple changes at once.
+
+## Hierarchy
+
+Nodes support parent-child relationships for compound/nested graphs. Query children, ancestors, descendants, depth, and least common ancestor. Use `flatten()` to decompose into a flat leaf-node graph.
+
+```ts
+import { createGraph, getChildren, getLCA, flatten } from '@statelyai/graph';
 
 const graph = createGraph({
   nodes: [
@@ -58,10 +74,33 @@ const graph = createGraph({
   ],
 });
 
-const flat = flatten(graph); // only leaf nodes, edges resolved
+const children = getChildren(graph, 'b'); // [b1, b2]
+const flat = flatten(graph);              // only leaf nodes, edges resolved
 ```
 
-### Visual Graphs
+## Algorithms
+
+Includes traversal (BFS, DFS), pathfinding (shortest path, simple paths, all-pairs shortest paths), cycle detection, connected/strongly-connected components, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+
+```ts
+import {
+  bfs, dfs, hasPath, isAcyclic,
+  getShortestPath, getCycles, getTopologicalSort,
+  getConnectedComponents, getMinimumSpanningTree,
+} from '@statelyai/graph';
+
+for (const node of bfs(graph, 'a')) { /* breadth-first */ }
+for (const node of dfs(graph, 'a')) { /* depth-first */ }
+
+hasPath(graph, 'a', 'c');                          // reachability
+isAcyclic(graph);                                  // cycle check
+getShortestPath(graph, { from: 'a', to: 'c' });   // single shortest path
+getTopologicalSort(graph);                         // topological order (or null)
+getConnectedComponents(graph);                     // connected components
+getMinimumSpanningTree(graph, { weight: e => e.data?.weight ?? 1 }); // MST
+```
+
+## Visual Graphs
 
 `createVisualGraph()` guarantees `x`, `y`, `width`, `height` on all nodes and edges (default `0`).
 
@@ -72,170 +111,50 @@ const diagram = createVisualGraph({
   direction: 'right',
   nodes: [
     { id: 'a', x: 0, y: 0, width: 120, height: 60, shape: 'rectangle' },
-    { id: 'b', x: 200, y: 0, width: 120, height: 60, shape: 'ellipse', color: '#3b82f6' },
+    { id: 'b', x: 200, y: 0, width: 120, height: 60, shape: 'ellipse' },
   ],
   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', width: 100, height: 100 }],
 });
 ```
 
-### Format Conversion
+## Format Conversion
+
+Import and export graphs to many formats. Converters are available as subpath imports.
 
 ```ts
-import { toCytoscapeJSON } from '@statelyai/graph/cytoscape';
-import { fromJGF } from '@statelyai/graph/jgf';
-import { toD3Graph } from '@statelyai/graph/d3';
 import { toDOT } from '@statelyai/graph/dot';
-import { toGraphML } from '@statelyai/graph/graphml';
 import { fromGEXF } from '@statelyai/graph/gexf';
+import { toCytoscapeJSON } from '@statelyai/graph/cytoscape';
+import { toD3Graph } from '@statelyai/graph/d3';
 
-// Export to web visualization libraries
-const cytoData = toCytoscapeJSON(graph); // Cytoscape.js JSON (compound graphs preserved)
-const d3Data = toD3Graph(graph);         // D3.js { nodes, links }
-
-// Export to text formats
-const dot = toDOT(graph);               // Graphviz DOT
-const xml = toGraphML(graph);            // GraphML XML
-
-// Import from any format
-const g1 = fromJGF(jsonGraphData);       // JSON Graph Format
-const g2 = fromGEXF(gexfXmlString);      // GEXF (Gephi)
+const dot = toDOT(graph);                   // Graphviz DOT
+const cytoData = toCytoscapeJSON(graph);     // Cytoscape.js JSON
+const d3Data = toD3Graph(graph);             // D3.js { nodes, links }
+const imported = fromGEXF(gexfXmlString);    // GEXF (Gephi)
 ```
 
-Each bidirectional format also has a converter object for a unified interface:
+**Supported formats:** Cytoscape.js JSON, D3.js JSON, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block), adjacency list, and edge list.
+
+Each bidirectional format also has a converter object:
 
 ```ts
-import { createFormatConverter } from '@statelyai/graph';
 import { cytoscapeConverter } from '@statelyai/graph/cytoscape';
 
-// Use a built-in converter
 const cyto = cytoscapeConverter.to(graph);
 const back = cytoscapeConverter.from(cyto);
-
-// Create your own
-const myConverter = createFormatConverter(myToFn, myFromFn);
 ```
+
+Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
 
 ## Why this library?
 
-Graph file formats (GEXF, GraphML) define how to _store_ graphs. Visualization libraries (Cytoscape.js, D3) define how to _render_ them. Neither gives you a good way to _work with_ them in between.
-
-This library is the computational layer: plain JSON objects in, algorithms and mutations, plain JSON objects out. No classes, no DOM, no rendering engine; just data and functions.
+Graph file formats define how to _store_ graphs. Visualization libraries define how to _render_ them. This library is the computational layer in between: plain JSON objects in, algorithms and mutations, plain JSON objects out.
 
 ```
 GEXF file → fromGEXF() → Graph → run algorithms, mutate → toCytoscapeJSON() → render
 ```
 
-Your `Graph` is a plain object that survives `JSON.stringify`, `structuredClone`, `postMessage`, and `localStorage` without adapters. Format converters are the I/O ports: read from any supported format, do your work, export to whatever your renderer or database expects.
-
-## API
-
-### Graph Creation
-
-| Function | Description |
-|----------|-------------|
-| `createGraph(config?)` | Create a graph |
-| `createVisualGraph(config?)` | Create a graph with required position/size on nodes and edges |
-
-### Lookups & Mutations
-
-| Function | Description |
-|----------|-------------|
-| `getNode(graph, id)` | Node by id, or `undefined` |
-| `getEdge(graph, id)` | Edge by id, or `undefined` |
-| `hasNode(graph, id)` | Node exists? |
-| `hasEdge(graph, id)` | Edge exists? |
-| `addNode(graph, config)` | Add a node |
-| `addEdge(graph, config)` | Add an edge |
-| `deleteNode(graph, id, opts?)` | Delete node + connected edges |
-| `deleteEdge(graph, id)` | Delete an edge |
-| `updateNode(graph, id, patch)` | Update node fields |
-| `updateEdge(graph, id, patch)` | Update edge fields |
-| `addEntities(graph, entities)` | Batch add |
-| `deleteEntities(graph, ids)` | Batch delete |
-| `updateEntities(graph, updates)` | Batch update |
-
-### Queries
-
-| Function | Description |
-|----------|-------------|
-| `getNeighbors(graph, nodeId)` | Adjacent nodes |
-| `getSuccessors(graph, nodeId)` | Outgoing neighbors |
-| `getPredecessors(graph, nodeId)` | Incoming neighbors |
-| `getDegree(graph, nodeId)` | Connected edge count |
-| `getInDegree` / `getOutDegree` | Directed edge counts |
-| `getEdgesOf(graph, nodeId)` | All connected edges |
-| `getInEdges` / `getOutEdges` | Directed edges |
-| `getEdgeBetween(graph, src, tgt)` | Edge between two nodes |
-| `getSources(graph)` | Nodes with inDegree 0 |
-| `getSinks(graph)` | Nodes with outDegree 0 |
-
-### Hierarchy
-
-| Function | Description |
-|----------|-------------|
-| `getChildren(graph, nodeId)` | Direct children |
-| `getParent(graph, nodeId)` | Parent node |
-| `getAncestors(graph, nodeId)` | All ancestors |
-| `getDescendants(graph, nodeId)` | All descendants |
-| `getSiblings(graph, nodeId)` | Same-parent nodes |
-| `getRoots(graph)` | Top-level nodes |
-| `getDepth(graph, nodeId)` | Hierarchy depth (root = 0) |
-| `getLCA(graph, ...nodeIds)` | Least Common Ancestor |
-| `isCompound(graph, nodeId)` | Has children? |
-| `isLeaf(graph, nodeId)` | No children? |
-
-### Algorithms
-
-| Function | Description |
-|----------|-------------|
-| `bfs(graph, startId)` | Breadth-first traversal (generator) |
-| `dfs(graph, startId)` | Depth-first traversal (generator) |
-| `hasPath(graph, src, tgt)` | Reachability check |
-| `isAcyclic(graph)` | No cycles? |
-| `isConnected(graph)` | Single connected component? |
-| `isTree(graph)` | Connected + acyclic? |
-| `getConnectedComponents(graph)` | Connected components |
-| `getStronglyConnectedComponents(graph)` | SCCs (directed) |
-| `getTopologicalSort(graph)` | Topological order, or `null` if cyclic |
-| `getShortestPath(graph, opts)` | Single shortest path |
-| `getShortestPaths(graph, opts)` | All shortest paths from source |
-| `getSimplePath(graph, opts)` | Single simple path |
-| `getSimplePaths(graph, opts)` | All simple paths |
-| `getCycles(graph)` | All cycles |
-| `getPreorder` / `getPostorder` | DFS orderings |
-| `getMinimumSpanningTree(graph, opts)` | MST (Prim's or Kruskal's) |
-| `getAllPairsShortestPaths(graph, opts)` | Floyd-Warshall or Dijkstra |
-
-Generator variants: `genShortestPaths`, `genSimplePaths`, `genCycles`, `genPreorders`, `genPostorders`.
-
-### Transforms
-
-| Function | Description |
-|----------|-------------|
-| `flatten(graph)` | Decompose hierarchy into flat leaf-node graph |
-
-### Formats
-
-Import format converters from subpaths (for example, `@statelyai/graph/dot` or `@statelyai/graph/mermaid`).
-
-| Format | Export | Import | Compound? | Notes |
-|--------|--------|--------|-----------|-------|
-| **Cytoscape.js JSON** | `toCytoscapeJSON` | `fromCytoscapeJSON` | Yes | `parent` maps to `parentId` |
-| **D3.js JSON** | `toD3Graph` | `fromD3Graph` | No | `{ nodes, links }` for force layouts |
-| **JSON Graph Format** | `toJGF` | `fromJGF` | Yes | Formal spec, metadata-extensible |
-| **GEXF** | `toGEXF` | `fromGEXF` | Yes | Gephi native, `pid` hierarchy, viz module |
-| **GraphML** | `toGraphML` | `fromGraphML` | Yes | XML standard, requires `fast-xml-parser` |
-| **GML** | `toGML` | `fromGML` | Yes | Nested node blocks for hierarchy |
-| **TGF** | `toTGF` | `fromTGF` | No | Minimal (id + label only) |
-| **DOT** | `toDOT` | `fromDOT` | Yes (subgraphs) | Graphviz DOT (`dotparser` peer dep) |
-| **Mermaid** | `toMermaid*` | `fromMermaid*` | Varies by diagram | Sequence, flowchart, state, class, ER, mindmap, block |
-| **Adjacency list** | `toAdjacencyList` | `fromAdjacencyList` | No | `Record<string, string[]>` |
-| **Edge list** | `toEdgeList` | `fromEdgeList` | No | `[source, target][]` |
-
-Optional peer deps by format:
-- `@statelyai/graph/gexf` and `@statelyai/graph/graphml` use `fast-xml-parser`
-- `@statelyai/graph/dot` uses `dotparser`
-- Other formats are dependency-free
+Your `Graph` is a plain object that survives `JSON.stringify`, `structuredClone`, `postMessage`, and `localStorage` without adapters.
 
 ## License
 
