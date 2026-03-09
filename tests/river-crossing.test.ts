@@ -86,8 +86,6 @@ function buildStateGraph() {
   return { g, start, goal, stateCount: states.size };
 }
 
-// ---------------------------------------------------------------------------
-
 describe('River Crossing Puzzle (Fox, Chicken & Cabbage)', () => {
   const { g, start, goal, stateCount } = buildStateGraph();
 

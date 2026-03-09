@@ -27,10 +27,11 @@ export interface SequenceEdgeData {
   sequenceNumber?: number;
 }
 
-// TODO: SequenceBlock types for loop/alt/par/opt/critical/break/rect
-// These control-flow blocks are not graph topology; they describe ordering
-// constraints. Storing them in graphData.blocks for round-trip fidelity
-// but they don't affect nodes/edges directly.
+/**
+ * Control-flow blocks (loop/alt/par/opt/critical/break/rect).
+ * Not graph topology — they describe ordering constraints.
+ * Stored in `graphData.blocks` for round-trip fidelity.
+ */
 export type SequenceBlock =
   | { type: 'loop'; label: string; edgeIds: string[] }
   | {

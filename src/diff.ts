@@ -16,9 +16,7 @@ import {
   updateEdge,
 } from './graph';
 
-// ---------------------------------------------------------------------------
 // Internal helpers
-// ---------------------------------------------------------------------------
 
 function nodeToConfig<N>(node: GraphNode<N>): NodeConfig<N> {
   const config: NodeConfig<N> = { id: node.id };
@@ -90,9 +88,7 @@ const EDGE_COMPARE_KEYS = [
   'style',
 ] as const;
 
-// ---------------------------------------------------------------------------
 // Diff functions
-// ---------------------------------------------------------------------------
 
 /**
  * Compute a structured diff from graph `a` to graph `b` by matching IDs.
@@ -235,9 +231,7 @@ export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Patch functions
-// ---------------------------------------------------------------------------
 
 /**
  * Compute an ordered patch list from graph `a` to graph `b`.
@@ -307,9 +301,7 @@ export function applyPatches<N, E>(
   }
 }
 
-// ---------------------------------------------------------------------------
 // Conversion functions
-// ---------------------------------------------------------------------------
 
 /**
  * Flatten a structured diff into an ordered patch list.

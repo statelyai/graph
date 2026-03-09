@@ -1,4 +1,10 @@
-import type { Graph, GraphEdge, NodeConfig } from './types';
+import type {
+  Graph,
+  GraphEdge,
+  GraphNode,
+  NodeConfig,
+  EdgeConfig,
+} from './types';
 import { getIndex } from './indexing';
 import { createGraph } from './graph';
 
@@ -130,6 +136,143 @@ export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
     type: graph.type,
     nodes: leafNodes,
     edges: flatEdges,
+    data: graph.data,
+  });
+}
+
+// Induced subgraph
+
+function nodeToConfig<N>(
+  node: GraphNode<N>,
+  nodeIdSet?: Set<string>,
+): NodeConfig<N> {
+  const config: NodeConfig<N> = {
+    id: node.id,
+    label: node.label,
+    data: node.data,
+  };
+  if (node.parentId !== undefined && node.parentId !== null) {
+    config.parentId =
+      nodeIdSet && !nodeIdSet.has(node.parentId) ? undefined : node.parentId;
+  }
+  if (node.initialNodeId !== undefined)
+    config.initialNodeId = node.initialNodeId ?? undefined;
+  if (node.x !== undefined) config.x = node.x;
+  if (node.y !== undefined) config.y = node.y;
+  if (node.width !== undefined) config.width = node.width;
+  if (node.height !== undefined) config.height = node.height;
+  if (node.shape !== undefined) config.shape = node.shape;
+  if (node.color !== undefined) config.color = node.color;
+  if (node.style !== undefined) config.style = node.style;
+  return config;
+}
+
+function edgeToConfig<E>(edge: GraphEdge<E>): EdgeConfig<E> {
+  const config: EdgeConfig<E> = {
+    id: edge.id,
+    sourceId: edge.sourceId,
+    targetId: edge.targetId,
+    label: edge.label,
+    data: edge.data,
+  };
+  if (edge.weight !== undefined) config.weight = edge.weight;
+  if (edge.x !== undefined) config.x = edge.x;
+  if (edge.y !== undefined) config.y = edge.y;
+  if (edge.width !== undefined) config.width = edge.width;
+  if (edge.height !== undefined) config.height = edge.height;
+  if (edge.color !== undefined) config.color = edge.color;
+  if (edge.style !== undefined) config.style = edge.style;
+  return config;
+}
+
+/**
+ * Returns the induced subgraph containing only the given node IDs
+ * and edges whose endpoints are both in the set.
+ *
+ * Parent references to nodes outside the set are removed.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getSubgraph } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * const sub = getSubgraph(graph, ['a', 'b']);
+ * // sub.nodes: [a, b], sub.edges: [ab]
+ * ```
+ */
+export function getSubgraph<N, E, G>(
+  graph: Graph<N, E, G>,
+  nodeIds: string[],
+): Graph<N, E, G> {
+  const nodeIdSet = new Set(nodeIds);
+
+  return createGraph({
+    id: graph.id,
+    type: graph.type,
+    initialNodeId:
+      graph.initialNodeId && nodeIdSet.has(graph.initialNodeId)
+        ? graph.initialNodeId
+        : undefined,
+    nodes: graph.nodes
+      .filter((n) => nodeIdSet.has(n.id))
+      .map((n) => nodeToConfig(n, nodeIdSet)),
+    edges: graph.edges
+      .filter((e) => nodeIdSet.has(e.sourceId) && nodeIdSet.has(e.targetId))
+      .map(edgeToConfig),
+    data: graph.data,
+  });
+}
+
+// Reverse graph
+
+/**
+ * Returns a new graph with all edge directions flipped (source ↔ target).
+ * Optionally filters which edges to include.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, reverseGraph } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * const rev = reverseGraph(graph);
+ * // rev edges: b→a, c→b
+ *
+ * const filtered = reverseGraph(graph, (e) => e.id !== 'bc');
+ * // filtered edges: b→a (only ab reversed, bc excluded)
+ * ```
+ */
+export function reverseGraph<N, E, G>(
+  graph: Graph<N, E, G>,
+  filterEdge?: (edge: GraphEdge<E>) => boolean,
+): Graph<N, E, G> {
+  const edges = filterEdge ? graph.edges.filter(filterEdge) : graph.edges;
+
+  return createGraph({
+    id: graph.id,
+    type: graph.type,
+    initialNodeId: graph.initialNodeId ?? undefined,
+    nodes: graph.nodes.map((n) => nodeToConfig(n)),
+    edges: edges.map((e) => {
+      const config = edgeToConfig(e);
+      // Flip source and target
+      config.sourceId = e.targetId;
+      config.targetId = e.sourceId;
+      return config;
+    }),
     data: graph.data,
   });
 }

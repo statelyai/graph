@@ -85,9 +85,9 @@ describe('createGraph', () => {
   });
 
   it('rejects empty string parentId', () => {
-    expect(() =>
-      createGraph({ nodes: [{ id: 'a', parentId: '' }] }),
-    ).toThrow('non-empty string');
+    expect(() => createGraph({ nodes: [{ id: 'a', parentId: '' }] })).toThrow(
+      'non-empty string',
+    );
   });
 
   it('supports plain object literal via satisfies', () => {
@@ -191,15 +191,15 @@ describe('Mutable: addNode / addEdge', () => {
 
   it('addEdge() throws on empty string ids', () => {
     const g = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }] });
-    expect(() =>
-      addEdge(g, { id: '', sourceId: 'a', targetId: 'b' }),
-    ).toThrow('non-empty string');
-    expect(() =>
-      addEdge(g, { id: 'e1', sourceId: '', targetId: 'b' }),
-    ).toThrow('non-empty string');
-    expect(() =>
-      addEdge(g, { id: 'e1', sourceId: 'a', targetId: '' }),
-    ).toThrow('non-empty string');
+    expect(() => addEdge(g, { id: '', sourceId: 'a', targetId: 'b' })).toThrow(
+      'non-empty string',
+    );
+    expect(() => addEdge(g, { id: 'e1', sourceId: '', targetId: 'b' })).toThrow(
+      'non-empty string',
+    );
+    expect(() => addEdge(g, { id: 'e1', sourceId: 'a', targetId: '' })).toThrow(
+      'non-empty string',
+    );
   });
 
   it('addEdge() throws on missing source/target', () => {
@@ -335,9 +335,7 @@ describe('JSON serialization', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Batch operations
-// ---------------------------------------------------------------------------
 
 describe('Mutable batch: addEntities()', () => {
   it('adds multiple nodes and edges', () => {
@@ -466,9 +464,7 @@ describe('Mutable batch: updateEntities()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // GraphInstance class
-// ---------------------------------------------------------------------------
 
 describe('GraphInstance', () => {
   it('constructor creates graph from config', () => {

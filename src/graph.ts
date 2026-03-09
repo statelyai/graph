@@ -25,7 +25,8 @@ import {
 
 function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
   if (!config.id) throw new Error('Node id must be a non-empty string');
-  if (config.parentId === '') throw new Error('Node parentId must be a non-empty string');
+  if (config.parentId === '')
+    throw new Error('Node parentId must be a non-empty string');
   const node: GraphNode<T> = {
     type: 'node',
     id: config.id,
@@ -48,8 +49,10 @@ function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
 
 function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
   if (!config.id) throw new Error('Edge id must be a non-empty string');
-  if (!config.sourceId) throw new Error('Edge sourceId must be a non-empty string');
-  if (!config.targetId) throw new Error('Edge targetId must be a non-empty string');
+  if (!config.sourceId)
+    throw new Error('Edge sourceId must be a non-empty string');
+  if (!config.targetId)
+    throw new Error('Edge targetId must be a non-empty string');
   const edge: GraphEdge<T> = {
     type: 'edge',
     id: config.id,
@@ -58,6 +61,7 @@ function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
     label: config.label ?? '',
     data: config.data as T,
   };
+  if (config.weight !== undefined) edge.weight = config.weight;
   if (config.x !== undefined) edge.x = config.x;
   if (config.y !== undefined) edge.y = config.y;
   if (config.width !== undefined) edge.width = config.width;
@@ -67,9 +71,7 @@ function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
   return edge;
 }
 
-// ---------------------------------------------------------------------------
 // Factory
-// ---------------------------------------------------------------------------
 
 /**
  * Create a graph from a config. Resolves defaults for all fields.
@@ -186,7 +188,11 @@ export function createGraphFromTransition<TState, TEvent>(
 
   const initialStateId = serializeState(options.initialState);
   visited.add(initialStateId);
-  nodes.push({ id: initialStateId, label: initialStateId, data: options.initialState });
+  nodes.push({
+    id: initialStateId,
+    label: initialStateId,
+    data: options.initialState,
+  });
 
   let iterations = 0;
 
@@ -237,9 +243,7 @@ export function createGraphFromTransition<TState, TEvent>(
   });
 }
 
-// ---------------------------------------------------------------------------
 // Lookup helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Get a node by id, or `undefined` if not found.
@@ -251,7 +255,10 @@ export function createGraphFromTransition<TState, TEvent>(
  * const missing = getNode(graph, 'z'); // undefined
  * ```
  */
-export function getNode<N>(graph: Graph<N>, id: string): GraphNode<N> | undefined {
+export function getNode<N>(
+  graph: Graph<N>,
+  id: string,
+): GraphNode<N> | undefined {
   const idx = getIndex(graph);
   const arrayIdx = idx.nodeById.get(id);
   return arrayIdx !== undefined ? graph.nodes[arrayIdx] : undefined;
@@ -270,7 +277,10 @@ export function getNode<N>(graph: Graph<N>, id: string): GraphNode<N> | undefine
  * const missing = getEdge(graph, 'z'); // undefined
  * ```
  */
-export function getEdge<E>(graph: Graph<any, E>, id: string): GraphEdge<E> | undefined {
+export function getEdge<E>(
+  graph: Graph<any, E>,
+  id: string,
+): GraphEdge<E> | undefined {
   const idx = getIndex(graph);
   const arrayIdx = idx.edgeById.get(id);
   return arrayIdx !== undefined ? graph.edges[arrayIdx] : undefined;
@@ -307,9 +317,7 @@ export function hasEdge(graph: Graph, id: string): boolean {
   return getIndex(graph).edgeById.has(id);
 }
 
-// ---------------------------------------------------------------------------
 // Mutable operations — mutate the graph in place
-// ---------------------------------------------------------------------------
 
 /**
  * **Mutable.** Add a node to the graph. Mutates `graph.nodes` in place.
@@ -322,7 +330,10 @@ export function hasEdge(graph: Graph, id: string): boolean {
  * // graph.nodes.length === 1
  * ```
  */
-export function addNode<N>(graph: Graph<N>, config: NodeConfig<N>): GraphNode<N> {
+export function addNode<N>(
+  graph: Graph<N>,
+  config: NodeConfig<N>,
+): GraphNode<N> {
   const node = resolveNode(config);
   const idx = getIndex(graph);
   if (idx.nodeById.has(config.id)) {
@@ -347,7 +358,10 @@ export function addNode<N>(graph: Graph<N>, config: NodeConfig<N>): GraphNode<N>
  * // graph.edges.length === 1
  * ```
  */
-export function addEdge<E>(graph: Graph<any, E>, config: EdgeConfig<E>): GraphEdge<E> {
+export function addEdge<E>(
+  graph: Graph<any, E>,
+  config: EdgeConfig<E>,
+): GraphEdge<E> {
   const edge = resolveEdge(config);
   const idx = getIndex(graph);
   if (idx.edgeById.has(config.id)) {
@@ -465,7 +479,9 @@ export function updateNode<N>(
   const updated: GraphNode<N> = {
     ...node,
     ...(update.parentId !== undefined && { parentId: update.parentId ?? null }),
-    ...(update.initialNodeId !== undefined && { initialNodeId: update.initialNodeId ?? null }),
+    ...(update.initialNodeId !== undefined && {
+      initialNodeId: update.initialNodeId ?? null,
+    }),
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
   };
@@ -523,15 +539,20 @@ export function updateEdge<E>(
 
   // Update adjacency index if endpoints changed
   if (updated.sourceId !== oldSourceId || updated.targetId !== oldTargetId) {
-    indexUpdateEdgeEndpoints(idx, id, oldSourceId, oldTargetId, updated.sourceId, updated.targetId);
+    indexUpdateEdgeEndpoints(
+      idx,
+      id,
+      oldSourceId,
+      oldTargetId,
+      updated.sourceId,
+      updated.targetId,
+    );
   }
 
   return updated;
 }
 
-// ---------------------------------------------------------------------------
 // Batch mutable operations
-// ---------------------------------------------------------------------------
 
 /**
  * **Mutable.** Add multiple nodes and edges to the graph.
@@ -588,9 +609,7 @@ export function deleteEntities(
   }
 }
 
-// ---------------------------------------------------------------------------
 // Batch update operations
-// ---------------------------------------------------------------------------
 
 /**
  * **Mutable.** Update multiple nodes and edges in place.
@@ -622,9 +641,7 @@ export function updateEntities<N, E>(
   }
 }
 
-// ---------------------------------------------------------------------------
 // Class wrapper
-// ---------------------------------------------------------------------------
 
 /**
  * OOP wrapper around a plain `Graph` object.
@@ -661,39 +678,79 @@ export class GraphInstance<N = any, E = any, G = any> {
   static from<N = any, E = any, G = any>(
     graph: Graph<N, E, G>,
   ): GraphInstance<N, E, G> {
-    const instance = Object.create(GraphInstance.prototype) as GraphInstance<N, E, G>;
+    const instance = Object.create(GraphInstance.prototype) as GraphInstance<
+      N,
+      E,
+      G
+    >;
     instance.graph = graph;
     return instance;
   }
 
-  get id() { return this.graph.id; }
-  get type() { return this.graph.type; }
-  get nodes() { return this.graph.nodes; }
-  get edges() { return this.graph.edges; }
-  get data() { return this.graph.data; }
+  get id() {
+    return this.graph.id;
+  }
+  get type() {
+    return this.graph.type;
+  }
+  get nodes() {
+    return this.graph.nodes;
+  }
+  get edges() {
+    return this.graph.edges;
+  }
+  get data() {
+    return this.graph.data;
+  }
 
-  getNode(id: string) { return getNode(this.graph, id); }
-  getEdge(id: string) { return getEdge(this.graph, id); }
-  hasNode(id: string) { return hasNode(this.graph, id); }
-  hasEdge(id: string) { return hasEdge(this.graph, id); }
+  getNode(id: string) {
+    return getNode(this.graph, id);
+  }
+  getEdge(id: string) {
+    return getEdge(this.graph, id);
+  }
+  hasNode(id: string) {
+    return hasNode(this.graph, id);
+  }
+  hasEdge(id: string) {
+    return hasEdge(this.graph, id);
+  }
 
-  addNode(config: NodeConfig<N>) { return addNode(this.graph, config); }
-  addEdge(config: EdgeConfig<E>) { return addEdge(this.graph, config); }
-  deleteNode(id: string, opts?: DeleteNodeOptions) { return deleteNode(this.graph, id, opts); }
-  deleteEdge(id: string) { return deleteEdge(this.graph, id); }
-  updateNode(id: string, update: Partial<Omit<NodeConfig<N>, 'id'>>) { return updateNode(this.graph, id, update); }
-  updateEdge(id: string, update: Partial<Omit<EdgeConfig<E>, 'id'>>) { return updateEdge(this.graph, id, update); }
+  addNode(config: NodeConfig<N>) {
+    return addNode(this.graph, config);
+  }
+  addEdge(config: EdgeConfig<E>) {
+    return addEdge(this.graph, config);
+  }
+  deleteNode(id: string, opts?: DeleteNodeOptions) {
+    return deleteNode(this.graph, id, opts);
+  }
+  deleteEdge(id: string) {
+    return deleteEdge(this.graph, id);
+  }
+  updateNode(id: string, update: Partial<Omit<NodeConfig<N>, 'id'>>) {
+    return updateNode(this.graph, id, update);
+  }
+  updateEdge(id: string, update: Partial<Omit<EdgeConfig<E>, 'id'>>) {
+    return updateEdge(this.graph, id, update);
+  }
 
-  addEntities(entities: EntitiesConfig<N, E>) { return addEntities(this.graph, entities); }
-  deleteEntities(ids: string | string[], opts?: DeleteNodeOptions) { return deleteEntities(this.graph, ids, opts); }
-  updateEntities(updates: EntitiesUpdate<N, E>) { return updateEntities(this.graph, updates); }
+  addEntities(entities: EntitiesConfig<N, E>) {
+    return addEntities(this.graph, entities);
+  }
+  deleteEntities(ids: string | string[], opts?: DeleteNodeOptions) {
+    return deleteEntities(this.graph, ids, opts);
+  }
+  updateEntities(updates: EntitiesUpdate<N, E>) {
+    return updateEntities(this.graph, updates);
+  }
 
-  toJSON() { return this.graph; }
+  toJSON() {
+    return this.graph;
+  }
 }
 
-// ---------------------------------------------------------------------------
 // Internal helpers
-// ---------------------------------------------------------------------------
 
 function collectDescendants(graph: Graph, id: string): Set<string> {
   const idx = getIndex(graph);

@@ -18,6 +18,7 @@ export type {
   GraphPath,
   PathOptions,
   SinglePathOptions,
+  AStarOptions,
   TraversalOptions,
   MSTOptions,
   AllPairsShortestPathsOptions,
@@ -116,6 +117,7 @@ export {
   genPostorders,
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
+  getAStarPath,
 } from './algorithms';
 
 // Diff & Patches
@@ -130,7 +132,7 @@ export {
 } from './diff';
 
 // Transforms
-export { flatten } from './transforms';
+export { flatten, getSubgraph, reverseGraph } from './transforms';
 
 // Formats — use subpath imports: @statelyai/graph/dot, @statelyai/graph/mermaid, etc.
 // Only createFormatConverter is re-exported from the main entry for convenience.

@@ -56,6 +56,12 @@ export interface EdgeConfig<TEdgeData = any> {
    * The label of the edge.
    */
   label?: string;
+  /**
+   * Optional numeric weight for the edge.
+   * Used by pathfinding, MST, and other weighted algorithms.
+   * When `getWeight` is not provided, algorithms default to `edge.weight ?? 1`.
+   */
+  weight?: number;
   data?: TEdgeData;
   x?: number;
   y?: number;
@@ -100,6 +106,12 @@ export interface GraphEdge<TEdgeData = any> {
   sourceId: string;
   targetId: string;
   label: string;
+  /**
+   * Optional numeric weight for the edge.
+   * Used by pathfinding, MST, and other weighted algorithms.
+   * When `getWeight` is not provided, algorithms default to `edge.weight ?? 1`.
+   */
+  weight?: number;
   data: TEdgeData;
   x?: number;
   y?: number;
@@ -174,7 +186,7 @@ export interface PathOptions<TEdgeData = any> {
   from?: string;
   /** Target node ID. If omitted → paths to all reachable nodes */
   to?: string;
-  /** Edge weight function. Default: every edge = 1. */
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }
 
@@ -183,8 +195,22 @@ export interface SinglePathOptions<TEdgeData = any> {
   from?: string;
   /** Target node ID. Required for single-path queries. */
   to: string;
-  /** Edge weight function. Default: every edge = 1. */
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+}
+
+export interface AStarOptions<TEdgeData = any> {
+  /** Source node ID. */
+  from: string;
+  /** Target node ID. */
+  to: string;
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+  /**
+   * Heuristic function estimating cost from a node to the target.
+   * Must be admissible (never overestimates the actual cost).
+   */
+  heuristic: (nodeId: string) => number;
 }
 
 // --- Algorithm option types ---
@@ -197,14 +223,14 @@ export interface TraversalOptions {
 export interface MSTOptions<TEdgeData = any> {
   /** Algorithm to use. Default: 'prim'. */
   algorithm?: 'prim' | 'kruskal';
-  /** Edge weight function. Default: every edge = 1. */
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }
 
 export interface AllPairsShortestPathsOptions<TEdgeData = any> {
   /** Algorithm to use. Default: 'dijkstra'. */
   algorithm?: 'floyd-warshall' | 'dijkstra';
-  /** Edge weight function. Default: every edge = 1. */
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }
 

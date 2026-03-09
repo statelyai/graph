@@ -9,6 +9,7 @@ import type {
   TraversalOptions,
   MSTOptions,
   AllPairsShortestPathsOptions,
+  AStarOptions,
 } from './types';
 import { getIndex } from './indexing';
 import { createGraph } from './graph';
@@ -17,6 +18,8 @@ import { createGraph } from './graph';
 
 /**
  * Breadth-first traversal generator yielding nodes level by level.
+ *
+ * **O(V + E)** time, **O(V)** space.
  *
  * @example
  * ```ts
@@ -58,6 +61,8 @@ export function* bfs<N>(
 
 /**
  * Depth-first traversal generator yielding nodes as visited.
+ *
+ * **O(V + E)** time, **O(V)** space.
  *
  * @example
  * ```ts
@@ -124,6 +129,8 @@ function getSuccessorIds(graph: Graph, nodeId: string): string[] {
 
 /**
  * Checks whether the graph contains no cycles.
+ *
+ * **O(V + E)** time.
  *
  * @example
  * ```ts
@@ -205,6 +212,8 @@ function isAcyclicUndirected(graph: Graph): boolean {
  * Returns connected components as arrays of nodes.
  * Treats all edges as undirected for connectivity.
  *
+ * **O(V + E)** time.
+ *
  * @example
  * ```ts
  * import { createGraph, getConnectedComponents } from '@statelyai/graph';
@@ -264,6 +273,8 @@ export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
 /**
  * Returns a topological ordering of nodes, or `null` if the graph is cyclic.
  *
+ * **O(V + E)** time (Kahn's algorithm).
+ *
  * @example
  * ```ts
  * import { createGraph, getTopologicalSort } from '@statelyai/graph';
@@ -316,6 +327,8 @@ export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
 /**
  * Checks whether a path exists between two nodes.
  *
+ * **O(V + E)** time (BFS) or **O((V + E) log V)** (Dijkstra when weighted).
+ *
  * @example
  * ```ts
  * import { createGraph, hasPath } from '@statelyai/graph';
@@ -340,6 +353,8 @@ export function hasPath(
 /**
  * Checks whether the graph is connected (all nodes reachable from any node).
  *
+ * **O(V + E)** time.
+ *
  * @example
  * ```ts
  * import { createGraph, isConnected } from '@statelyai/graph';
@@ -360,6 +375,8 @@ export function isConnected(graph: Graph): boolean {
 
 /**
  * Checks whether the graph is a tree (connected and acyclic).
+ *
+ * **O(V + E)** time.
  *
  * @example
  * ```ts
@@ -432,7 +449,7 @@ function getNeighborEdges(
 /**
  * Returns all shortest paths from a source node.
  * Returns all paths of equal minimum length per target (not just one).
- * Uses BFS by default; Dijkstra when `opts.getWeight` is provided.
+ * Uses BFS when all edges are unweighted; Dijkstra otherwise.
  */
 /** Compute distance + prev maps via BFS or Dijkstra. */
 function computeShortestDistances<E>(
@@ -449,7 +466,10 @@ function computeShortestDistances<E>(
   dist.set(sourceId, 0);
   prev.set(sourceId, []);
 
-  if (!getWeight) {
+  // Use BFS fast path only when no explicit getWeight AND no edges have weight set
+  const useBFS = !getWeight && !graph.edges.some((e) => e.weight !== undefined);
+
+  if (useBFS) {
     const queue: string[] = [sourceId];
 
     while (queue.length > 0) {
@@ -470,6 +490,7 @@ function computeShortestDistances<E>(
       }
     }
   } else {
+    const effectiveWeight = getWeight ?? ((e: GraphEdge<E>) => e.weight ?? 1);
     const visited = new Set<string>();
     const pq: Array<{ id: string; dist: number }> = [{ id: sourceId, dist: 0 }];
 
@@ -484,7 +505,7 @@ function computeShortestDistances<E>(
       visited.add(id);
 
       for (const { neighborId, edge } of getNeighborEdges(graph, id)) {
-        const w = getWeight(edge as GraphEdge<E>);
+        const w = effectiveWeight(edge as GraphEdge<E>);
         const newDist = d + w;
         const existing = dist.get(neighborId);
 
@@ -538,6 +559,9 @@ function* reconstructPaths<N, E>(
  * Lazily yields all shortest paths from a source node.
  * Use `getShortestPaths` for the full array.
  *
+ * **O(V + E)** time (BFS) or **O((V + E) log V)** (Dijkstra when weighted),
+ * plus **O(P)** per path yielded where P is the path length.
+ *
  * @example
  * ```ts
  * import { createGraph, genShortestPaths } from '@statelyai/graph';
@@ -587,6 +611,8 @@ export function* genShortestPaths<N, E>(
  * Returns all shortest paths from a source node as an array.
  * Delegates to `genShortestPaths` internally.
  *
+ * **O(V + E)** time (BFS) or **O((V + E) log V)** (Dijkstra when weighted).
+ *
  * @example
  * ```ts
  * import { createGraph, getShortestPaths } from '@statelyai/graph';
@@ -613,6 +639,8 @@ export function getShortestPaths<N, E>(
 
 /**
  * Returns a single shortest path from source to target, or `undefined` if unreachable.
+ *
+ * **O(V + E)** time (BFS) or **O((V + E) log V)** (Dijkstra when weighted).
  *
  * @example
  * ```ts
@@ -645,6 +673,8 @@ export function getShortestPath<N, E>(
  * Returns all simple (acyclic) paths from a source node as an array.
  * Delegates to `genSimplePaths` internally.
  *
+ * **O(V!)** worst-case (exponential in dense graphs).
+ *
  * @example
  * ```ts
  * import { createGraph, getSimplePaths } from '@statelyai/graph';
@@ -673,6 +703,8 @@ export function getSimplePaths<N, E>(
 /**
  * Lazily yields all simple (acyclic) paths from a source node via DFS backtracking.
  * Use `getSimplePaths` for the full array.
+ *
+ * **O(V!)** worst-case (exponential in dense graphs).
  *
  * @example
  * ```ts
@@ -749,6 +781,8 @@ export function* genSimplePaths<N, E>(
 /**
  * Returns a single simple (acyclic) path from source to target, or `undefined` if unreachable.
  *
+ * **O(V + E)** typical, **O(V!)** worst-case.
+ *
  * @example
  * ```ts
  * import { createGraph, getSimplePath } from '@statelyai/graph';
@@ -777,13 +811,13 @@ export function getSimplePath<N, E>(
   return undefined;
 }
 
-// ---------------------------------------------------------------------------
 // Strongly connected components (Tarjan's)
-// ---------------------------------------------------------------------------
 
 /**
  * Returns strongly connected components using Tarjan's algorithm.
  * Only meaningful for directed graphs.
+ *
+ * **O(V + E)** time.
  *
  * @example
  * ```ts
@@ -853,13 +887,13 @@ export function getStronglyConnectedComponents<N>(
   return result;
 }
 
-// ---------------------------------------------------------------------------
 // Cycle detection — all elementary cycles
-// ---------------------------------------------------------------------------
 
 /**
  * Returns all elementary cycles as an array of paths.
  * Delegates to `genCycles` internally.
+ *
+ * **O((V + E) · C)** where C is the number of elementary cycles (can be exponential).
  *
  * @example
  * ```ts
@@ -884,6 +918,8 @@ export function getCycles<N, E>(graph: Graph<N, E>): GraphPath<N, E>[] {
 /**
  * Lazily yields elementary cycles one at a time.
  * Use `getCycles` for the full array.
+ *
+ * **O((V + E) · C)** where C is the number of elementary cycles (can be exponential).
  *
  * @example
  * ```ts
@@ -1045,13 +1081,13 @@ function getNeighborEdgesAll(
   return result;
 }
 
-// ---------------------------------------------------------------------------
 // Single canonical DFS orderings
-// ---------------------------------------------------------------------------
 
 /**
  * Returns a single canonical preorder (DFS visit-order) sequence.
  * Visits neighbors in the order they appear in the adjacency list.
+ *
+ * **O(V + E)** time.
  *
  * @example
  * ```ts
@@ -1105,6 +1141,8 @@ export function getPreorder<N>(
  * Returns a single canonical postorder (DFS finish-order) sequence.
  * Visits neighbors in the order they appear in the adjacency list.
  *
+ * **O(V + E)** time.
+ *
  * @example
  * ```ts
  * import { createGraph, getPostorder } from '@statelyai/graph';
@@ -1153,12 +1191,12 @@ export function getPostorder<N>(
   return result;
 }
 
-// ---------------------------------------------------------------------------
 // Traversal order enumeration — all possible DFS orderings (generators)
-// ---------------------------------------------------------------------------
 
 /**
  * Returns all possible preorder sequences as an array. Can be exponential -- prefer `genPreorders`.
+ *
+ * **O(V! · V)** worst-case (exponential).
  *
  * @example
  * ```ts
@@ -1186,6 +1224,8 @@ export function getPreorders<N>(
 
 /**
  * Returns all possible postorder sequences as an array. Can be exponential -- prefer `genPostorders`.
+ *
+ * **O(V! · V)** worst-case (exponential).
  *
  * @example
  * ```ts
@@ -1215,6 +1255,8 @@ export function getPostorders<N>(
  * Lazily yields all possible preorder (DFS visit-order) sequences.
  * Different neighbor exploration orders yield different sequences.
  * Use `getPreorder()` for a single canonical ordering.
+ *
+ * **O(V! · V)** worst-case (exponential).
  *
  * @example
  * ```ts
@@ -1301,6 +1343,8 @@ export function* genPreorders<N>(
  * Different neighbor exploration orders yield different sequences.
  * Use `getPostorder()` for a single canonical ordering.
  *
+ * **O(V! · V)** worst-case (exponential).
+ *
  * @example
  * ```ts
  * import { createGraph, genPostorders } from '@statelyai/graph';
@@ -1379,14 +1423,14 @@ export function* genPostorders<N>(
   }
 }
 
-// ---------------------------------------------------------------------------
 // Minimum spanning tree
-// ---------------------------------------------------------------------------
 
 /**
  * Returns a minimum spanning tree of the graph.
  * Only meaningful for connected undirected graphs (or the component reachable
  * from an arbitrary start node in directed graphs).
+ *
+ * **O(E log V)** (Kruskal) or **O(V²)** (Prim with linear scan).
  *
  * @example
  * ```ts
@@ -1413,7 +1457,7 @@ export function getMinimumSpanningTree<N, E>(
   opts?: MSTOptions<E>,
 ): Graph<N, E> {
   const algorithm = opts?.algorithm ?? 'prim';
-  const getWeight = opts?.getWeight ?? (() => 1);
+  const getWeight = opts?.getWeight ?? ((e: GraphEdge<E>) => e.weight ?? 1);
 
   const mstEdges =
     algorithm === 'kruskal'
@@ -1437,6 +1481,7 @@ export function getMinimumSpanningTree<N, E>(
       targetId: e.targetId,
       label: e.label,
       data: e.data,
+      ...(e.weight !== undefined && { weight: e.weight }),
     })),
   });
 }
@@ -1548,14 +1593,14 @@ function kruskalMST<E>(
   return mstEdges;
 }
 
-// ---------------------------------------------------------------------------
 // All-pairs shortest paths
-// ---------------------------------------------------------------------------
 
 /**
  * Returns shortest paths between all pairs of nodes.
  * Algorithm 'dijkstra' (default): runs getShortestPaths per source node.
- * Algorithm 'floyd-warshall': classic O(V^3) dynamic programming.
+ * Algorithm 'floyd-warshall': classic dynamic programming.
+ *
+ * **O(V · (V + E) log V)** (Dijkstra) or **O(V³)** (Floyd-Warshall).
  *
  * @example
  * ```ts
@@ -1604,7 +1649,7 @@ function floydWarshallAllPaths<N, E>(
   getWeight?: (edge: GraphEdge<E>) => number,
 ): GraphPath<N, E>[] {
   const idx = getIndex(graph);
-  const w = getWeight ?? (() => 1);
+  const w = getWeight ?? ((e: GraphEdge<E>) => e.weight ?? 1);
   const nodeIds = graph.nodes.map((n) => n.id);
   const n = nodeIds.length;
 
@@ -1732,9 +1777,120 @@ function fwReconstruct<N, E>(
   return results;
 }
 
-// ---------------------------------------------------------------------------
+// A* pathfinding
+
+/**
+ * Returns a shortest path using A* search with an admissible heuristic.
+ * More efficient than Dijkstra when a good heuristic is available.
+ *
+ * **O((V + E) log V)** time with a good heuristic; degrades to Dijkstra
+ * with `heuristic: () => 0`.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getAStarPath } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'a', x: 0, y: 0 },
+ *     { id: 'b', x: 1, y: 0 },
+ *     { id: 'c', x: 1, y: 1 },
+ *   ],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c', weight: 1 },
+ *     { id: 'ac', sourceId: 'a', targetId: 'c', weight: 3 },
+ *   ],
+ * });
+ *
+ * const path = getAStarPath(graph, {
+ *   from: 'a',
+ *   to: 'c',
+ *   heuristic: (nodeId) => {
+ *     const node = graph.nodes.find(n => n.id === nodeId)!;
+ *     const target = graph.nodes.find(n => n.id === 'c')!;
+ *     return Math.abs(node.x! - target.x!) + Math.abs(node.y! - target.y!);
+ *   },
+ * });
+ * // path: a -> b -> c (weight 2, cheaper than direct a -> c)
+ * ```
+ */
+export function getAStarPath<N, E>(
+  graph: Graph<N, E>,
+  opts: AStarOptions<E>,
+): GraphPath<N, E> | undefined {
+  const idx = getIndex(graph);
+  const { from: sourceId, to: targetId, heuristic } = opts;
+  const getWeight = opts.getWeight ?? ((e: GraphEdge<E>) => e.weight ?? 1);
+
+  const sourceNi = idx.nodeById.get(sourceId);
+  if (sourceNi === undefined) return undefined;
+  if (!idx.nodeById.has(targetId)) return undefined;
+
+  // Same node
+  if (sourceId === targetId) {
+    return { source: graph.nodes[sourceNi], steps: [] };
+  }
+
+  const gScore = new Map<string, number>();
+  const cameFrom = new Map<string, { from: string; edge: GraphEdge<E> }>();
+  const closedSet = new Set<string>();
+  const openSet: Array<{ id: string; f: number }> = [];
+
+  gScore.set(sourceId, 0);
+  openSet.push({ id: sourceId, f: heuristic(sourceId) });
+
+  while (openSet.length > 0) {
+    // Extract node with lowest f-score
+    let minIdx = 0;
+    for (let i = 1; i < openSet.length; i++) {
+      if (openSet[i].f < openSet[minIdx].f) minIdx = i;
+    }
+    const { id: currentId } = openSet.splice(minIdx, 1)[0];
+
+    if (currentId === targetId) {
+      // Reconstruct path
+      const steps: GraphStep<N, E>[] = [];
+      let cur = targetId;
+      while (cur !== sourceId) {
+        const prev = cameFrom.get(cur)!;
+        const ni = idx.nodeById.get(cur)!;
+        steps.unshift({ edge: prev.edge, node: graph.nodes[ni] });
+        cur = prev.from;
+      }
+      return { source: graph.nodes[sourceNi], steps };
+    }
+
+    closedSet.add(currentId);
+
+    for (const { neighborId, edge } of getNeighborEdges(graph, currentId)) {
+      if (closedSet.has(neighborId)) continue;
+
+      const tentativeG =
+        (gScore.get(currentId) ?? Infinity) + getWeight(edge as GraphEdge<E>);
+
+      if (tentativeG < (gScore.get(neighborId) ?? Infinity)) {
+        cameFrom.set(neighborId, {
+          from: currentId,
+          edge: edge as GraphEdge<E>,
+        });
+        gScore.set(neighborId, tentativeG);
+        const f = tentativeG + heuristic(neighborId);
+
+        const existing = openSet.find((o) => o.id === neighborId);
+        if (existing) {
+          existing.f = f;
+        } else {
+          openSet.push({ id: neighborId, f });
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
 // Path joining
-// ---------------------------------------------------------------------------
 
 /**
  * Joins two paths end-to-end. The last node of the head path must equal

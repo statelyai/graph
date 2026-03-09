@@ -185,9 +185,7 @@ describe('isTree', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getShortestPaths
-// ---------------------------------------------------------------------------
 
 describe('getShortestPaths', () => {
   it('linear chain: returns paths to each node with increasing weight', () => {
@@ -316,9 +314,7 @@ describe('getShortestPaths', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getSimplePaths
-// ---------------------------------------------------------------------------
 
 describe('getSimplePaths', () => {
   it('diamond: returns 2 simple paths to D', () => {

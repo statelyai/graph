@@ -1,8 +1,6 @@
 import type { Graph, GraphNode, GraphEdge } from './types';
 
-// ---------------------------------------------------------------------------
 // Index types
-// ---------------------------------------------------------------------------
 
 export interface GraphIndex {
   /** id → array index for nodes */
@@ -20,15 +18,11 @@ export interface GraphIndex {
   edgeCount: number;
 }
 
-// ---------------------------------------------------------------------------
 // WeakMap cache
-// ---------------------------------------------------------------------------
 
 const indexes = new WeakMap<Graph, GraphIndex>();
 
-// ---------------------------------------------------------------------------
 // Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Get or lazily build the index for a graph.
@@ -78,9 +72,7 @@ export function invalidateIndex(graph: Graph): void {
   indexes.delete(graph);
 }
 
-// ---------------------------------------------------------------------------
 // Full rebuild
-// ---------------------------------------------------------------------------
 
 function buildIndex(graph: Graph): GraphIndex {
   const nodeById = new Map<string, number>();
@@ -118,11 +110,13 @@ function buildIndex(graph: Graph): GraphIndex {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Incremental updates — used by mutation functions in graph.ts
-// ---------------------------------------------------------------------------
 
-export function indexAddNode(idx: GraphIndex, node: GraphNode, arrayIndex: number): void {
+export function indexAddNode(
+  idx: GraphIndex,
+  node: GraphNode,
+  arrayIndex: number,
+): void {
   idx.nodeById.set(node.id, arrayIndex);
   idx.outEdges.set(node.id, []);
   idx.inEdges.set(node.id, []);
@@ -134,7 +128,11 @@ export function indexAddNode(idx: GraphIndex, node: GraphNode, arrayIndex: numbe
   idx.nodeCount++;
 }
 
-export function indexRemoveNode(idx: GraphIndex, node: GraphNode, arrayIndex: number): void {
+export function indexRemoveNode(
+  idx: GraphIndex,
+  node: GraphNode,
+  arrayIndex: number,
+): void {
   idx.nodeById.delete(node.id);
   idx.outEdges.delete(node.id);
   idx.inEdges.delete(node.id);
@@ -157,14 +155,22 @@ export function indexRemoveNode(idx: GraphIndex, node: GraphNode, arrayIndex: nu
   idx.nodeCount--;
 }
 
-export function indexAddEdge(idx: GraphIndex, edge: GraphEdge, arrayIndex: number): void {
+export function indexAddEdge(
+  idx: GraphIndex,
+  edge: GraphEdge,
+  arrayIndex: number,
+): void {
   idx.edgeById.set(edge.id, arrayIndex);
   idx.outEdges.get(edge.sourceId)?.push(edge.id);
   idx.inEdges.get(edge.targetId)?.push(edge.id);
   idx.edgeCount++;
 }
 
-export function indexRemoveEdge(idx: GraphIndex, edge: GraphEdge, arrayIndex: number): void {
+export function indexRemoveEdge(
+  idx: GraphIndex,
+  edge: GraphEdge,
+  arrayIndex: number,
+): void {
   idx.edgeById.delete(edge.id);
 
   // Remove from adjacency lists

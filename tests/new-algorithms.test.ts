@@ -13,9 +13,7 @@ import {
   getAllPairsShortestPaths,
 } from '../src/algorithms';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeDAG() {
   return createGraph({
@@ -60,9 +58,7 @@ function makeDisconnectedGraph() {
   });
 }
 
-// ---------------------------------------------------------------------------
 // getSources / getSinks
-// ---------------------------------------------------------------------------
 
 describe('getSources', () => {
   it('returns nodes with no incoming edges', () => {
@@ -75,7 +71,11 @@ describe('getSources', () => {
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'c' }],
     });
-    expect(getSources(g).map((n) => n.id).sort()).toEqual(['a', 'b']);
+    expect(
+      getSources(g)
+        .map((n) => n.id)
+        .sort(),
+    ).toEqual(['a', 'b']);
   });
 
   it('all nodes are sources in edgeless graph', () => {
@@ -101,7 +101,11 @@ describe('getSources', () => {
 
   it('disconnected: sources from both components', () => {
     const g = makeDisconnectedGraph(); // a→b, c→d
-    expect(getSources(g).map((n) => n.id).sort()).toEqual(['a', 'c']);
+    expect(
+      getSources(g)
+        .map((n) => n.id)
+        .sort(),
+    ).toEqual(['a', 'c']);
   });
 });
 
@@ -115,7 +119,11 @@ describe('getSinks', () => {
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
     });
-    expect(getSinks(g).map((n) => n.id).sort()).toEqual(['b', 'c']);
+    expect(
+      getSinks(g)
+        .map((n) => n.id)
+        .sort(),
+    ).toEqual(['b', 'c']);
   });
 
   it('no sinks in cyclic graph', () => {
@@ -136,7 +144,11 @@ describe('getSinks', () => {
 
   it('disconnected: sinks from both components', () => {
     const g = makeDisconnectedGraph();
-    expect(getSinks(g).map((n) => n.id).sort()).toEqual(['b', 'd']);
+    expect(
+      getSinks(g)
+        .map((n) => n.id)
+        .sort(),
+    ).toEqual(['b', 'd']);
   });
 
   it('single isolated node is both source and sink', () => {
@@ -146,9 +158,7 @@ describe('getSinks', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getStronglyConnectedComponents
-// ---------------------------------------------------------------------------
 
 describe('getStronglyConnectedComponents', () => {
   it('DAG: each node is its own SCC', () => {
@@ -165,11 +175,7 @@ describe('getStronglyConnectedComponents', () => {
 
   it('two separate cycles + tail node', () => {
     const g = createGraph({
-      nodes: [
-        { id: 'a' }, { id: 'b' },
-        { id: 'c' }, { id: 'd' },
-        { id: 'e' },
-      ],
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
         { id: 'e2', sourceId: 'b', targetId: 'a' },
@@ -248,9 +254,7 @@ describe('getStronglyConnectedComponents', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getCycles
-// ---------------------------------------------------------------------------
 
 describe('getCycles', () => {
   it('DAG has no cycles', () => {
@@ -418,9 +422,7 @@ describe('genCycles', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getPreorder / getPostorder (single canonical ordering)
-// ---------------------------------------------------------------------------
 
 describe('getPreorder', () => {
   it('linear chain: canonical preorder', () => {
@@ -505,9 +507,7 @@ describe('getPostorder', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getPreorders / getPostorders (generator — all possible orderings)
-// ---------------------------------------------------------------------------
 
 describe('genPreorders', () => {
   it('linear chain: one preorder', () => {
@@ -542,7 +542,12 @@ describe('genPreorders', () => {
       expect(order[0].id).toBe('a');
       expect(order).toHaveLength(4);
     }
-    const tails = orders.map((o) => o.slice(1).map((n) => n.id).join(','));
+    const tails = orders.map((o) =>
+      o
+        .slice(1)
+        .map((n) => n.id)
+        .join(','),
+    );
     expect(new Set(tails).size).toBe(6);
   });
 
@@ -624,9 +629,7 @@ describe('genPostorders', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getMinimumSpanningTree
-// ---------------------------------------------------------------------------
 
 describe('getMinimumSpanningTree', () => {
   const makeWeightedTriangle = () =>
@@ -674,8 +677,14 @@ describe('getMinimumSpanningTree', () => {
       ],
     });
     const w = (e: { data: number }) => e.data;
-    const primMST = getMinimumSpanningTree(g, { algorithm: 'prim', getWeight: w });
-    const kruskalMST = getMinimumSpanningTree(g, { algorithm: 'kruskal', getWeight: w });
+    const primMST = getMinimumSpanningTree(g, {
+      algorithm: 'prim',
+      getWeight: w,
+    });
+    const kruskalMST = getMinimumSpanningTree(g, {
+      algorithm: 'kruskal',
+      getWeight: w,
+    });
     const primW = primMST.edges.reduce((s, e) => s + e.data, 0);
     const kruskalW = kruskalMST.edges.reduce((s, e) => s + e.data, 0);
     expect(primW).toBe(kruskalW);
@@ -767,9 +776,7 @@ describe('getMinimumSpanningTree', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // getAllPairsShortestPaths
-// ---------------------------------------------------------------------------
 
 describe('getAllPairsShortestPaths', () => {
   it('dijkstra: linear chain, 3 pairs', () => {
