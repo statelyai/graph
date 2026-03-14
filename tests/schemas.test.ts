@@ -2,6 +2,7 @@ import { describe, it, expect, expectTypeOf } from 'vitest';
 import * as z from 'zod';
 import { GraphSchema, NodeSchema, EdgeSchema } from '../src/schemas';
 import type { GraphNode, GraphEdge, Graph } from '../src/types';
+import { getFullyFeaturedGraphFixture } from './fixtures';
 
 describe('Zod schemas', () => {
   it('NodeSchema validates a valid node', () => {
@@ -61,19 +62,30 @@ describe('Zod schemas', () => {
     expect(result.success).toBe(false);
   });
 
+  it('schemas preserve all known graph fields from the fully featured fixture', () => {
+    const graph = getFullyFeaturedGraphFixture();
+
+    expect(NodeSchema.parse(graph.nodes[0])).toEqual(graph.nodes[0]);
+    expect(EdgeSchema.parse(graph.edges[0])).toEqual(graph.edges[0]);
+    expect(GraphSchema.parse(graph)).toEqual(graph);
+  });
+
   it('NodeSchema stays in sync with GraphNode type', () => {
     expectTypeOf<z.infer<typeof NodeSchema>>().toMatchTypeOf<GraphNode>();
     expectTypeOf<GraphNode>().toMatchTypeOf<z.infer<typeof NodeSchema>>();
+    expectTypeOf<keyof z.infer<typeof NodeSchema>>().toEqualTypeOf<keyof GraphNode>();
   });
 
   it('EdgeSchema stays in sync with GraphEdge type', () => {
     expectTypeOf<z.infer<typeof EdgeSchema>>().toMatchTypeOf<GraphEdge>();
     expectTypeOf<GraphEdge>().toMatchTypeOf<z.infer<typeof EdgeSchema>>();
+    expectTypeOf<keyof z.infer<typeof EdgeSchema>>().toEqualTypeOf<keyof GraphEdge>();
   });
 
   it('GraphSchema stays in sync with Graph type', () => {
     expectTypeOf<z.infer<typeof GraphSchema>>().toMatchTypeOf<Graph>();
     expectTypeOf<Graph>().toMatchTypeOf<z.infer<typeof GraphSchema>>();
+    expectTypeOf<keyof z.infer<typeof GraphSchema>>().toEqualTypeOf<keyof Graph>();
   });
 
   it('produces JSON Schema via z.toJSONSchema()', () => {

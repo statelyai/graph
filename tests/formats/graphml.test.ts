@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toGraphML, fromGraphML } from '../../src/formats/graphml';
 import type { Graph } from '../../src/types';
+import { getFullyFeaturedGraphFixture } from '../fixtures';
 
 const sampleGraph: Graph = {
   id: 'test',
@@ -52,6 +53,13 @@ describe('GraphML', () => {
 
     // Check graph data
     expect(parsed.data).toEqual({ version: 1 });
+  });
+
+  it('round-trips a fully featured graph without serialization drift', () => {
+    const graph = getFullyFeaturedGraphFixture();
+    const parsed = fromGraphML(toGraphML(graph));
+
+    expect(parsed).toEqual(graph);
   });
 
   it('handles undirected graphs', () => {

@@ -24,6 +24,7 @@ export const EdgeSchema = z.object({
   sourceId: z.string(),
   targetId: z.string(),
   label: z.string(),
+  weight: z.number().optional(),
   data: z.any(),
   x: z.number().optional(),
   y: z.number().optional(),

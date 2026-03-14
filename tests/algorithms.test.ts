@@ -11,7 +11,9 @@ import {
   isTree,
   getShortestPaths,
   getSimplePaths,
+  genSimplePaths,
 } from '../src/algorithms';
+import { getIndex } from '../src/indexing';
 
 function makeDAG() {
   return createGraph({
@@ -383,5 +385,38 @@ describe('getSimplePaths', () => {
     });
     const paths = getSimplePaths(g, { to: 'b' });
     expect(paths).toHaveLength(1);
+  });
+});
+
+describe('genSimplePaths', () => {
+  it('yields the first path lazily without exploring later branches', () => {
+    const graph = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 't' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bt', sourceId: 'b', targetId: 't' },
+        { id: 'ac', sourceId: 'a', targetId: 'c' },
+        { id: 'ct', sourceId: 'c', targetId: 't' },
+      ],
+    });
+
+    // Prebuild the index so the proxy only affects traversal after iteration starts.
+    getIndex(graph);
+
+    const originalEdges = graph.edges;
+    graph.edges = new Proxy(originalEdges, {
+      get(target, prop, receiver) {
+        if (prop === '3') {
+          throw new Error('later branch should not be touched before first yield');
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+
+    const iterator = genSimplePaths(graph, { from: 'a', to: 't' });
+    const first = iterator.next();
+
+    expect(first.done).toBe(false);
+    expect(first.value.steps.map((step) => step.node.id)).toEqual(['b', 't']);
   });
 });

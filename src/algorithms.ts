@@ -125,6 +125,78 @@ function getSuccessorIds(graph: Graph, nodeId: string): string[] {
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!].targetId);
 }
 
+class MinPriorityQueue<T> {
+  private items: T[] = [];
+
+  constructor(private compare: (a: T, b: T) => number) {}
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  push(item: T): void {
+    this.items.push(item);
+    this.bubbleUp(this.items.length - 1);
+  }
+
+  pop(): T | undefined {
+    if (this.items.length === 0) return undefined;
+
+    const first = this.items[0];
+    const last = this.items.pop()!;
+
+    if (this.items.length > 0) {
+      this.items[0] = last;
+      this.bubbleDown(0);
+    }
+
+    return first;
+  }
+
+  private bubbleUp(index: number): void {
+    let current = index;
+    while (current > 0) {
+      const parent = Math.floor((current - 1) / 2);
+      if (this.compare(this.items[current], this.items[parent]) >= 0) break;
+      [this.items[current], this.items[parent]] = [
+        this.items[parent],
+        this.items[current],
+      ];
+      current = parent;
+    }
+  }
+
+  private bubbleDown(index: number): void {
+    let current = index;
+
+    while (true) {
+      const left = current * 2 + 1;
+      const right = left + 1;
+      let smallest = current;
+
+      if (
+        left < this.items.length &&
+        this.compare(this.items[left], this.items[smallest]) < 0
+      ) {
+        smallest = left;
+      }
+      if (
+        right < this.items.length &&
+        this.compare(this.items[right], this.items[smallest]) < 0
+      ) {
+        smallest = right;
+      }
+      if (smallest === current) break;
+
+      [this.items[current], this.items[smallest]] = [
+        this.items[smallest],
+        this.items[current],
+      ];
+      current = smallest;
+    }
+  }
+}
+
 // --- Graph properties ---
 
 /**
@@ -492,16 +564,16 @@ function computeShortestDistances<E>(
   } else {
     const effectiveWeight = getWeight ?? ((e: GraphEdge<E>) => e.weight ?? 1);
     const visited = new Set<string>();
-    const pq: Array<{ id: string; dist: number }> = [{ id: sourceId, dist: 0 }];
+    const pq = new MinPriorityQueue<{ id: string; dist: number }>(
+      (a, b) => a.dist - b.dist,
+    );
+    pq.push({ id: sourceId, dist: 0 });
 
-    while (pq.length > 0) {
-      let minIdx = 0;
-      for (let i = 1; i < pq.length; i++) {
-        if (pq[i].dist < pq[minIdx].dist) minIdx = i;
-      }
-      const { id, dist: d } = pq.splice(minIdx, 1)[0];
+    while (pq.size > 0) {
+      const current = pq.pop()!;
+      const { id, dist: d } = current;
 
-      if (visited.has(id)) continue;
+      if (visited.has(id) || d !== dist.get(id)) continue;
       visited.add(id);
 
       for (const { neighborId, edge } of getNeighborEdges(graph, id)) {
@@ -740,19 +812,18 @@ export function* genSimplePaths<N, E>(
   const targetId = opts?.to;
   const visited = new Set<string>();
   const currentSteps: GraphStep<N, E>[] = [];
-  const found: GraphPath<N, E>[] = [];
 
-  function dfsCollect(nodeId: string): void {
+  function* dfsCollect(nodeId: string): Generator<GraphPath<N, E>> {
     visited.add(nodeId);
 
     if (targetId !== undefined) {
       if (nodeId === targetId) {
-        found.push({ source: sourceNode, steps: [...currentSteps] });
+        yield { source: sourceNode, steps: [...currentSteps] };
         visited.delete(nodeId);
         return;
       }
     } else if (currentSteps.length > 0) {
-      found.push({ source: sourceNode, steps: [...currentSteps] });
+      yield { source: sourceNode, steps: [...currentSteps] };
     }
 
     for (const { neighborId, edge } of getNeighborEdges(graph, nodeId)) {
@@ -763,7 +834,7 @@ export function* genSimplePaths<N, E>(
             ? graph.nodes[neighborNi]
             : graph.nodes.find((n) => n.id === neighborId)!;
         currentSteps.push({ edge: edge as GraphEdge<E>, node: neighborNode });
-        dfsCollect(neighborId);
+        yield* dfsCollect(neighborId);
         currentSteps.pop();
       }
     }
@@ -771,11 +842,7 @@ export function* genSimplePaths<N, E>(
     visited.delete(nodeId);
   }
 
-  // DFS finds paths in batches between yields
-  // We use a trampoline: run DFS, yield found paths, repeat
-  // For simplicity, collect all then yield (DFS doesn't naturally pause)
-  dfsCollect(sourceId);
-  yield* found;
+  yield* dfsCollect(sourceId);
 }
 
 /**
@@ -1430,7 +1497,7 @@ export function* genPostorders<N>(
  * Only meaningful for connected undirected graphs (or the component reachable
  * from an arbitrary start node in directed graphs).
  *
- * **O(E log V)** (Kruskal) or **O(V²)** (Prim with linear scan).
+ * **O(E log E)** using either edge sorting (Kruskal) or a min-heap (Prim).
  *
  * @example
  * ```ts
@@ -1494,9 +1561,9 @@ function primMST<E>(
   const idx = getIndex(graph);
   const inMST = new Set<string>();
   const mstEdges: GraphEdge<E>[] = [];
-
-  // Candidate edges: [weight, edge]
-  const candidates: Array<{ weight: number; edge: GraphEdge<E> }> = [];
+  const candidates = new MinPriorityQueue<{ weight: number; edge: GraphEdge<E> }>(
+    (a, b) => a.weight - b.weight,
+  );
 
   function addEdgesOf(nodeId: string): void {
     for (const eid of idx.outEdges.get(nodeId) ?? []) {
@@ -1524,13 +1591,8 @@ function primMST<E>(
   inMST.add(startId);
   addEdgesOf(startId);
 
-  while (candidates.length > 0 && inMST.size < graph.nodes.length) {
-    // Extract minimum weight edge
-    let minIdx = 0;
-    for (let i = 1; i < candidates.length; i++) {
-      if (candidates[i].weight < candidates[minIdx].weight) minIdx = i;
-    }
-    const { edge } = candidates.splice(minIdx, 1)[0];
+  while (candidates.size > 0 && inMST.size < graph.nodes.length) {
+    const { edge } = candidates.pop()!;
 
     const targetId =
       graph.type === 'undirected' && inMST.has(edge.targetId)
@@ -1835,18 +1897,16 @@ export function getAStarPath<N, E>(
   const gScore = new Map<string, number>();
   const cameFrom = new Map<string, { from: string; edge: GraphEdge<E> }>();
   const closedSet = new Set<string>();
-  const openSet: Array<{ id: string; f: number }> = [];
+  const openSet = new MinPriorityQueue<{ id: string; f: number }>(
+    (a, b) => a.f - b.f,
+  );
 
   gScore.set(sourceId, 0);
   openSet.push({ id: sourceId, f: heuristic(sourceId) });
 
-  while (openSet.length > 0) {
-    // Extract node with lowest f-score
-    let minIdx = 0;
-    for (let i = 1; i < openSet.length; i++) {
-      if (openSet[i].f < openSet[minIdx].f) minIdx = i;
-    }
-    const { id: currentId } = openSet.splice(minIdx, 1)[0];
+  while (openSet.size > 0) {
+    const { id: currentId } = openSet.pop()!;
+    if (closedSet.has(currentId)) continue;
 
     if (currentId === targetId) {
       // Reconstruct path
@@ -1875,14 +1935,10 @@ export function getAStarPath<N, E>(
           edge: edge as GraphEdge<E>,
         });
         gScore.set(neighborId, tentativeG);
-        const f = tentativeG + heuristic(neighborId);
-
-        const existing = openSet.find((o) => o.id === neighborId);
-        if (existing) {
-          existing.f = f;
-        } else {
-          openSet.push({ id: neighborId, f });
-        }
+        openSet.push({
+          id: neighborId,
+          f: tentativeG + heuristic(neighborId),
+        });
       }
     }
   }
