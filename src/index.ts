@@ -28,6 +28,10 @@ export type {
   GraphPatch,
   TransitionOptions,
   GraphFormatConverter,
+  WalkOptions,
+  WeightedWalkOptions,
+  WalkContext,
+  CoverageStats,
 } from './types';
 
 // Factory & helpers
@@ -133,6 +137,20 @@ export {
 
 // Transforms
 export { flatten, getSubgraph, reverseGraph } from './transforms';
+
+// Walks (MBT)
+export {
+  genRandomWalk,
+  genWeightedRandomWalk,
+  genQuickRandomWalk,
+  genPredefinedWalk,
+  takeSteps,
+  takeUntilNode,
+  takeUntilEdge,
+  takeUntilNodeCoverage,
+  takeUntilEdgeCoverage,
+  getCoverage,
+} from './walks';
 
 // Formats — use subpath imports: @statelyai/graph/dot, @statelyai/graph/mermaid, etc.
 // Only createFormatConverter is re-exported from the main entry for convenience.

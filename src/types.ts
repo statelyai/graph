@@ -315,6 +315,40 @@ export interface VisualGraphFormatConverter<TSerial, N = any, E = any, G = any> 
   from(input: TSerial): VisualGraph<N, E, G>;
 }
 
+// --- Walk types ---
+
+export interface WalkOptions<TEdgeData = any> {
+  /** Start node ID. Default: graph.initialNodeId, else sole inDegree-0 node */
+  from?: string;
+  /** Seed for deterministic RNG. Omit for Math.random. */
+  seed?: number;
+  /** Guard: only traverse edges where filter returns true. */
+  filter?: (edge: GraphEdge<TEdgeData>, context: WalkContext) => boolean;
+  /** Callback fired after each step. */
+  onStep?: (step: GraphStep<any, TEdgeData>, context: WalkContext) => void;
+}
+
+export interface WeightedWalkOptions<TEdgeData = any>
+  extends WalkOptions<TEdgeData> {
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+}
+
+export interface WalkContext {
+  currentNodeId: string;
+  visitedNodes: Set<string>;
+  visitedEdges: Set<string>;
+  stepCount: number;
+}
+
+export interface CoverageStats {
+  nodeCoverage: number;
+  edgeCoverage: number;
+  visitedNodes: string[];
+  visitedEdges: string[];
+  totalSteps: number;
+}
+
 // --- Transition exploration options ---
 
 export interface TransitionOptions<TState, TEvent> {
