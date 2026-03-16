@@ -1,5 +1,35 @@
 # @statelyai/graph
 
+## 0.6.0
+
+### Minor Changes
+
+- [`3115609`](https://github.com/statelyai/graph/commit/31156099ab26fe34e0bcf205221c48855a7d5674) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Make `edge.label` nullable
+
+- [`54023f4`](https://github.com/statelyai/graph/commit/54023f4996a95a12145ed8f0ac1ed73ec9daedf0) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add edge weights, A\* pathfinding, subgraph extraction, and graph reversal.
+
+  - `weight?: number` on edges; algorithms default to `(e) => e.weight ?? 1` with BFS fast path when unweighted
+  - `getAStarPath(graph, { from, to, heuristic })` for heuristic-guided shortest paths
+  - `getSubgraph(graph, nodeIds)` returns induced subgraph with internal edges
+  - `reverseGraph(graph, filterEdge?)` flips edge directions
+  - Remove stale TODO for Mermaid sequence blocks (already implemented)
+
+- [`8f9912d`](https://github.com/statelyai/graph/commit/8f9912dd18c8ffaca4547061fe007f67124afd3a) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add walk generators and coverage utilities for model-based testing.
+
+  - `genRandomWalk()`, `genWeightedRandomWalk()`, `genQuickRandomWalk()`, `genPredefinedWalk()` — step-by-step graph traversal generators that yield `GraphStep`, with optional `seed` for deterministic replay
+  - Composable stop conditions: `takeSteps()`, `takeUntilNode()`, `takeUntilEdge()`, `takeUntilNodeCoverage()`, `takeUntilEdgeCoverage()`
+  - `getCoverage()` computes node/edge coverage stats from a walk
+  - `filter` option for edge guards, `onStep` callback for actions — keeps graph JSON-serializable
+
+### Patch Changes
+
+- [`22f77a5`](https://github.com/statelyai/graph/commit/22f77a51b6b0bed60a8890e44b8b9148c994e96d) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Fix schema and GraphML serialization drift, optimize weighted graph algorithms, and make `genSimplePaths()` truly lazy.
+
+  - add `weight` to `EdgeSchema` and tighten schema drift tests against the runtime graph types
+  - preserve graph, node, and edge metadata in GraphML round-trips, including `initialNodeId`, `direction`, `style`, geometry, and edge `weight`
+  - use a heap-backed priority queue for weighted shortest paths, A\*, and Prim MST
+  - refactor `genSimplePaths()` to yield incrementally instead of collecting all paths before returning
+
 ## 0.5.0
 
 ### Minor Changes
