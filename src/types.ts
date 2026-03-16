@@ -55,7 +55,7 @@ export interface EdgeConfig<TEdgeData = any> {
   /**
    * The label of the edge.
    */
-  label?: string;
+  label?: string | null;
   /**
    * Optional numeric weight for the edge.
    * Used by pathfinding, MST, and other weighted algorithms.
@@ -105,7 +105,7 @@ export interface GraphEdge<TEdgeData = any> {
   id: string;
   sourceId: string;
   targetId: string;
-  label: string;
+  label: string | null;
   /**
    * Optional numeric weight for the edge.
    * Used by pathfinding, MST, and other weighted algorithms.

@@ -70,7 +70,7 @@ describe('getDiff', () => {
     expect(diff.edges.updated[0].old).toEqual({
       sourceId: 'b',
       targetId: 'c',
-      label: '',
+      label: null,
     });
     expect(diff.edges.updated[0].new).toEqual({
       sourceId: 'c',

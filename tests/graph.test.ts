@@ -202,6 +202,34 @@ describe('Mutable: addNode / addEdge', () => {
     );
   });
 
+  it('addEdge() defaults label to null', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }] });
+    const edge = addEdge(g, { id: 'e1', sourceId: 'a', targetId: 'b' });
+    expect(edge.label).toBeNull();
+  });
+
+  it('addEdge() preserves explicit label', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }] });
+    const edge = addEdge(g, {
+      id: 'e1',
+      sourceId: 'a',
+      targetId: 'b',
+      label: 'hello',
+    });
+    expect(edge.label).toBe('hello');
+  });
+
+  it('addEdge() allows explicit null label', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }] });
+    const edge = addEdge(g, {
+      id: 'e1',
+      sourceId: 'a',
+      targetId: 'b',
+      label: null,
+    });
+    expect(edge.label).toBeNull();
+  });
+
   it('addEdge() throws on missing source/target', () => {
     const g = createGraph({ nodes: [{ id: 'a' }] });
     expect(() =>

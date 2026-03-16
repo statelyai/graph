@@ -58,7 +58,7 @@ function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
     id: config.id,
     sourceId: config.sourceId,
     targetId: config.targetId,
-    label: config.label ?? '',
+    label: config.label ?? null,
     data: config.data as T,
   };
   if (config.weight !== undefined) edge.weight = config.weight;
