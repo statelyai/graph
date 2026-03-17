@@ -76,7 +76,7 @@ export interface EdgeConfig<TEdgeData = any> {
 export interface Graph<TNodeData = any, TEdgeData = any, TGraphData = any> {
   id: string;
   type: 'directed' | 'undirected';
-  initialNodeId: string | null;
+  initialNodeId?: string | null;
   nodes: GraphNode<TNodeData>[];
   edges: GraphEdge<TEdgeData>[];
   data: TGraphData;
@@ -89,7 +89,7 @@ export interface GraphNode<TNodeData = any> {
   id: string;
   parentId?: string | null;
   initialNodeId?: string | null;
-  label: string;
+  label?: string;
   data: TNodeData;
   x?: number;
   y?: number;
@@ -105,7 +105,7 @@ export interface GraphEdge<TEdgeData = any> {
   id: string;
   sourceId: string;
   targetId: string;
-  label: string | null;
+  label?: string | null;
   /**
    * Optional numeric weight for the edge.
    * Used by pathfinding, MST, and other weighted algorithms.

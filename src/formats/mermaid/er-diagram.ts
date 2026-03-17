@@ -166,7 +166,10 @@ export function fromMermaidER(input: string): MermaidERGraph {
       );
       if (attrMatch) {
         const node = nodeMap.get(currentEntity)!;
-        if (!node.data.attributes) node.data.attributes = [];
+        if (!node.data?.attributes) {
+          if (!node.data) node.data = {};
+          node.data.attributes = [];
+        }
         node.data.attributes.push({
           type: attrMatch[1],
           name: attrMatch[2],

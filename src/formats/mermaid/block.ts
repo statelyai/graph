@@ -150,7 +150,7 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
       const label = spanMatch[2] ?? id;
       const span = parseInt(spanMatch[3], 10);
       const node = ensureNode(id, label);
-      node.data.span = span;
+      if (node.data) node.data.span = span;
       continue;
     }
 

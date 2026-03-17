@@ -239,6 +239,7 @@ export function fromMermaidClass(input: string): MermaidClassGraph {
       currentClass = classBlockMatch[1];
       const node = ensureNode(currentClass);
       if (classBlockMatch[2]) {
+        node.data ??= {};
         node.data.genericType = classBlockMatch[2];
       }
       inClassBlock = true;
@@ -260,12 +261,15 @@ export function fromMermaidClass(input: string): MermaidClassGraph {
       // Annotation <<interface>> etc.
       const annotMatch = line.match(/^<<(.+)>>$/);
       if (annotMatch) {
-        nodeMap.get(currentClass)!.data.annotation = annotMatch[1];
+        const node = nodeMap.get(currentClass)!;
+        node.data ??= {};
+        node.data.annotation = annotMatch[1];
         continue;
       }
 
       // Member line
       const node = nodeMap.get(currentClass)!;
+      node.data ??= {};
       if (!node.data.members) node.data.members = [];
       node.data.members.push(parseMember(line));
       continue;
@@ -275,7 +279,10 @@ export function fromMermaidClass(input: string): MermaidClassGraph {
     const classInlineMatch = line.match(/^class\s+(\S+?)(?:~(.+?)~)?\s*$/);
     if (classInlineMatch) {
       const node = ensureNode(classInlineMatch[1]);
-      if (classInlineMatch[2]) node.data.genericType = classInlineMatch[2];
+      if (classInlineMatch[2]) {
+        node.data ??= {};
+        node.data.genericType = classInlineMatch[2];
+      }
       continue;
     }
 
@@ -283,6 +290,7 @@ export function fromMermaidClass(input: string): MermaidClassGraph {
     const annotLineMatch = line.match(/^<<(.+)>>\s+(\S+)\s*$/);
     if (annotLineMatch) {
       const node = ensureNode(annotLineMatch[2]);
+      node.data ??= {};
       node.data.annotation = annotLineMatch[1];
       continue;
     }
@@ -294,6 +302,7 @@ export function fromMermaidClass(input: string): MermaidClassGraph {
       const possibleRel = parseRelationship(line);
       if (!possibleRel) {
         const node = ensureNode(inlineMemberMatch[1]);
+        node.data ??= {};
         if (!node.data.members) node.data.members = [];
         node.data.members.push(parseMember(inlineMemberMatch[2]));
         continue;

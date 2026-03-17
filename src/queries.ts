@@ -648,7 +648,7 @@ export function getRelativeDistanceMap(
       sourceId = graph.nodes[pi].initialNodeId ?? null;
     }
   } else {
-    sourceId = graph.initialNodeId;
+    sourceId = graph.initialNodeId ?? null;
   }
   if (!sourceId) return {};
 

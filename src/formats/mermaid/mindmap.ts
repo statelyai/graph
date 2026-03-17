@@ -176,7 +176,7 @@ export function toMermaidMindmap(graph: MermaidMindmapGraph): string {
       const indent = '  '.repeat(depth + 1);
       const shape = (child as any).shape;
       const brackets = shape ? SHAPE_TO_BRACKETS[shape] : undefined;
-      const label = escapeMermaidLabel(child.label);
+      const label = escapeMermaidLabel(child.label ?? child.id);
       const text = brackets
         ? `${brackets[0]}${label}${brackets[1]}`
         : label;
