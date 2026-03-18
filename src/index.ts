@@ -37,6 +37,8 @@ export type {
 // Factory & helpers
 export {
   createGraph,
+  createGraphNode,
+  createGraphEdge,
   createVisualGraph,
   createGraphFromTransition,
   getNode,

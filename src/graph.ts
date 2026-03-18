@@ -23,7 +23,16 @@ import {
   indexUpdateEdgeEndpoints,
 } from './indexing';
 
-function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
+/**
+ * Create a resolved graph node from a config. Fills in defaults.
+ *
+ * @example
+ * ```ts
+ * const node = createGraphNode({ id: 'a', data: { label: 'hi' } });
+ * // { type: 'node', id: 'a', label: '', data: { label: 'hi' } }
+ * ```
+ */
+export function createGraphNode<T = any>(config: NodeConfig<T>): GraphNode<T> {
   if (!config.id) throw new Error('Node id must be a non-empty string');
   if (config.parentId === '')
     throw new Error('Node parentId must be a non-empty string');
@@ -47,7 +56,16 @@ function resolveNode<T>(config: NodeConfig<T>): GraphNode<T> {
   return node;
 }
 
-function resolveEdge<T>(config: EdgeConfig<T>): GraphEdge<T> {
+/**
+ * Create a resolved graph edge from a config. Fills in defaults.
+ *
+ * @example
+ * ```ts
+ * const edge = createGraphEdge({ id: 'e1', sourceId: 'a', targetId: 'b' });
+ * // { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', label: null, data: undefined }
+ * ```
+ */
+export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
   if (!config.id) throw new Error('Edge id must be a non-empty string');
   if (!config.sourceId)
     throw new Error('Edge sourceId must be a non-empty string');
@@ -91,8 +109,8 @@ export function createGraph<N = any, E = any, G = any>(
     id: config?.id ?? '',
     type: config?.type ?? 'directed',
     initialNodeId: config?.initialNodeId ?? null,
-    nodes: (config?.nodes ?? []).map(resolveNode),
-    edges: (config?.edges ?? []).map(resolveEdge),
+    nodes: (config?.nodes ?? []).map(createGraphNode),
+    edges: (config?.edges ?? []).map(createGraphEdge),
     data: (config?.data ?? undefined) as G,
   };
   if (config?.direction !== undefined) graph.direction = config.direction;
@@ -334,7 +352,7 @@ export function addNode<N>(
   graph: Graph<N>,
   config: NodeConfig<N>,
 ): GraphNode<N> {
-  const node = resolveNode(config);
+  const node = createGraphNode(config);
   const idx = getIndex(graph);
   if (idx.nodeById.has(config.id)) {
     throw new Error(`Node "${config.id}" already exists`);
@@ -362,7 +380,7 @@ export function addEdge<E>(
   graph: Graph<any, E>,
   config: EdgeConfig<E>,
 ): GraphEdge<E> {
-  const edge = resolveEdge(config);
+  const edge = createGraphEdge(config);
   const idx = getIndex(graph);
   if (idx.edgeById.has(config.id)) {
     throw new Error(`Edge "${config.id}" already exists`);
