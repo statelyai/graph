@@ -61,6 +61,8 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
         source: e.sourceId,
         target: e.targetId,
       };
+      if (e.sourcePort) edge.sourceHandle = e.sourcePort;
+      if (e.targetPort) edge.targetHandle = e.targetPort;
       if (e.data !== undefined) edge.data = e.data;
       if (e.label) {
         edge.data = { ...edge.data, label: e.label } as Record<
@@ -126,6 +128,8 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
       label:
         (e.data as Record<string, unknown> | undefined)?.label?.toString() ??
         '',
+      ...(e.sourceHandle && { sourcePort: e.sourceHandle }),
+      ...(e.targetHandle && { targetPort: e.targetHandle }),
       data: e.data,
       x: 0,
       y: 0,

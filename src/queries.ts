@@ -1,4 +1,4 @@
-import type { Graph, GraphNode, GraphEdge } from './types';
+import type { Graph, GraphNode, GraphEdge, GraphPort } from './types';
 import { getIndex } from './indexing';
 
 // --- Edge queries ---
@@ -782,4 +782,107 @@ export function getSources<N>(graph: Graph<N>): GraphNode<N>[] {
 export function getSinks<N>(graph: Graph<N>): GraphNode<N>[] {
   const idx = getIndex(graph);
   return graph.nodes.filter((n) => (idx.outEdges.get(n.id)?.length ?? 0) === 0);
+}
+
+// --- Port queries ---
+
+/**
+ * Get a port by name on a node, or `undefined` if not found.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{
+ *     id: 'a',
+ *     ports: [{ name: 'out', direction: 'out' }],
+ *   }],
+ * });
+ * getPort(graph, 'a', 'out'); // => { name: 'out', direction: 'out', ... }
+ * getPort(graph, 'a', 'missing'); // => undefined
+ * ```
+ */
+export function getPort<P = any>(
+  graph: Graph<any, any, any, P>,
+  nodeId: string,
+  portName: string,
+): GraphPort<P> | undefined {
+  const idx = getIndex(graph);
+  const ni = idx.nodeById.get(nodeId);
+  if (ni === undefined) return undefined;
+  return graph.nodes[ni].ports?.find((p) => p.name === portName);
+}
+
+/**
+ * Get all ports on a node. Returns `[]` if the node has no ports or doesn't exist.
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [{
+ *     id: 'a',
+ *     ports: [
+ *       { name: 'in', direction: 'in' },
+ *       { name: 'out', direction: 'out' },
+ *     ],
+ *   }],
+ * });
+ * getPorts(graph, 'a'); // => [port in, port out]
+ * ```
+ */
+export function getPorts<P = any>(
+  graph: Graph<any, any, any, P>,
+  nodeId: string,
+): GraphPort<P>[] {
+  const idx = getIndex(graph);
+  const ni = idx.nodeById.get(nodeId);
+  if (ni === undefined) return [];
+  return graph.nodes[ni].ports ?? [];
+}
+
+/**
+ * Get all edges connected to a specific port on a node.
+ *
+ * Returns edges where:
+ * - `sourceId === nodeId && sourcePort === portName`, or
+ * - `targetId === nodeId && targetPort === portName`
+ *
+ * @example
+ * ```ts
+ * const graph = createGraph({
+ *   nodes: [
+ *     { id: 'a', ports: [{ name: 'out', direction: 'out' }] },
+ *     { id: 'b', ports: [{ name: 'in', direction: 'in' }] },
+ *   ],
+ *   edges: [{
+ *     id: 'e1', sourceId: 'a', targetId: 'b',
+ *     sourcePort: 'out', targetPort: 'in',
+ *   }],
+ * });
+ * getEdgesByPort(graph, 'a', 'out'); // => [edge e1]
+ * ```
+ */
+export function getEdgesByPort<E = any>(
+  graph: Graph<any, E>,
+  nodeId: string,
+  portName: string,
+): GraphEdge<E>[] {
+  const idx = getIndex(graph);
+  const result: GraphEdge<E>[] = [];
+
+  // Check outgoing edges
+  for (const eid of idx.outEdges.get(nodeId) ?? []) {
+    const ai = idx.edgeById.get(eid);
+    if (ai !== undefined && graph.edges[ai].sourcePort === portName) {
+      result.push(graph.edges[ai]);
+    }
+  }
+  // Check incoming edges
+  for (const eid of idx.inEdges.get(nodeId) ?? []) {
+    const ai = idx.edgeById.get(eid);
+    if (ai !== undefined && graph.edges[ai].targetPort === portName) {
+      result.push(graph.edges[ai]);
+    }
+  }
+
+  return result;
 }

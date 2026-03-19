@@ -1,4 +1,4 @@
-// --- Visual base ---
+// --- Base interfaces (DRY) ---
 
 export interface EntityRect {
   x: number;
@@ -7,39 +7,80 @@ export interface EntityRect {
   height: number;
 }
 
+/** Config-level base — shared optional visual/style props for nodes, edges, ports. */
+export interface GraphEntityConfig {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  style?: Record<string, string | number>;
+}
+
+/** Resolved entity base — optional visual props (non-visual graphs may omit). */
+export interface GraphEntity extends GraphEntityConfig {}
+
+/** Visual entity base — required position/size. */
+export interface VisualGraphEntity {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  style?: Record<string, string | number>;
+}
+
+// --- Port types ---
+
+export type PortDirection = 'in' | 'out' | 'inout';
+
+export interface PortConfig<TPortData = any> extends GraphEntityConfig {
+  name: string;
+  direction?: PortDirection;
+  label?: string;
+  data?: TPortData;
+}
+
+export interface GraphPort<TPortData = any> extends GraphEntity {
+  name: string;
+  direction: PortDirection;
+  label?: string;
+  data: TPortData;
+}
+
+export interface VisualPort<TPortData = any>
+  extends Omit<GraphPort<TPortData>, keyof EntityRect>,
+    VisualGraphEntity {}
+
 // --- Config types (input, lenient) ---
 
 export interface GraphConfig<
   TNodeData = any,
   TEdgeData = any,
   TGraphData = any,
+  TPortData = any,
 > {
   id?: string;
   type?: 'directed' | 'undirected';
   initialNodeId?: string;
-  nodes?: NodeConfig<TNodeData>[];
+  nodes?: NodeConfig<TNodeData, TPortData>[];
   edges?: EdgeConfig<TEdgeData>[];
   data?: TGraphData;
   direction?: 'up' | 'down' | 'left' | 'right';
   style?: Record<string, string | number>;
 }
 
-export interface NodeConfig<TNodeData = any> {
+export interface NodeConfig<TNodeData = any, TPortData = any>
+  extends GraphEntityConfig {
   id: string;
   parentId?: string | null;
   initialNodeId?: string;
   label?: string;
   data?: TNodeData;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
+  ports?: PortConfig<TPortData>[];
   shape?: string;
   color?: string;
-  style?: Record<string, string | number>;
 }
 
-export interface EdgeConfig<TEdgeData = any> {
+export interface EdgeConfig<TEdgeData = any> extends GraphEntityConfig {
   /**
    * The id of the edge.
    */
@@ -62,45 +103,46 @@ export interface EdgeConfig<TEdgeData = any> {
    * When `getWeight` is not provided, algorithms default to `edge.weight ?? 1`.
    */
   weight?: number;
+  /** Port name on the source node this edge connects from. */
+  sourcePort?: string;
+  /** Port name on the target node this edge connects to. */
+  targetPort?: string;
   data?: TEdgeData;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
   color?: string;
-  style?: Record<string, string | number>;
 }
 
 // --- Primary types (plain JSON-serializable objects) ---
 
-export interface Graph<TNodeData = any, TEdgeData = any, TGraphData = any> {
+export interface Graph<
+  TNodeData = any,
+  TEdgeData = any,
+  TGraphData = any,
+  TPortData = any,
+> {
   id: string;
   type: 'directed' | 'undirected';
   initialNodeId?: string | null;
-  nodes: GraphNode<TNodeData>[];
+  nodes: GraphNode<TNodeData, TPortData>[];
   edges: GraphEdge<TEdgeData>[];
   data: TGraphData;
   direction?: 'up' | 'down' | 'left' | 'right';
   style?: Record<string, string | number>;
 }
 
-export interface GraphNode<TNodeData = any> {
+export interface GraphNode<TNodeData = any, TPortData = any>
+  extends GraphEntity {
   type: 'node';
   id: string;
   parentId?: string | null;
   initialNodeId?: string | null;
   label?: string;
   data: TNodeData;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
+  ports?: GraphPort<TPortData>[];
   shape?: string;
   color?: string;
-  style?: Record<string, string | number>;
 }
 
-export interface GraphEdge<TEdgeData = any> {
+export interface GraphEdge<TEdgeData = any> extends GraphEntity {
   type: 'edge';
   id: string;
   sourceId: string;
@@ -112,31 +154,37 @@ export interface GraphEdge<TEdgeData = any> {
    * When `getWeight` is not provided, algorithms default to `edge.weight ?? 1`.
    */
   weight?: number;
+  /** Port name on the source node this edge connects from. */
+  sourcePort?: string;
+  /** Port name on the target node this edge connects to. */
+  targetPort?: string;
   data: TEdgeData;
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
   color?: string;
-  style?: Record<string, string | number>;
 }
 
 // --- Visual types (required position/size) ---
 
-export interface VisualNode<TNodeData = any>
-  extends Omit<GraphNode<TNodeData>, keyof EntityRect>, EntityRect {
+export interface VisualNode<TNodeData = any, TPortData = any>
+  extends Omit<GraphNode<TNodeData, TPortData>, keyof EntityRect>,
+    VisualGraphEntity {
   shape?: string;
+  ports?: VisualPort<TPortData>[];
 }
 
 export interface VisualEdge<TEdgeData = any>
-  extends Omit<GraphEdge<TEdgeData>, keyof EntityRect>, EntityRect {}
+  extends Omit<GraphEdge<TEdgeData>, keyof EntityRect>,
+    VisualGraphEntity {}
 
 export interface VisualGraph<
   TNodeData = any,
   TEdgeData = any,
   TGraphData = any,
-> extends Omit<Graph<TNodeData, TEdgeData, TGraphData>, 'nodes' | 'edges'> {
-  nodes: VisualNode<TNodeData>[];
+  TPortData = any,
+> extends Omit<
+    Graph<TNodeData, TEdgeData, TGraphData, TPortData>,
+    'nodes' | 'edges'
+  > {
+  nodes: VisualNode<TNodeData, TPortData>[];
   edges: VisualEdge<TEdgeData>[];
   direction: 'up' | 'down' | 'left' | 'right';
 }
@@ -145,7 +193,8 @@ export interface VisualGraphConfig<
   TNodeData = any,
   TEdgeData = any,
   TGraphData = any,
-> extends GraphConfig<TNodeData, TEdgeData, TGraphData> {
+  TPortData = any,
+> extends GraphConfig<TNodeData, TEdgeData, TGraphData, TPortData> {
   direction?: 'up' | 'down' | 'left' | 'right';
 }
 
@@ -153,13 +202,23 @@ export interface DeleteNodeOptions {
   reparent?: boolean;
 }
 
-export interface EntitiesConfig<TNodeData = any, TEdgeData = any> {
-  nodes?: NodeConfig<TNodeData>[];
+export interface EntitiesConfig<
+  TNodeData = any,
+  TEdgeData = any,
+  TPortData = any,
+> {
+  nodes?: NodeConfig<TNodeData, TPortData>[];
   edges?: EdgeConfig<TEdgeData>[];
 }
 
-export interface EntitiesUpdate<TNodeData = any, TEdgeData = any> {
-  nodes?: (Partial<Omit<NodeConfig<TNodeData>, 'id'>> & { id: string })[];
+export interface EntitiesUpdate<
+  TNodeData = any,
+  TEdgeData = any,
+  TPortData = any,
+> {
+  nodes?: (Partial<Omit<NodeConfig<TNodeData, TPortData>, 'id'>> & {
+    id: string;
+  })[];
   edges?: (Partial<Omit<EdgeConfig<TEdgeData>, 'id'>> & { id: string })[];
 }
 

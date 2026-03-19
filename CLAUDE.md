@@ -39,18 +39,19 @@ Single-result convenience functions use `get*` with required `to` option (`Singl
 
 | Pattern | Purpose | Example |
 |---------|---------|---------|
-| `Graph*` | Primary types (strict, resolved) | `GraphNode`, `GraphEdge` |
-| `*Config` | Input types (lenient, optional fields) | `NodeConfig`, `GraphConfig` |
+| `Graph*` | Primary types (strict, resolved) | `GraphNode`, `GraphEdge`, `GraphPort` |
+| `*Config` | Input types (lenient, optional fields) | `NodeConfig`, `GraphConfig`, `PortConfig` |
 | `*Options` | Algorithm parameters | `PathOptions`, `MSTOptions` |
-| `Visual*` | Required position/size | `VisualNode`, `VisualGraph` |
+| `Visual*` | Required position/size | `VisualNode`, `VisualGraph`, `VisualPort` |
 | `*Update` | Batch update payloads | `EntitiesUpdate` |
+| `GraphEntityConfig` / `GraphEntity` / `VisualGraphEntity` | DRY base interfaces | Shared `x,y,width,height,style` |
 
-Generics order: `<TNodeData, TEdgeData, TGraphData>`, shortened to `<N, E, G>` in function signatures.
+Generics order: `<TNodeData, TEdgeData, TGraphData, TPortData>`, shortened to `<N, E, G, P>` in function signatures. All default to `any`.
 
 ## Architecture
 
-- **`graph.ts`** — factory, lookups, mutations (add/delete/update), batch ops
-- **`queries.ts`** — neighborhood, hierarchy, degree, edge queries
+- **`graph.ts`** — factory, lookups, mutations (add/delete/update), batch ops, port creation
+- **`queries.ts`** — neighborhood, hierarchy, degree, edge queries, port queries
 - **`algorithms.ts`** — traversal, components, cycles, paths, ordering, MST
 - **`transforms.ts`** — `flatten()` (statechart decomposition)
 - **`formats/`** — DOT, GraphML, adjacency list, edge list
@@ -63,5 +64,18 @@ Generics order: `<TNodeData, TEdgeData, TGraphData>`, shortened to `<N, E, G>` i
 - Mutations document with `/** **Mutable.** */` JSDoc
 - Collection queries return `[]` not `undefined` when empty
 - Config types use `?? null` for parentId/initialNodeId, `?? ''` for strings, `?? 0` for visual numbers
-- Keep objects JSON-serializable — no functions, classes, or symbols on Graph/Node/Edge
+- Keep objects JSON-serializable — no functions, classes, or symbols on Graph/Node/Edge/Port
 - Tests use vitest. Existing tests must keep passing.
+
+## Ports
+
+Ports are optional connection points on nodes. Edges can reference ports by name via `sourcePort`/`targetPort`.
+
+- Ports use **names, not IDs**. Unique per node; `(nodeId, portName)` is the global identifier.
+- `direction` (`'in' | 'out' | 'inout'`) is **advisory metadata** for layout engines — not enforced.
+- Ports have generic data (`P` parameter), like nodes and edges.
+- `GraphEntityConfig` / `GraphEntity` / `VisualGraphEntity` are DRY base interfaces shared by nodes, edges, and ports.
+- `addEdge`/`updateEdge` validate that referenced ports exist on the respective nodes.
+- Port queries: `getPort(graph, nodeId, portName)`, `getPorts(graph, nodeId)`, `getEdgesByPort(graph, nodeId, portName)`.
+- ELK adapter: port `name` maps to ELK port `id`; `direction` maps to `org.eclipse.elk.port.side`.
+- xyflow adapter: `sourcePort` ↔ `sourceHandle`, `targetPort` ↔ `targetHandle`.

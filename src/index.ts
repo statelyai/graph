@@ -1,6 +1,13 @@
 // Types
 export type {
   EntityRect as Positioned,
+  GraphEntityConfig,
+  GraphEntity,
+  VisualGraphEntity,
+  PortDirection,
+  PortConfig,
+  GraphPort,
+  VisualPort,
   Graph,
   GraphNode,
   GraphEdge,
@@ -39,6 +46,7 @@ export {
   createGraph,
   createGraphNode,
   createGraphEdge,
+  createGraphPort,
   createVisualGraph,
   createGraphFromTransition,
   getNode,
@@ -93,6 +101,9 @@ export {
   getSinks,
   getRelativeDistanceMap,
   getRelativeDistance,
+  getPort,
+  getPorts,
+  getEdgesByPort,
 } from './queries';
 
 // Algorithms

@@ -2,9 +2,11 @@ import type {
   GraphConfig,
   NodeConfig,
   EdgeConfig,
+  PortConfig,
   Graph,
   GraphNode,
   GraphEdge,
+  GraphPort,
   DeleteNodeOptions,
   EntitiesConfig,
   EntitiesUpdate,
@@ -12,6 +14,7 @@ import type {
   VisualGraph,
   VisualNode,
   VisualEdge,
+  VisualPort,
   TransitionOptions,
 } from './types';
 import {
@@ -24,6 +27,43 @@ import {
 } from './indexing';
 
 /**
+ * Create a resolved graph port from a config. Fills in defaults.
+ *
+ * @example
+ * ```ts
+ * const port = createGraphPort({ name: 'output', direction: 'out' });
+ * // { name: 'output', direction: 'out', data: undefined }
+ * ```
+ */
+export function createGraphPort<P = any>(
+  config: PortConfig<P>,
+): GraphPort<P> {
+  if (!config.name) throw new Error('Port name must be a non-empty string');
+  const port: GraphPort<P> = {
+    name: config.name,
+    direction: config.direction ?? 'inout',
+    data: config.data as P,
+  };
+  if (config.label !== undefined) port.label = config.label;
+  if (config.x !== undefined) port.x = config.x;
+  if (config.y !== undefined) port.y = config.y;
+  if (config.width !== undefined) port.width = config.width;
+  if (config.height !== undefined) port.height = config.height;
+  if (config.style !== undefined) port.style = config.style;
+  return port;
+}
+
+function validatePortNames(ports: PortConfig[]): void {
+  const seen = new Set<string>();
+  for (const port of ports) {
+    if (seen.has(port.name)) {
+      throw new Error(`Duplicate port name "${port.name}" on node`);
+    }
+    seen.add(port.name);
+  }
+}
+
+/**
  * Create a resolved graph node from a config. Fills in defaults.
  *
  * @example
@@ -32,11 +72,13 @@ import {
  * // { type: 'node', id: 'a', label: '', data: { label: 'hi' } }
  * ```
  */
-export function createGraphNode<T = any>(config: NodeConfig<T>): GraphNode<T> {
+export function createGraphNode<N = any, P = any>(
+  config: NodeConfig<N, P>,
+): GraphNode<N, P> {
   if (!config.id) throw new Error('Node id must be a non-empty string');
   if (config.parentId === '')
     throw new Error('Node parentId must be a non-empty string');
-  const node: GraphNode<T> = {
+  const node: GraphNode<N, P> = {
     type: 'node',
     id: config.id,
     ...(config.parentId !== undefined && { parentId: config.parentId ?? null }),
@@ -44,8 +86,12 @@ export function createGraphNode<T = any>(config: NodeConfig<T>): GraphNode<T> {
       initialNodeId: config.initialNodeId ?? null,
     }),
     label: config.label ?? '',
-    data: config.data as T,
+    data: config.data as N,
   };
+  if (config.ports !== undefined && config.ports.length > 0) {
+    validatePortNames(config.ports);
+    node.ports = config.ports.map(createGraphPort);
+  }
   if (config.x !== undefined) node.x = config.x;
   if (config.y !== undefined) node.y = config.y;
   if (config.width !== undefined) node.width = config.width;
@@ -79,6 +125,8 @@ export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
     label: config.label ?? null,
     data: config.data as T,
   };
+  if (config.sourcePort !== undefined) edge.sourcePort = config.sourcePort;
+  if (config.targetPort !== undefined) edge.targetPort = config.targetPort;
   if (config.weight !== undefined) edge.weight = config.weight;
   if (config.x !== undefined) edge.x = config.x;
   if (config.y !== undefined) edge.y = config.y;
@@ -102,10 +150,10 @@ export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
  * });
  * ```
  */
-export function createGraph<N = any, E = any, G = any>(
-  config?: GraphConfig<N, E, G>,
-): Graph<N, E, G> {
-  const graph: Graph<N, E, G> = {
+export function createGraph<N = any, E = any, G = any, P = any>(
+  config?: GraphConfig<N, E, G, P>,
+): Graph<N, E, G, P> {
+  const graph: Graph<N, E, G, P> = {
     id: config?.id ?? '',
     type: config?.type ?? 'directed',
     initialNodeId: config?.initialNodeId ?? null,
@@ -130,23 +178,35 @@ export function createGraph<N = any, E = any, G = any>(
  * // graph.nodes[0].x === 0
  * ```
  */
-export function createVisualGraph<N = any, E = any, G = any>(
-  config?: VisualGraphConfig<N, E, G>,
-): VisualGraph<N, E, G> {
+export function createVisualGraph<N = any, E = any, G = any, P = any>(
+  config?: VisualGraphConfig<N, E, G, P>,
+): VisualGraph<N, E, G, P> {
   const base = createGraph(config);
   return {
     ...base,
     direction: config?.direction ?? 'down',
-    nodes: base.nodes.map(
-      (n): VisualNode<N> => ({
-        ...n,
+    nodes: base.nodes.map((n): VisualNode<N, P> => {
+      const { ports, ...rest } = n;
+      return {
+        ...rest,
         x: n.x ?? 0,
         y: n.y ?? 0,
         width: n.width ?? 0,
         height: n.height ?? 0,
         ...(n.shape !== undefined && { shape: n.shape }),
-      }),
-    ),
+        ...(ports !== undefined && {
+          ports: ports.map(
+            (p): VisualPort<P> => ({
+              ...p,
+              x: p.x ?? 0,
+              y: p.y ?? 0,
+              width: p.width ?? 0,
+              height: p.height ?? 0,
+            }),
+          ),
+        }),
+      };
+    }),
     edges: base.edges.map(
       (e): VisualEdge<E> => ({
         ...e,
@@ -348,10 +408,10 @@ export function hasEdge(graph: Graph, id: string): boolean {
  * // graph.nodes.length === 1
  * ```
  */
-export function addNode<N>(
-  graph: Graph<N>,
-  config: NodeConfig<N>,
-): GraphNode<N> {
+export function addNode<N, P = any>(
+  graph: Graph<N, any, any, P>,
+  config: NodeConfig<N, P>,
+): GraphNode<N, P> {
   const node = createGraphNode(config);
   const idx = getIndex(graph);
   if (idx.nodeById.has(config.id)) {
@@ -390,6 +450,23 @@ export function addEdge<E>(
   }
   if (!idx.nodeById.has(config.targetId)) {
     throw new Error(`Target node "${config.targetId}" does not exist`);
+  }
+  // Validate port references
+  if (config.sourcePort !== undefined) {
+    const sourceNode = graph.nodes[idx.nodeById.get(config.sourceId)!];
+    if (!sourceNode.ports?.some((p) => p.name === config.sourcePort)) {
+      throw new Error(
+        `Port "${config.sourcePort}" does not exist on source node "${config.sourceId}"`,
+      );
+    }
+  }
+  if (config.targetPort !== undefined) {
+    const targetNode = graph.nodes[idx.nodeById.get(config.targetId)!];
+    if (!targetNode.ports?.some((p) => p.name === config.targetPort)) {
+      throw new Error(
+        `Port "${config.targetPort}" does not exist on target node "${config.targetId}"`,
+      );
+    }
   }
   const arrayIndex = graph.edges.push(edge) - 1;
   indexAddEdge(idx, edge, arrayIndex);
@@ -477,11 +554,11 @@ export function deleteEdge(graph: Graph, id: string): void {
  * // updated.label === 'new'
  * ```
  */
-export function updateNode<N>(
-  graph: Graph<N>,
+export function updateNode<N, P = any>(
+  graph: Graph<N, any, any, P>,
   id: string,
-  update: Partial<Omit<NodeConfig<N>, 'id'>>,
-): GraphNode<N> {
+  update: Partial<Omit<NodeConfig<N, P>, 'id'>>,
+): GraphNode<N, P> {
   const idx = getIndex(graph);
   const arrayIdx = idx.nodeById.get(id);
   if (arrayIdx === undefined) {
@@ -492,9 +569,12 @@ export function updateNode<N>(
       throw new Error(`Parent node "${update.parentId}" does not exist`);
     }
   }
+  if (update.ports !== undefined && update.ports.length > 0) {
+    validatePortNames(update.ports);
+  }
   const node = graph.nodes[arrayIdx];
   const oldParentId = node.parentId;
-  const updated: GraphNode<N> = {
+  const updated: GraphNode<N, P> = {
     ...node,
     ...(update.parentId !== undefined && { parentId: update.parentId ?? null }),
     ...(update.initialNodeId !== undefined && {
@@ -502,6 +582,9 @@ export function updateNode<N>(
     }),
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
+    ...(update.ports !== undefined && {
+      ports: update.ports.map(createGraphPort),
+    }),
   };
   graph.nodes[arrayIdx] = updated;
 
@@ -546,12 +629,37 @@ export function updateEdge<E>(
   const edge = graph.edges[arrayIdx];
   const oldSourceId = edge.sourceId;
   const oldTargetId = edge.targetId;
+  // Validate port references
+  const effectiveSourceId = update.sourceId ?? edge.sourceId;
+  const effectiveTargetId = update.targetId ?? edge.targetId;
+  if (update.sourcePort !== undefined) {
+    const sourceNode = graph.nodes[idx.nodeById.get(effectiveSourceId)!];
+    if (!sourceNode.ports?.some((p) => p.name === update.sourcePort)) {
+      throw new Error(
+        `Port "${update.sourcePort}" does not exist on source node "${effectiveSourceId}"`,
+      );
+    }
+  }
+  if (update.targetPort !== undefined) {
+    const targetNode = graph.nodes[idx.nodeById.get(effectiveTargetId)!];
+    if (!targetNode.ports?.some((p) => p.name === update.targetPort)) {
+      throw new Error(
+        `Port "${update.targetPort}" does not exist on target node "${effectiveTargetId}"`,
+      );
+    }
+  }
   const updated: GraphEdge<E> = {
     ...edge,
     ...(update.sourceId !== undefined && { sourceId: update.sourceId }),
     ...(update.targetId !== undefined && { targetId: update.targetId }),
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
+    ...(update.sourcePort !== undefined && {
+      sourcePort: update.sourcePort,
+    }),
+    ...(update.targetPort !== undefined && {
+      targetPort: update.targetPort,
+    }),
   };
   graph.edges[arrayIdx] = updated;
 
@@ -676,10 +784,10 @@ export function updateEntities<N, E>(
  * instance.toJSON(); // plain Graph object
  * ```
  */
-export class GraphInstance<N = any, E = any, G = any> {
-  public graph: Graph<N, E, G>;
+export class GraphInstance<N = any, E = any, G = any, P = any> {
+  public graph: Graph<N, E, G, P>;
 
-  constructor(config?: GraphConfig<N, E, G>) {
+  constructor(config?: GraphConfig<N, E, G, P>) {
     this.graph = createGraph(config);
   }
 
@@ -693,14 +801,12 @@ export class GraphInstance<N = any, E = any, G = any> {
    * instance.hasNode('a'); // true
    * ```
    */
-  static from<N = any, E = any, G = any>(
-    graph: Graph<N, E, G>,
-  ): GraphInstance<N, E, G> {
-    const instance = Object.create(GraphInstance.prototype) as GraphInstance<
-      N,
-      E,
-      G
-    >;
+  static from<N = any, E = any, G = any, P = any>(
+    graph: Graph<N, E, G, P>,
+  ): GraphInstance<N, E, G, P> {
+    const instance = Object.create(
+      GraphInstance.prototype,
+    ) as GraphInstance<N, E, G, P>;
     instance.graph = graph;
     return instance;
   }
@@ -734,7 +840,7 @@ export class GraphInstance<N = any, E = any, G = any> {
     return hasEdge(this.graph, id);
   }
 
-  addNode(config: NodeConfig<N>) {
+  addNode(config: NodeConfig<N, P>) {
     return addNode(this.graph, config);
   }
   addEdge(config: EdgeConfig<E>) {
@@ -746,20 +852,20 @@ export class GraphInstance<N = any, E = any, G = any> {
   deleteEdge(id: string) {
     return deleteEdge(this.graph, id);
   }
-  updateNode(id: string, update: Partial<Omit<NodeConfig<N>, 'id'>>) {
+  updateNode(id: string, update: Partial<Omit<NodeConfig<N, P>, 'id'>>) {
     return updateNode(this.graph, id, update);
   }
   updateEdge(id: string, update: Partial<Omit<EdgeConfig<E>, 'id'>>) {
     return updateEdge(this.graph, id, update);
   }
 
-  addEntities(entities: EntitiesConfig<N, E>) {
+  addEntities(entities: EntitiesConfig<N, E, P>) {
     return addEntities(this.graph, entities);
   }
   deleteEntities(ids: string | string[], opts?: DeleteNodeOptions) {
     return deleteEntities(this.graph, ids, opts);
   }
-  updateEntities(updates: EntitiesUpdate<N, E>) {
+  updateEntities(updates: EntitiesUpdate<N, E, P>) {
     return updateEntities(this.graph, updates);
   }
 
