@@ -1,5 +1,12 @@
 # @statelyai/graph
 
+## 0.7.0
+
+### Minor Changes
+
+- [`976a7e6`](https://github.com/statelyai/graph/commit/976a7e6821d43d0149e5ad776c660a5059484f23) Thanks [@davidkpiano](https://github.com/davidkpiano)! - - Make `Graph.initialNodeId`, `GraphNode.label`, and `GraphEdge.label` optional on resolved types for easier consumer usage
+  - Add `createGraphNode()` and `createGraphEdge()` helpers that resolve defaults from config
+
 ## 0.6.0
 
 ### Minor Changes
