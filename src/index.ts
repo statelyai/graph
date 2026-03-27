@@ -40,6 +40,13 @@ export type {
   WalkContext,
   CoverageStats,
 } from './types';
+export type {
+  IterativeCentralityOptions,
+  HITSResult,
+  GirvanNewmanOptions,
+  LabelPropagationOptions,
+  IsomorphismOptions,
+} from './algorithms';
 
 // Factory & helpers
 export {
@@ -135,6 +142,23 @@ export {
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
   getAStarPath,
+  getDegreeCentrality,
+  getInDegreeCentrality,
+  getOutDegreeCentrality,
+  getClosenessCentrality,
+  getBetweennessCentrality,
+  getPageRank,
+  getHITS,
+  getEigenvectorCentrality,
+  getLabelPropagationCommunities,
+  genGirvanNewmanCommunities,
+  getGirvanNewmanCommunities,
+  getGreedyModularityCommunities,
+  getModularity,
+  getBridges,
+  getArticulationPoints,
+  getBiconnectedComponents,
+  isIsomorphic,
 } from './algorithms';
 
 // Diff & Patches

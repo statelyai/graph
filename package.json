@@ -55,6 +55,8 @@
     "dev": "tsdown --watch",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
+    "verify": "pnpm typecheck && pnpm test -- --run && pnpm build && pnpm validate:package",
+    "validate:package": "publint && tsx scripts/smoke-package.ts",
     "generate-schema": "tsx scripts/generate-json-schema.ts",
     "changeset": "changeset",
     "version": "changeset version",
@@ -62,6 +64,7 @@
     "prepublishOnly": "pnpm run build"
   },
   "devDependencies": {
+    "publint": "^0.3.15",
     "@changesets/changelog-github": "^0.5.2",
     "@changesets/cli": "^2.29.8",
     "@types/d3-array": "^3.2.2",

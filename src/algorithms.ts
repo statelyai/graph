@@ -13,6 +13,38 @@ import type {
 } from './types';
 import { getIndex } from './indexing';
 import { createGraph } from './graph';
+export {
+  getDegreeCentrality,
+  getInDegreeCentrality,
+  getOutDegreeCentrality,
+  getClosenessCentrality,
+  getBetweennessCentrality,
+  getPageRank,
+  getHITS,
+  getEigenvectorCentrality,
+} from './algorithms/centrality';
+export type {
+  IterativeCentralityOptions,
+  HITSResult,
+} from './algorithms/centrality';
+export {
+  getLabelPropagationCommunities,
+  genGirvanNewmanCommunities,
+  getGirvanNewmanCommunities,
+  getGreedyModularityCommunities,
+  getModularity,
+} from './algorithms/community';
+export type {
+  GirvanNewmanOptions,
+  LabelPropagationOptions,
+} from './algorithms/community';
+export {
+  getBridges,
+  getArticulationPoints,
+  getBiconnectedComponents,
+} from './algorithms/connectivity';
+export { isIsomorphic } from './algorithms/isomorphism';
+export type { IsomorphismOptions } from './algorithms/isomorphism';
 
 // --- Traversal generators ---
 

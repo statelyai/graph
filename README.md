@@ -10,6 +10,28 @@ Made from our experience at [stately.ai](https://stately.ai), where we build vis
 npm install @statelyai/graph
 ```
 
+Optional peers are only needed for specific adapters:
+
+| Package | Needed for |
+| --- | --- |
+| `fast-xml-parser` | `@statelyai/graph/gexf`, `@statelyai/graph/graphml` |
+| `dotparser` | `@statelyai/graph/dot` parsing |
+| `cytoscape` | Cytoscape integration tests and consumer typing |
+| `d3-force` | D3 force integration tests and consumer typing |
+| `elkjs` | `@statelyai/graph/elk` |
+| `zod` | `@statelyai/graph/schemas` |
+
+## Highlights
+
+- Plain JSON graphs with no runtime wrappers required
+- Standalone functions with a consistent `get*`/`gen*`/`is*`/`add*` naming model
+- Directed, undirected, hierarchical, and visual graph support
+- Ports for node-editor and dataflow-style graphs
+- Algorithms for traversal, paths, centrality, communities, connectivity, isomorphism, ordering, MST, and walks
+- Diff/patch utilities for graph state changes
+- Multi-format conversion via package subpaths
+- Small, fast test suite with broad format coverage
+
 ## Quick Start
 
 Graphs are plain JSON-serializable objects. All operations are standalone functions — no classes, no DOM, no rendering engine.
@@ -78,15 +100,50 @@ const children = getChildren(graph, 'b'); // [b1, b2]
 const flat = flatten(graph);              // only leaf nodes, edges resolved
 ```
 
+## Ports
+
+Ports are optional named connection points on nodes. They are useful for flow-based systems, node editors, and dataflow graphs where edges need to target a specific input or output.
+
+```ts
+import { createGraph, getEdgesByPort, getPorts } from '@statelyai/graph';
+
+const graph = createGraph({
+  nodes: [
+    {
+      id: 'fetch',
+      ports: [{ name: 'result', direction: 'out' }],
+    },
+    {
+      id: 'render',
+      ports: [{ name: 'input', direction: 'in' }],
+    },
+  ],
+  edges: [
+    {
+      id: 'e1',
+      sourceId: 'fetch',
+      sourcePort: 'result',
+      targetId: 'render',
+      targetPort: 'input',
+    },
+  ],
+});
+
+getPorts(graph, 'fetch'); // [{ name: 'result', ... }]
+getEdgesByPort(graph, 'render', 'input'); // [e1]
+```
+
 ## Algorithms
 
-Includes traversal (BFS, DFS), pathfinding (shortest path, simple paths, all-pairs shortest paths), cycle detection, connected/strongly-connected components, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+Includes traversal (BFS, DFS), pathfinding (shortest path, simple paths, all-pairs shortest paths), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (label propagation, Girvan-Newman, greedy modularity, modularity scoring), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
 
 ```ts
 import {
   bfs, dfs, hasPath, isAcyclic,
   getShortestPath, getCycles, getTopologicalSort,
   getConnectedComponents, getMinimumSpanningTree,
+  getPageRank, getLabelPropagationCommunities,
+  genGirvanNewmanCommunities, getBridges, isIsomorphic,
 } from '@statelyai/graph';
 
 for (const node of bfs(graph, 'a')) { /* breadth-first */ }
@@ -98,7 +155,20 @@ getShortestPath(graph, { from: 'a', to: 'c' });   // single shortest path
 getTopologicalSort(graph);                         // topological order (or null)
 getConnectedComponents(graph);                     // connected components
 getMinimumSpanningTree(graph, { weight: e => e.data?.weight ?? 1 }); // MST
+getPageRank(graph);                                // link analysis scores
+getLabelPropagationCommunities(graph);             // community detection
+[...genGirvanNewmanCommunities(graph)];            // lazy community splits
+getBridges(graph);                                 // bridge edges
+isIsomorphic(graph, otherGraph);                   // structural equivalence
 ```
+
+## Diff & Walks
+
+Beyond classic graph algorithms, the library also includes utilities for evolving and exploring graph state:
+
+- `getDiff()`, `getPatches()`, `applyPatches()` for graph change tracking
+- `genRandomWalk()`, `genWeightedRandomWalk()`, and coverage helpers for model-based testing and simulation
+- `getSubgraph()` and `reverseGraph()` for structural transforms
 
 ## Visual Graphs
 
@@ -145,6 +215,35 @@ const back = cytoscapeConverter.from(cyto);
 ```
 
 Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
+
+Format-specific docs live alongside the source:
+
+- [DOT](./src/formats/dot/README.md)
+- [GraphML](./src/formats/graphml/README.md)
+- [GEXF](./src/formats/gexf/README.md)
+- [GML](./src/formats/gml/README.md)
+- [JGF](./src/formats/jgf/README.md)
+- [TGF](./src/formats/tgf/README.md)
+- [Cytoscape](./src/formats/cytoscape/README.md)
+- [D3](./src/formats/d3/README.md)
+- [Mermaid](./src/formats/mermaid/README.md)
+- [Converter helpers](./src/formats/converter/README.md)
+
+## Examples
+
+The repo includes runnable examples under [`examples/`](./examples):
+
+- [Flow-based math](./examples/flow-based-math.ts) shows ports, topological ordering, and value propagation.
+- [Async workflow](./examples/async-workflow.ts) models an n8n/Zapier-style workflow with ports and dependency-aware execution.
+
+## Development
+
+```bash
+pnpm install
+pnpm verify
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor conventions, format-module checklist, and release notes guidance.
 
 ## Why this library?
 
