@@ -63,5 +63,8 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build
+        run: pnpm build
+
       - name: Validate Published Package Surface
         run: pnpm validate:package
