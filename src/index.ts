@@ -161,6 +161,14 @@ export {
   isIsomorphic,
 } from './algorithms';
 
+// Equivalence
+export {
+  areEntitiesEqual,
+  isLayoutEqual,
+  isNonLayoutEqual,
+  LAYOUT_KEYS,
+} from './equivalence';
+
 // Diff & Patches
 export {
   getDiff,
