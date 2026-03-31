@@ -12,12 +12,8 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify (Node ${{ matrix.node-version }})
+    name: Verify
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20, 22, 24]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -28,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: pnpm
 
       - name: Install Dependencies
