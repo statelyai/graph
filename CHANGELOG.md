@@ -1,5 +1,13 @@
 # @statelyai/graph
 
+## 0.9.0
+
+### Minor Changes
+
+- [`0fb9433`](https://github.com/statelyai/graph/commit/0fb9433c9490bf2014fea1eb9acab79a894a451b) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add entity equivalence functions: `areEntitiesEqual`, `isLayoutEqual`, `isNonLayoutEqual`, and `LAYOUT_KEYS`.
+
+- [`6d2465d`](https://github.com/statelyai/graph/commit/6d2465d88eb53122365e76d9fc89c061627d5f90) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add centrality, community detection, connectivity, and isomorphism algorithms.
+
 ## 0.8.0
 
 ### Minor Changes
