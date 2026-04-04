@@ -556,8 +556,8 @@ function getNeighborEdges(
  * Uses BFS when all edges are unweighted; Dijkstra otherwise.
  */
 /** Compute distance + prev maps via BFS or Dijkstra. */
-function computeShortestDistances<E>(
-  graph: Graph<any, E>,
+function computeShortestDistances<N, E>(
+  graph: Graph<N, E>,
   sourceId: string,
   getWeight?: (edge: GraphEdge<E>) => number,
 ): {
@@ -1585,8 +1585,8 @@ export function getMinimumSpanningTree<N, E>(
   });
 }
 
-function primMST<E>(
-  graph: Graph<any, E>,
+function primMST<N, E>(
+  graph: Graph<N, E>,
   getWeight: (edge: GraphEdge<E>) => number,
 ): GraphEdge<E>[] {
   if (graph.nodes.length === 0) return [];
@@ -1640,8 +1640,8 @@ function primMST<E>(
   return mstEdges;
 }
 
-function kruskalMST<E>(
-  graph: Graph<any, E>,
+function kruskalMST<N, E>(
+  graph: Graph<N, E>,
   getWeight: (edge: GraphEdge<E>) => number,
 ): GraphEdge<E>[] {
   // Sort edges by weight

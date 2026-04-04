@@ -1,7 +1,6 @@
 // Types
 export type {
-  EntityRect as Positioned,
-  GraphEntityConfig,
+  EntityRect,
   GraphEntity,
   VisualGraphEntity,
   PortDirection,
@@ -35,6 +34,7 @@ export type {
   GraphPatch,
   TransitionOptions,
   GraphFormatConverter,
+  VisualGraphFormatConverter,
   WalkOptions,
   WeightedWalkOptions,
   WalkContext,

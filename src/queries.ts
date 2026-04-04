@@ -19,7 +19,7 @@ import { getIndex } from './indexing';
  * // => [edge e1, edge e2]
  * ```
  */
-export function getEdgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
+export function getEdgesOf<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const outIds = idx.outEdges.get(nodeId) ?? [];
   const inIds = idx.inEdges.get(nodeId) ?? [];
@@ -54,7 +54,7 @@ export function getEdgesOf<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E
  * // => []
  * ```
  */
-export function getInEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
+export function getInEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.inEdges.get(nodeId) ?? [];
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!]);
@@ -75,7 +75,7 @@ export function getInEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E
  * // => []
  * ```
  */
-export function getOutEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<E>[] {
+export function getOutEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge<E>[] {
   const idx = getIndex(graph);
   const edgeIds = idx.outEdges.get(nodeId) ?? [];
   return edgeIds.map((eid) => graph.edges[idx.edgeById.get(eid)!]);
@@ -97,8 +97,8 @@ export function getOutEdges<E>(graph: Graph<any, E>, nodeId: string): GraphEdge<
  * // => undefined (directed graph)
  * ```
  */
-export function getEdgeBetween<E>(
-  graph: Graph<any, E>,
+export function getEdgeBetween<N, E>(
+  graph: Graph<N, E>,
   sourceId: string,
   targetId: string,
 ): GraphEdge<E> | undefined {
@@ -801,8 +801,8 @@ export function getSinks<N>(graph: Graph<N>): GraphNode<N>[] {
  * getPort(graph, 'a', 'missing'); // => undefined
  * ```
  */
-export function getPort<P = any>(
-  graph: Graph<any, any, any, P>,
+export function getPort<N, E, G, P>(
+  graph: Graph<N, E, G, P>,
   nodeId: string,
   portName: string,
 ): GraphPort<P> | undefined {
@@ -829,8 +829,8 @@ export function getPort<P = any>(
  * getPorts(graph, 'a'); // => [port in, port out]
  * ```
  */
-export function getPorts<P = any>(
-  graph: Graph<any, any, any, P>,
+export function getPorts<N, E, G, P>(
+  graph: Graph<N, E, G, P>,
   nodeId: string,
 ): GraphPort<P>[] {
   const idx = getIndex(graph);
@@ -861,8 +861,8 @@ export function getPorts<P = any>(
  * getEdgesByPort(graph, 'a', 'out'); // => [edge e1]
  * ```
  */
-export function getEdgesByPort<E = any>(
-  graph: Graph<any, E>,
+export function getEdgesByPort<N, E>(
+  graph: Graph<N, E>,
   nodeId: string,
   portName: string,
 ): GraphEdge<E>[] {

@@ -53,7 +53,7 @@ describe('createGraph', () => {
       edges: [],
     });
     expect(g.nodes[0].parentId).toBeUndefined();
-    expect(g.nodes[0].label).toBe('');
+    expect(g.nodes[0].label).toBeNull();
     expect(g.nodes[0].type).toBe('node');
   });
 

@@ -85,7 +85,7 @@ export function createGraphNode<N = any, P = any>(
     ...(config.initialNodeId !== undefined && {
       initialNodeId: config.initialNodeId ?? null,
     }),
-    label: config.label ?? '',
+    label: config.label ?? null,
     data: config.data as N,
   };
   if (config.ports !== undefined && config.ports.length > 0) {
@@ -355,8 +355,8 @@ export function getNode<N>(
  * const missing = getEdge(graph, 'z'); // undefined
  * ```
  */
-export function getEdge<E>(
-  graph: Graph<any, E>,
+export function getEdge<N, E>(
+  graph: Graph<N, E>,
   id: string,
 ): GraphEdge<E> | undefined {
   const idx = getIndex(graph);
@@ -436,8 +436,8 @@ export function addNode<N, P = any>(
  * // graph.edges.length === 1
  * ```
  */
-export function addEdge<E>(
-  graph: Graph<any, E>,
+export function addEdge<N, E>(
+  graph: Graph<N, E>,
   config: EdgeConfig<E>,
 ): GraphEdge<E> {
   const edge = createGraphEdge(config);
@@ -610,8 +610,8 @@ export function updateNode<N, P = any>(
  * // updated.label === 'new'
  * ```
  */
-export function updateEdge<E>(
-  graph: Graph<any, E>,
+export function updateEdge<N, E>(
+  graph: Graph<N, E>,
   id: string,
   update: Partial<Omit<EdgeConfig<E>, 'id'>>,
 ): GraphEdge<E> {

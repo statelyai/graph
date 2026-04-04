@@ -21,8 +21,8 @@ function getDegreeSignature(graph: Graph, nodeId: string): string {
   return `d:${inDegree}:${outDegree}`;
 }
 
-function getEdgesBetween<E>(
-  graph: Graph<any, E>,
+function getEdgesBetween<N, E>(
+  graph: Graph<N, E>,
   sourceId: string,
   targetId: string,
 ): GraphEdge<E>[] {

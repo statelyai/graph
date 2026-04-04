@@ -7,17 +7,14 @@ export interface EntityRect {
   height: number;
 }
 
-/** Config-level base — shared optional visual/style props for nodes, edges, ports. */
-export interface GraphEntityConfig {
+/** Shared optional visual/style props for nodes, edges, ports. */
+export interface GraphEntity {
   x?: number;
   y?: number;
   width?: number;
   height?: number;
   style?: Record<string, string | number>;
 }
-
-/** Resolved entity base — optional visual props (non-visual graphs may omit). */
-export interface GraphEntity extends GraphEntityConfig {}
 
 /** Visual entity base — required position/size. */
 export interface VisualGraphEntity {
@@ -32,7 +29,7 @@ export interface VisualGraphEntity {
 
 export type PortDirection = 'in' | 'out' | 'inout';
 
-export interface PortConfig<TPortData = any> extends GraphEntityConfig {
+export interface PortConfig<TPortData = any> extends GraphEntity {
   name: string;
   direction?: PortDirection;
   label?: string;
@@ -46,9 +43,12 @@ export interface GraphPort<TPortData = any> extends GraphEntity {
   data: TPortData;
 }
 
-export interface VisualPort<TPortData = any>
-  extends Omit<GraphPort<TPortData>, keyof EntityRect>,
-    VisualGraphEntity {}
+export interface VisualPort<TPortData = any> extends GraphPort<TPortData> {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 // --- Config types (input, lenient) ---
 
@@ -69,18 +69,18 @@ export interface GraphConfig<
 }
 
 export interface NodeConfig<TNodeData = any, TPortData = any>
-  extends GraphEntityConfig {
+  extends GraphEntity {
   id: string;
   parentId?: string | null;
   initialNodeId?: string;
-  label?: string;
+  label?: string | null;
   data?: TNodeData;
   ports?: PortConfig<TPortData>[];
   shape?: string;
   color?: string;
 }
 
-export interface EdgeConfig<TEdgeData = any> extends GraphEntityConfig {
+export interface EdgeConfig<TEdgeData = any> extends GraphEntity {
   /**
    * The id of the edge.
    */
@@ -135,7 +135,7 @@ export interface GraphNode<TNodeData = any, TPortData = any>
   id: string;
   parentId?: string | null;
   initialNodeId?: string | null;
-  label?: string;
+  label?: string | null;
   data: TNodeData;
   ports?: GraphPort<TPortData>[];
   shape?: string;
@@ -165,15 +165,20 @@ export interface GraphEdge<TEdgeData = any> extends GraphEntity {
 // --- Visual types (required position/size) ---
 
 export interface VisualNode<TNodeData = any, TPortData = any>
-  extends Omit<GraphNode<TNodeData, TPortData>, keyof EntityRect>,
-    VisualGraphEntity {
-  shape?: string;
+  extends GraphNode<TNodeData, TPortData> {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   ports?: VisualPort<TPortData>[];
 }
 
-export interface VisualEdge<TEdgeData = any>
-  extends Omit<GraphEdge<TEdgeData>, keyof EntityRect>,
-    VisualGraphEntity {}
+export interface VisualEdge<TEdgeData = any> extends GraphEdge<TEdgeData> {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export interface VisualGraph<
   TNodeData = any,

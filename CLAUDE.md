@@ -44,7 +44,7 @@ Single-result convenience functions use `get*` with required `to` option (`Singl
 | `*Options` | Algorithm parameters | `PathOptions`, `MSTOptions` |
 | `Visual*` | Required position/size | `VisualNode`, `VisualGraph`, `VisualPort` |
 | `*Update` | Batch update payloads | `EntitiesUpdate` |
-| `GraphEntityConfig` / `GraphEntity` / `VisualGraphEntity` | DRY base interfaces | Shared `x,y,width,height,style` |
+| `GraphEntity` / `VisualGraphEntity` | DRY base interfaces | Shared `x,y,width,height,style` |
 
 Generics order: `<TNodeData, TEdgeData, TGraphData, TPortData>`, shortened to `<N, E, G, P>` in function signatures. All default to `any`.
 
@@ -74,7 +74,7 @@ Ports are optional connection points on nodes. Edges can reference ports by name
 - Ports use **names, not IDs**. Unique per node; `(nodeId, portName)` is the global identifier.
 - `direction` (`'in' | 'out' | 'inout'`) is **advisory metadata** for layout engines — not enforced.
 - Ports have generic data (`P` parameter), like nodes and edges.
-- `GraphEntityConfig` / `GraphEntity` / `VisualGraphEntity` are DRY base interfaces shared by nodes, edges, and ports.
+- `GraphEntity` / `VisualGraphEntity` are DRY base interfaces shared by nodes, edges, and ports.
 - `addEdge`/`updateEdge` validate that referenced ports exist on the respective nodes.
 - Port queries: `getPort(graph, nodeId, portName)`, `getPorts(graph, nodeId)`, `getEdgesByPort(graph, nodeId, portName)`.
 - ELK adapter: port `name` maps to ELK port `id`; `direction` maps to `org.eclipse.elk.port.side`.
