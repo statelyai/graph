@@ -252,6 +252,8 @@ export interface PathOptions<TEdgeData = any> {
   to?: string;
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+  /** Algorithm to use. Default: 'dijkstra'. Use 'bellman-ford' for negative weights. */
+  algorithm?: 'dijkstra' | 'bellman-ford';
 }
 
 export interface SinglePathOptions<TEdgeData = any> {
@@ -261,6 +263,8 @@ export interface SinglePathOptions<TEdgeData = any> {
   to: string;
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+  /** Algorithm to use. Default: 'dijkstra'. Use 'bellman-ford' for negative weights. */
+  algorithm?: 'dijkstra' | 'bellman-ford';
 }
 
 export interface AStarOptions<TEdgeData = any> {
@@ -292,8 +296,8 @@ export interface MSTOptions<TEdgeData = any> {
 }
 
 export interface AllPairsShortestPathsOptions<TEdgeData = any> {
-  /** Algorithm to use. Default: 'dijkstra'. */
-  algorithm?: 'floyd-warshall' | 'dijkstra';
+  /** Algorithm to use. Default: 'dijkstra'. Use 'bellman-ford' for negative weights. */
+  algorithm?: 'floyd-warshall' | 'dijkstra' | 'bellman-ford';
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }

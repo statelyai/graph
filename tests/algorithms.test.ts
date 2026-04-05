@@ -9,7 +9,9 @@ import {
   hasPath,
   isConnected,
   isTree,
+  getShortestPath,
   getShortestPaths,
+  getAllPairsShortestPaths,
   getSimplePaths,
   genSimplePaths,
 } from '../src/algorithms';
@@ -313,6 +315,156 @@ describe('getShortestPaths', () => {
       // first step node is b or c, not a
       expect(path.steps[0].node.id).not.toBe('a');
     }
+  });
+});
+
+// Bellman-Ford
+
+describe('Bellman-Ford (algorithm: bellman-ford)', () => {
+  it('finds shortest path with negative weights', () => {
+    // A→B (weight 4), A→C (weight 1), C→B (weight -3)
+    // Dijkstra would pick A→B (weight 4), Bellman-Ford picks A→C→B (weight -2)
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 4 },
+        { id: 'e2', sourceId: 'a', targetId: 'c', weight: 1 },
+        { id: 'e3', sourceId: 'c', targetId: 'b', weight: -3 },
+      ],
+    });
+    const paths = getShortestPaths(g, {
+      from: 'a',
+      to: 'b',
+      algorithm: 'bellman-ford',
+    });
+    expect(paths).toHaveLength(1);
+    expect(paths[0].steps.map((s) => s.node.id)).toEqual(['c', 'b']);
+  });
+
+  it('matches Dijkstra on non-negative weights', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 10 },
+        { id: 'e2', sourceId: 'a', targetId: 'c', weight: 1 },
+        { id: 'e3', sourceId: 'c', targetId: 'b', weight: 1 },
+      ],
+    });
+    const dijkstra = getShortestPaths(g, { from: 'a', to: 'b' });
+    const bf = getShortestPaths(g, {
+      from: 'a',
+      to: 'b',
+      algorithm: 'bellman-ford',
+    });
+    expect(bf).toHaveLength(dijkstra.length);
+    expect(bf[0].steps.map((s) => s.node.id)).toEqual(
+      dijkstra[0].steps.map((s) => s.node.id),
+    );
+  });
+
+  it('throws on negative-weight cycle', () => {
+    // A→B (1), B→C (-1), C→A (-1) → cycle weight = -1
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'e2', sourceId: 'b', targetId: 'c', weight: -1 },
+        { id: 'e3', sourceId: 'c', targetId: 'a', weight: -1 },
+      ],
+    });
+    expect(() =>
+      getShortestPaths(g, { from: 'a', algorithm: 'bellman-ford' }),
+    ).toThrow('negative-weight cycle');
+  });
+
+  it('works with getWeight option', () => {
+    const g = createGraph<unknown, { w: number }>({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', data: { w: 5 } },
+        { id: 'e2', sourceId: 'a', targetId: 'c', data: { w: 1 } },
+        { id: 'e3', sourceId: 'c', targetId: 'b', data: { w: -2 } },
+      ],
+    });
+    const paths = getShortestPaths(g, {
+      from: 'a',
+      to: 'b',
+      algorithm: 'bellman-ford',
+      getWeight: (e) => e.data.w,
+    });
+    expect(paths).toHaveLength(1);
+    expect(paths[0].steps.map((s) => s.node.id)).toEqual(['c', 'b']);
+  });
+
+  it('getShortestPath returns single path with negative weights', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 4 },
+        { id: 'e2', sourceId: 'a', targetId: 'c', weight: 1 },
+        { id: 'e3', sourceId: 'c', targetId: 'b', weight: -3 },
+      ],
+    });
+    const path = getShortestPath(g, {
+      from: 'a',
+      to: 'b',
+      algorithm: 'bellman-ford',
+    });
+    expect(path).toBeDefined();
+    expect(path!.steps.map((s) => s.node.id)).toEqual(['c', 'b']);
+  });
+
+  it('getAllPairsShortestPaths with bellman-ford', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 4 },
+        { id: 'e2', sourceId: 'a', targetId: 'c', weight: 1 },
+        { id: 'e3', sourceId: 'c', targetId: 'b', weight: -3 },
+      ],
+    });
+    const allPaths = getAllPairsShortestPaths(g, {
+      algorithm: 'bellman-ford',
+    });
+    // From a: paths to b (via c) and c
+    // From c: path to b
+    // From b: no outgoing edges
+    const fromA = allPaths.filter((p) => p.source.id === 'a');
+    expect(fromA).toHaveLength(2);
+    const aToBPath = fromA.find(
+      (p) => p.steps.at(-1)?.node.id === 'b',
+    )!;
+    expect(aToBPath.steps.map((s) => s.node.id)).toEqual(['c', 'b']);
+  });
+
+  it('handles unreachable nodes', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', weight: -1 }],
+    });
+    const paths = getShortestPaths(g, {
+      from: 'a',
+      algorithm: 'bellman-ford',
+    });
+    // Only b is reachable from a
+    expect(paths).toHaveLength(1);
+    expect(paths[0].steps.at(-1)!.node.id).toBe('b');
+  });
+
+  it('undirected graph with negative weight detects implicit cycle', () => {
+    // Undirected edge with negative weight creates an implicit negative cycle
+    // (traverse back and forth indefinitely), so Bellman-Ford should throw
+    const g = createGraph({
+      type: 'undirected',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 5 },
+        { id: 'e2', sourceId: 'b', targetId: 'c', weight: -2 },
+      ],
+    });
+    expect(() =>
+      getShortestPaths(g, { from: 'a', algorithm: 'bellman-ford' }),
+    ).toThrow('negative-weight cycle');
   });
 });
 

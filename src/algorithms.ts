@@ -555,15 +555,20 @@ function getNeighborEdges(
  * Returns all paths of equal minimum length per target (not just one).
  * Uses BFS when all edges are unweighted; Dijkstra otherwise.
  */
-/** Compute distance + prev maps via BFS or Dijkstra. */
+/** Compute distance + prev maps via BFS, Dijkstra, or Bellman-Ford. */
 function computeShortestDistances<N, E>(
   graph: Graph<N, E>,
   sourceId: string,
   getWeight?: (edge: GraphEdge<E>) => number,
+  algorithm?: 'dijkstra' | 'bellman-ford',
 ): {
   dist: Map<string, number>;
   prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>;
 } {
+  if (algorithm === 'bellman-ford') {
+    return bellmanFord(graph, sourceId, getWeight);
+  }
+
   const dist = new Map<string, number>();
   const prev = new Map<string, Array<{ from: string; edge: GraphEdge<E> }>>();
 
@@ -621,6 +626,102 @@ function computeShortestDistances<N, E>(
           prev.get(neighborId)!.push({ from: id, edge: edge as GraphEdge<E> });
         }
       }
+    }
+  }
+
+  return { dist, prev };
+}
+
+/**
+ * Bellman-Ford single-source shortest paths.
+ * **O(VE)** time. Handles negative edge weights.
+ * Throws if a negative-weight cycle is reachable from the source.
+ */
+function bellmanFord<N, E>(
+  graph: Graph<N, E>,
+  sourceId: string,
+  getWeight?: (edge: GraphEdge<E>) => number,
+): {
+  dist: Map<string, number>;
+  prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>;
+} {
+  const dist = new Map<string, number>();
+  const prev = new Map<string, Array<{ from: string; edge: GraphEdge<E> }>>();
+  const effectiveWeight = getWeight ?? ((e: GraphEdge<E>) => e.weight ?? 1);
+  const isUndirected = graph.type === 'undirected';
+
+  // Initialize
+  for (const node of graph.nodes) {
+    dist.set(node.id, Infinity);
+    prev.set(node.id, []);
+  }
+  dist.set(sourceId, 0);
+
+  const V = graph.nodes.length;
+
+  // Build directed edge list (expand undirected edges into both directions)
+  const directedEdges: Array<{
+    fromId: string;
+    toId: string;
+    edge: GraphEdge<E>;
+  }> = [];
+  for (const edge of graph.edges) {
+    directedEdges.push({
+      fromId: edge.sourceId,
+      toId: edge.targetId,
+      edge: edge as GraphEdge<E>,
+    });
+    if (isUndirected) {
+      directedEdges.push({
+        fromId: edge.targetId,
+        toId: edge.sourceId,
+        edge: edge as GraphEdge<E>,
+      });
+    }
+  }
+
+  // Relax edges V-1 times
+  for (let i = 0; i < V - 1; i++) {
+    let changed = false;
+    for (const { fromId, toId, edge } of directedEdges) {
+      const d = dist.get(fromId)!;
+      if (d === Infinity) continue;
+      const w = effectiveWeight(edge);
+      const newDist = d + w;
+      const existing = dist.get(toId)!;
+
+      if (newDist < existing) {
+        dist.set(toId, newDist);
+        prev.set(toId, [{ from: fromId, edge }]);
+        changed = true;
+      } else if (newDist === existing && existing !== Infinity) {
+        const preds = prev.get(toId)!;
+        if (!preds.some((p) => p.from === fromId && p.edge === edge)) {
+          preds.push({ from: fromId, edge });
+        }
+      }
+    }
+    // Early exit if no relaxation occurred
+    if (!changed) break;
+  }
+
+  // Check for negative cycles
+  for (const { fromId, toId, edge } of directedEdges) {
+    const d = dist.get(fromId)!;
+    if (d === Infinity) continue;
+    const w = effectiveWeight(edge);
+    if (d + w < dist.get(toId)!) {
+      throw new Error(
+        'Graph contains a negative-weight cycle reachable from the source node',
+      );
+    }
+  }
+
+  // Remove unreachable nodes
+  for (const [id, d] of dist) {
+    if (d === Infinity) {
+      dist.delete(id);
+      prev.delete(id);
     }
   }
 
@@ -694,6 +795,7 @@ export function* genShortestPaths<N, E>(
     graph,
     sourceId,
     opts?.getWeight,
+    opts?.algorithm,
   );
 
   const targets = opts?.to
@@ -1692,9 +1794,10 @@ function kruskalMST<N, E>(
 /**
  * Returns shortest paths between all pairs of nodes.
  * Algorithm 'dijkstra' (default): runs getShortestPaths per source node.
+ * Algorithm 'bellman-ford': handles negative weights, throws on negative cycles.
  * Algorithm 'floyd-warshall': classic dynamic programming.
  *
- * **O(V · (V + E) log V)** (Dijkstra) or **O(V³)** (Floyd-Warshall).
+ * **O(V · (V + E) log V)** (Dijkstra), **O(V²E)** (Bellman-Ford), or **O(V³)** (Floyd-Warshall).
  *
  * @example
  * ```ts
@@ -1720,7 +1823,26 @@ export function getAllPairsShortestPaths<N, E>(
   if (algorithm === 'floyd-warshall') {
     return floydWarshallAllPaths(graph, opts?.getWeight);
   }
+  if (algorithm === 'bellman-ford') {
+    return bellmanFordAllPaths(graph, opts?.getWeight);
+  }
   return dijkstraAllPaths(graph, opts?.getWeight);
+}
+
+function bellmanFordAllPaths<N, E>(
+  graph: Graph<N, E>,
+  getWeight?: (edge: GraphEdge<E>) => number,
+): GraphPath<N, E>[] {
+  const results: GraphPath<N, E>[] = [];
+  for (const node of graph.nodes) {
+    const paths = getShortestPaths(graph, {
+      from: node.id,
+      getWeight,
+      algorithm: 'bellman-ford',
+    });
+    results.push(...paths);
+  }
+  return results;
 }
 
 function dijkstraAllPaths<N, E>(
