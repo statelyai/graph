@@ -82,7 +82,7 @@ export function getOutEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge
 }
 
 /**
- * Returns the edge from `sourceId` to `targetId`, or `undefined` if none exists.
+ * Returns all edges from `sourceId` to `targetId`.
  * For undirected graphs, checks both directions.
  *
  * @example
@@ -91,33 +91,41 @@ export function getOutEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge
  *   nodes: [{ id: 'a' }, { id: 'b' }],
  *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
  * });
- * getEdgeBetween(graph, 'a', 'b');
- * // => edge e1
- * getEdgeBetween(graph, 'b', 'a');
- * // => undefined (directed graph)
+ * getEdgesBetween(graph, 'a', 'b');
+ * // => [edge e1]
+ * getEdgesBetween(graph, 'b', 'a');
+ * // => [] (directed graph)
  * ```
  */
-export function getEdgeBetween<N, E>(
+export function getEdgesBetween<N, E>(
   graph: Graph<N, E>,
   sourceId: string,
   targetId: string,
-): GraphEdge<E> | undefined {
+): GraphEdge<E>[] {
   const idx = getIndex(graph);
+  const result: GraphEdge<E>[] = [];
+  const seen = new Set<string>();
   const outIds = idx.outEdges.get(sourceId) ?? [];
   for (const eid of outIds) {
     const ai = idx.edgeById.get(eid)!;
     const e = graph.edges[ai];
-    if (e.targetId === targetId) return e;
+    if (e.targetId === targetId) {
+      seen.add(eid);
+      result.push(e);
+    }
   }
   if (graph.type === 'undirected') {
     const outIds2 = idx.outEdges.get(targetId) ?? [];
     for (const eid of outIds2) {
+      if (seen.has(eid)) continue;
       const ai = idx.edgeById.get(eid)!;
       const e = graph.edges[ai];
-      if (e.targetId === sourceId) return e;
+      if (e.targetId === sourceId) {
+        result.push(e);
+      }
     }
   }
-  return undefined;
+  return result;
 }
 
 // --- Neighbor queries ---

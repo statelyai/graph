@@ -10,7 +10,7 @@ import {
   getEdgesOf,
   getInEdges,
   getOutEdges,
-  getEdgeBetween,
+  getEdgesBetween,
   getChildren,
   getParent,
   getAncestors,
@@ -75,16 +75,16 @@ describe('Edge queries', () => {
     expect(getOutEdges(g, 'a')).toHaveLength(2);
   });
 
-  it('getEdgeBetween() directed', () => {
+  it('getEdgesBetween() directed', () => {
     const g = makeDirectedGraph();
-    expect(getEdgeBetween(g, 'a', 'b')?.id).toBe('e1');
-    expect(getEdgeBetween(g, 'b', 'a')).toBeUndefined();
+    expect(getEdgesBetween(g, 'a', 'b').map((e) => e.id)).toEqual(['e1']);
+    expect(getEdgesBetween(g, 'b', 'a')).toEqual([]);
   });
 
-  it('getEdgeBetween() undirected', () => {
+  it('getEdgesBetween() undirected', () => {
     const g = makeUndirectedGraph();
-    expect(getEdgeBetween(g, 'a', 'b')?.id).toBe('e1');
-    expect(getEdgeBetween(g, 'b', 'a')?.id).toBe('e1');
+    expect(getEdgesBetween(g, 'a', 'b').map((e) => e.id)).toEqual(['e1']);
+    expect(getEdgesBetween(g, 'b', 'a').map((e) => e.id)).toEqual(['e1']);
   });
 });
 

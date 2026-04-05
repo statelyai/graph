@@ -93,7 +93,7 @@ export {
   getEdgesOf,
   getInEdges,
   getOutEdges,
-  getEdgeBetween,
+  getEdgesBetween,
   getChildren,
   getParent,
   getAncestors,
