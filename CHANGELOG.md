@@ -1,5 +1,22 @@
 # @statelyai/graph
 
+## 0.10.0
+
+### Minor Changes
+
+- [`bfb5f0b`](https://github.com/statelyai/graph/commit/bfb5f0b5c3ef6323160322f31b7c5807785d91f0) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Clean up and simplify type definitions:
+
+  - Remove `GraphEntityConfig`; merged into `GraphEntity`
+  - Export `VisualGraphFormatConverter` from main entry
+  - Rename `Positioned` export to `EntityRect`
+  - Simplify `VisualNode`, `VisualEdge`, `VisualPort` to use property narrowing instead of `Omit`
+  - Fix `Graph<any, E>` → `Graph<N, E>` on exported APIs for better generic propagation
+  - Normalize `label` to `string | null` on both `GraphNode` and `GraphEdge` (node label default changed from `''` to `null`)
+
+### Patch Changes
+
+- [`160167b`](https://github.com/statelyai/graph/commit/160167bfbd6fae4b7092ff6e45873ac166e41ba1) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Remove `getEdgeBetween` in favor of `getEdgesBetween`.
+
 ## 0.9.0
 
 ### Minor Changes
