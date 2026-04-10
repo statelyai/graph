@@ -1,6 +1,19 @@
 import * as z from 'zod';
 
 const StyleSchema = z.record(z.string(), z.union([z.string(), z.number()]));
+const PortDirectionSchema = z.enum(['in', 'out', 'inout']);
+
+export const PortSchema = z.object({
+  name: z.string(),
+  direction: PortDirectionSchema.optional(),
+  label: z.string().optional(),
+  data: z.any(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  style: StyleSchema.optional(),
+});
 
 export const NodeSchema = z.object({
   type: z.literal('node'),
@@ -16,6 +29,7 @@ export const NodeSchema = z.object({
   shape: z.string().optional(),
   color: z.string().optional(),
   style: StyleSchema.optional(),
+  ports: z.array(PortSchema).optional(),
 });
 
 export const EdgeSchema = z.object({
@@ -25,6 +39,8 @@ export const EdgeSchema = z.object({
   targetId: z.string(),
   label: z.string().nullable().optional(),
   weight: z.number().optional(),
+  sourcePort: z.string().optional(),
+  targetPort: z.string().optional(),
   data: z.any(),
   x: z.number().optional(),
   y: z.number().optional(),

@@ -5,6 +5,7 @@ export default defineConfig({
     'src/index.ts',
     'src/schemas.ts',
     'src/algorithms.ts',
+    'src/format-support.ts',
     'src/queries.ts',
     // Formats — each gets its own subpath export
     'src/formats/adjacency-list/index.ts',

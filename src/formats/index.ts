@@ -2,6 +2,15 @@ export { toDOT, fromDOT, dotConverter } from './dot';
 export { toAdjacencyList, fromAdjacencyList } from './adjacency-list';
 export { toEdgeList, fromEdgeList } from './edge-list';
 export {
+  FORMAT_SUPPORT_MATRIX,
+  getFormatSupportEntry,
+} from './support';
+export type {
+  FormatSupportEntry,
+  FormatSupportFeatures,
+  FormatSupportLevel,
+} from './support';
+export {
   createFormatConverter,
   adjacencyListConverter,
   edgeListConverter,

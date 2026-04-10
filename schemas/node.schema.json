@@ -66,12 +66,67 @@
           }
         ]
       }
+    },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out",
+              "inout"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "data": {},
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "style": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "data"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
     "type",
     "id",
-    "label",
     "data"
   ],
   "additionalProperties": false

@@ -16,6 +16,22 @@
       "type": "string"
     },
     "label": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "weight": {
+      "type": "number"
+    },
+    "sourcePort": {
+      "type": "string"
+    },
+    "targetPort": {
       "type": "string"
     },
     "data": {},
@@ -56,7 +72,6 @@
     "id",
     "sourceId",
     "targetId",
-    "label",
     "data"
   ],
   "additionalProperties": false

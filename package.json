@@ -25,6 +25,7 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./algorithms": "./dist/algorithms.mjs",
+    "./format-support": "./dist/format-support.mjs",
     "./adjacency-list": "./dist/formats/adjacency-list/index.mjs",
     "./converter": "./dist/formats/converter/index.mjs",
     "./cytoscape": "./dist/formats/cytoscape/index.mjs",
@@ -52,10 +53,12 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "bench": "vitest bench --run",
     "dev": "tsdown --watch",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "pnpm typecheck && pnpm test -- --run && pnpm build && pnpm validate:package",
+    "check:generated": "tsx scripts/generate-json-schema.ts --check",
+    "verify": "pnpm typecheck && pnpm check:generated && pnpm test -- --run && pnpm build && pnpm validate:package",
     "validate:package": "publint && tsx scripts/smoke-package.ts",
     "generate-schema": "tsx scripts/generate-json-schema.ts",
     "changeset": "changeset",

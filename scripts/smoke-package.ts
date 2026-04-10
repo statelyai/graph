@@ -48,6 +48,7 @@ async function main(): Promise<void> {
 import assert from 'node:assert/strict';
 import { createGraph, getShortestPath } from '@statelyai/graph';
 import { getTopologicalSort } from '@statelyai/graph/algorithms';
+import { getFormatSupportEntry } from '@statelyai/graph/format-support';
 import { getNeighbors } from '@statelyai/graph/queries';
 import { adjacencyListConverter } from '@statelyai/graph/converter';
 import { toJGF, fromJGF } from '@statelyai/graph/jgf';
@@ -64,6 +65,7 @@ const graph = createGraph({
 assert.equal(typeof getShortestPath, 'function');
 assert.equal(typeof getTopologicalSort, 'function');
 assert.equal(typeof getNeighbors, 'function');
+assert.equal(getFormatSupportEntry('dot')?.features.roundTrip, 'partial');
 
 assert.deepEqual(
   [

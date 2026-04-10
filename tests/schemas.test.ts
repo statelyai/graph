@@ -1,5 +1,7 @@
 import { describe, it, expect, expectTypeOf } from 'vitest';
 import * as z from 'zod';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { GraphSchema, NodeSchema, EdgeSchema } from '../src/schemas';
 import type { GraphNode, GraphEdge, Graph } from '../src/types';
 import { getFullyFeaturedGraphFixture } from './fixtures';
@@ -13,6 +15,7 @@ describe('Zod schemas', () => {
       initialNodeId: null,
       label: 'Test',
       data: { color: 'red' },
+      ports: [{ name: 'out', direction: 'out', data: { kind: 'result' } }],
     });
     expect(result.success).toBe(true);
   });
@@ -32,6 +35,8 @@ describe('Zod schemas', () => {
       id: 'e1',
       sourceId: 'a',
       targetId: 'b',
+      sourcePort: 'out',
+      targetPort: 'in',
       label: '',
       data: null,
     });
@@ -94,5 +99,22 @@ describe('Zod schemas', () => {
     expect(jsonSchema.properties).toHaveProperty('id');
     expect(jsonSchema.properties).toHaveProperty('nodes');
     expect(jsonSchema.properties).toHaveProperty('edges');
+  });
+
+  it('generated JSON schemas stay in sync with port fields', () => {
+    const nodeJsonSchema = JSON.parse(
+      readFileSync(join(process.cwd(), 'schemas/node.schema.json'), 'utf8'),
+    ) as {
+      properties: Record<string, unknown>;
+    };
+    const edgeJsonSchema = JSON.parse(
+      readFileSync(join(process.cwd(), 'schemas/edge.schema.json'), 'utf8'),
+    ) as {
+      properties: Record<string, unknown>;
+    };
+
+    expect(nodeJsonSchema.properties).toHaveProperty('ports');
+    expect(edgeJsonSchema.properties).toHaveProperty('sourcePort');
+    expect(edgeJsonSchema.properties).toHaveProperty('targetPort');
   });
 });
