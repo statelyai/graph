@@ -12,11 +12,19 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, '..');
 
 async function main(): Promise<void> {
-  const packOutput = execFileSync('npm', ['pack', '--json'], {
+  const packOutput = execFileSync('npm', ['pack', '--json', '--ignore-scripts'], {
     cwd: rootDir,
     encoding: 'utf8',
   });
-  const [{ filename }] = JSON.parse(packOutput) as PackResult[];
+  const jsonStart = packOutput.indexOf('[\n  {');
+  const jsonEnd = packOutput.lastIndexOf('\n]');
+  if (jsonStart < 0 || jsonEnd < 0) {
+    throw new Error(`Unable to parse npm pack output as JSON:\n${packOutput}`);
+  }
+  const parsedOutput = JSON.parse(
+    packOutput.slice(jsonStart, jsonEnd + 2),
+  ) as PackResult[];
+  const [{ filename }] = parsedOutput;
   const tarballPath = join(rootDir, filename);
   const tempDir = await mkdtemp(join(tmpdir(), 'statelyai-graph-smoke-'));
   const consumerDir = join(tempDir, 'consumer');

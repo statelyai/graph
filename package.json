@@ -55,6 +55,7 @@
     "build": "tsdown",
     "bench": "vitest bench --run",
     "dev": "tsdown --watch",
+    "fix:generated": "pnpm generate-schema",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "check:generated": "tsx scripts/generate-json-schema.ts --check",
