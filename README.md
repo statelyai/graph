@@ -12,6 +12,8 @@ npm install @statelyai/graph
 
 Optional peers are only needed for specific adapters:
 
+<!-- optional peer dependencies derived from package.json#peerDependencies -->
+
 | Package | Needed for |
 | --- | --- |
 | `fast-xml-parser` | `@statelyai/graph/gexf`, `@statelyai/graph/graphml` |
@@ -203,7 +205,9 @@ const d3Data = toD3Graph(graph);             // D3.js { nodes, links }
 const imported = fromGEXF(gexfXmlString);    // GEXF (Gephi)
 ```
 
-**Supported formats:** Cytoscape.js JSON, D3.js JSON, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block), adjacency list, and edge list.
+<!-- supported format adapters derived from src/formats/* subdirectories -->
+
+**Supported formats:** Cytoscape.js JSON, D3.js JSON, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block), ELK, xyflow, adjacency list, and edge list.
 
 Each bidirectional format also has a converter object:
 
@@ -218,15 +222,21 @@ Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) 
 
 Format-specific docs live alongside the source:
 
-- [DOT](./src/formats/dot/README.md)
-- [GraphML](./src/formats/graphml/README.md)
-- [GEXF](./src/formats/gexf/README.md)
-- [GML](./src/formats/gml/README.md)
-- [JGF](./src/formats/jgf/README.md)
-- [TGF](./src/formats/tgf/README.md)
+<!-- format README files under src/formats/*/README.md -->
+
+- [Adjacency list](./src/formats/adjacency-list/README.md)
 - [Cytoscape](./src/formats/cytoscape/README.md)
 - [D3](./src/formats/d3/README.md)
+- [DOT](./src/formats/dot/README.md)
+- [Edge list](./src/formats/edge-list/README.md)
+- [ELK](./src/formats/elk/README.md)
+- [GEXF](./src/formats/gexf/README.md)
+- [GML](./src/formats/gml/README.md)
+- [GraphML](./src/formats/graphml/README.md)
+- [JGF](./src/formats/jgf/README.md)
 - [Mermaid](./src/formats/mermaid/README.md)
+- [TGF](./src/formats/tgf/README.md)
+- [xyflow](./src/formats/xyflow/README.md)
 - [Converter helpers](./src/formats/converter/README.md)
 
 ## Examples
