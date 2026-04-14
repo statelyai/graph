@@ -1,3 +1,7 @@
+---
+title: @statelyai/graph
+---
+
 # @statelyai/graph
 
 A TypeScript graph library built on plain JSON objects. Supports directed/undirected graphs, hierarchical nodes, graph algorithms, visual properties, and serialization to DOT, GraphML, Mermaid, and more.
