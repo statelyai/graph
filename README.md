@@ -1,5 +1,5 @@
 ---
-title: @statelyai/graph
+title: '@statelyai/graph'
 ---
 
 # @statelyai/graph
