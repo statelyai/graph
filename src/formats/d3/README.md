@@ -9,6 +9,8 @@ Converter for [D3.js](https://d3js.org/) force-directed graph JSON — the `{ no
 
 ## API
 
+<!-- exported symbols from src/formats/d3/index.ts -->
+
 ```ts
 import { toD3Graph, fromD3Graph, d3Converter } from '@statelyai/graph/d3';
 import { createGraph } from '@statelyai/graph';

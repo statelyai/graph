@@ -8,6 +8,8 @@ Converter for the adjacency list format — a plain `Record<string, string[]>` m
 
 ## API
 
+<!-- exported symbols from src/formats/adjacency-list/index.ts -->
+
 ```ts
 import { toAdjacencyList, fromAdjacencyList, adjacencyListConverter } from '@statelyai/graph/adjacency-list';
 import { createGraph } from '@statelyai/graph';

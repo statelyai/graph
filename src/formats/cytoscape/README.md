@@ -15,6 +15,8 @@ npm install cytoscape
 
 ## API
 
+<!-- exported symbols from src/formats/cytoscape/index.ts -->
+
 ```ts
 import { toCytoscapeJSON, fromCytoscapeJSON, cytoscapeConverter } from '@statelyai/graph/cytoscape';
 import { createGraph } from '@statelyai/graph';

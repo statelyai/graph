@@ -141,7 +141,9 @@ getEdgesByPort(graph, 'render', 'input'); // [e1]
 
 ## Algorithms
 
-Includes traversal (BFS, DFS), pathfinding (shortest path, simple paths, all-pairs shortest paths), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (label propagation, Girvan-Newman, greedy modularity, modularity scoring), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+<!-- algorithm functions exported from src/algorithms.ts -->
+
+Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (label propagation, Girvan-Newman, greedy modularity, modularity scoring), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
 
 ```ts
 import {
@@ -245,12 +247,16 @@ Format-specific docs live alongside the source:
 
 ## Examples
 
+<!-- runnable example files under examples/ -->
+
 The repo includes runnable examples under [`examples/`](./examples):
 
 - [Flow-based math](./examples/flow-based-math.ts) shows ports, topological ordering, and value propagation.
 - [Async workflow](./examples/async-workflow.ts) models an n8n/Zapier-style workflow with ports and dependency-aware execution.
 
 ## Development
+
+<!-- dev commands from package.json#scripts -->
 
 ```bash
 pnpm install

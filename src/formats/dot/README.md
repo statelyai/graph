@@ -16,6 +16,8 @@ npm install dotparser
 
 ## API
 
+<!-- exported symbols from src/formats/dot/index.ts -->
+
 ```ts
 import { toDOT, fromDOT, dotConverter } from '@statelyai/graph/dot';
 import { createGraph } from '@statelyai/graph';

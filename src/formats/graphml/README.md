@@ -15,6 +15,8 @@ npm install fast-xml-parser
 
 ## API
 
+<!-- exported symbols from src/formats/graphml/index.ts -->
+
 ```ts
 import { toGraphML, fromGraphML, graphmlConverter } from '@statelyai/graph/graphml';
 import { createGraph } from '@statelyai/graph';

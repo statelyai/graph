@@ -9,6 +9,8 @@ Converter for [GML](https://en.wikipedia.org/wiki/Graph_Modelling_Language) (Gra
 
 ## API
 
+<!-- exported symbols from src/formats/gml/index.ts -->
+
 ```ts
 import { toGML, fromGML, gmlConverter } from '@statelyai/graph/gml';
 import { createGraph } from '@statelyai/graph';

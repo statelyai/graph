@@ -9,6 +9,8 @@ Converter for [JSON Graph Format](https://jsongraphformat.info/) — a standardi
 
 ## API
 
+<!-- exported symbols from src/formats/jgf/index.ts -->
+
 ```ts
 import { toJGF, fromJGF, jgfConverter } from '@statelyai/graph/jgf';
 import { createGraph } from '@statelyai/graph';

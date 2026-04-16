@@ -15,6 +15,8 @@ npm install fast-xml-parser
 
 ## API
 
+<!-- exported symbols from src/formats/gexf/index.ts -->
+
 ```ts
 import { toGEXF, fromGEXF, gexfConverter } from '@statelyai/graph/gexf';
 import { createGraph } from '@statelyai/graph';

@@ -8,6 +8,8 @@ Converter for the edge list format — a simple `[source, target][]` array of tu
 
 ## API
 
+<!-- exported symbols from src/formats/edge-list/index.ts -->
+
 ```ts
 import { toEdgeList, fromEdgeList, edgeListConverter } from '@statelyai/graph/edge-list';
 import { createGraph } from '@statelyai/graph';

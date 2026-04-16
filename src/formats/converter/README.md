@@ -4,6 +4,8 @@ Utility for creating custom `GraphFormatConverter` objects from `to`/`from` func
 
 ## API
 
+<!-- exported symbols from src/formats/converter/index.ts -->
+
 ```ts
 import { createFormatConverter } from '@statelyai/graph/converter';
 import { createGraph } from '@statelyai/graph';

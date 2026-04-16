@@ -9,6 +9,8 @@ Converters for [Mermaid](https://mermaid.js.org/) diagram syntax. Each diagram t
 
 ## API
 
+<!-- exported symbols from src/formats/mermaid/index.ts -->
+
 ```ts
 import {
   // Sequence diagram

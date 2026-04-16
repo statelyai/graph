@@ -8,6 +8,8 @@ Converter for [TGF](https://en.wikipedia.org/wiki/Trivial_Graph_Format) (Trivial
 
 ## API
 
+<!-- exported symbols from src/formats/tgf/index.ts -->
+
 ```ts
 import { toTGF, fromTGF, tgfConverter } from '@statelyai/graph/tgf';
 import { createGraph } from '@statelyai/graph';
