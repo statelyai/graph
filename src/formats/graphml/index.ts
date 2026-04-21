@@ -107,6 +107,24 @@ export function toGraphML(graph: Graph): string {
       '@_attr.name': 'weight',
       '@_attr.type': 'double',
     },
+    {
+      '@_id': 'ports',
+      '@_for': 'node',
+      '@_attr.name': 'ports',
+      '@_attr.type': 'string',
+    },
+    {
+      '@_id': 'sourcePort',
+      '@_for': 'edge',
+      '@_attr.name': 'sourcePort',
+      '@_attr.type': 'string',
+    },
+    {
+      '@_id': 'targetPort',
+      '@_for': 'edge',
+      '@_attr.name': 'targetPort',
+      '@_attr.type': 'string',
+    },
   ];
 
   const nodes = graph.nodes.map((node) => {
@@ -133,6 +151,9 @@ export function toGraphML(graph: Graph): string {
     }
     if (node.shape) data.push({ '@_key': 'shape', '#text': node.shape });
     if (node.color) data.push({ '@_key': 'color', '#text': node.color });
+    if (node.ports !== undefined) {
+      data.push({ '@_key': 'ports', '#text': JSON.stringify(node.ports) });
+    }
 
     return {
       '@_id': node.id,
@@ -160,6 +181,12 @@ export function toGraphML(graph: Graph): string {
     if (edge.color) data.push({ '@_key': 'color', '#text': edge.color });
     if (edge.weight !== undefined) {
       data.push({ '@_key': 'weight', '#text': edge.weight });
+    }
+    if (edge.sourcePort !== undefined) {
+      data.push({ '@_key': 'sourcePort', '#text': edge.sourcePort });
+    }
+    if (edge.targetPort !== undefined) {
+      data.push({ '@_key': 'targetPort', '#text': edge.targetPort });
     }
 
     return {
@@ -269,6 +296,7 @@ export function fromGraphML(xml: string): Graph {
     if (dataMap.shape !== undefined) node.shape = dataMap.shape;
     if (dataMap.color !== undefined) node.color = dataMap.color;
     if (dataMap.style !== undefined) node.style = tryParseJSON(dataMap.style);
+    if (dataMap.ports !== undefined) node.ports = tryParseJSON(dataMap.ports);
 
     return node;
   });
@@ -292,6 +320,8 @@ export function fromGraphML(xml: string): Graph {
     if (dataMap.height !== undefined) edge.height = parseNumber(dataMap.height);
     if (dataMap.color !== undefined) edge.color = dataMap.color;
     if (dataMap.style !== undefined) edge.style = tryParseJSON(dataMap.style);
+    if (dataMap.sourcePort !== undefined) edge.sourcePort = dataMap.sourcePort;
+    if (dataMap.targetPort !== undefined) edge.targetPort = dataMap.targetPort;
 
     return edge;
   });

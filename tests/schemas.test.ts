@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GraphSchema, NodeSchema, EdgeSchema } from '../src/schemas';
+import { createGraph } from '../src/graph';
 import type { GraphNode, GraphEdge, Graph } from '../src/types';
 import { getFullyFeaturedGraphFixture } from './fixtures';
 
@@ -57,6 +58,15 @@ describe('Zod schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('GraphSchema validates createGraph() defaults', () => {
+    const graph = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+    });
+
+    expect(GraphSchema.safeParse(graph).success).toBe(true);
+  });
+
   it('GraphSchema rejects invalid type', () => {
     const result = GraphSchema.safeParse({
       id: 'g1',
@@ -70,6 +80,8 @@ describe('Zod schemas', () => {
   it('schemas preserve all known graph fields from the fully featured fixture', () => {
     const graph = getFullyFeaturedGraphFixture();
 
+    expect(graph.nodes[1].ports?.[0]?.name).toBe('out');
+    expect(graph.edges[0].sourcePort).toBe('out');
     expect(NodeSchema.parse(graph.nodes[0])).toEqual(graph.nodes[0]);
     expect(EdgeSchema.parse(graph.edges[0])).toEqual(graph.edges[0]);
     expect(GraphSchema.parse(graph)).toEqual(graph);

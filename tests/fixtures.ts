@@ -50,6 +50,23 @@ export function getFullyFeaturedGraphFixture(): Graph {
           collapsed: 0,
           accent: 'blue',
         },
+        ports: [
+          {
+            name: 'out',
+            direction: 'out',
+            label: 'Output',
+            data: {
+              kind: 'event',
+            },
+            x: 130,
+            y: 85,
+            width: 8,
+            height: 8,
+            style: {
+              side: 'right',
+            },
+          },
+        ],
       },
       {
         type: 'node',
@@ -70,6 +87,23 @@ export function getFullyFeaturedGraphFixture(): Graph {
           collapsed: 1,
           accent: 'green',
         },
+        ports: [
+          {
+            name: 'in',
+            direction: 'in',
+            label: 'Input',
+            data: {
+              kind: 'event',
+            },
+            x: 152,
+            y: 85,
+            width: 8,
+            height: 8,
+            style: {
+              side: 'left',
+            },
+          },
+        ],
       },
     ],
     edges: [
@@ -78,6 +112,8 @@ export function getFullyFeaturedGraphFixture(): Graph {
         id: 'e1',
         sourceId: 'child-a',
         targetId: 'child-b',
+        sourcePort: 'out',
+        targetPort: 'in',
         label: 'A to B',
         weight: 2.5,
         data: {

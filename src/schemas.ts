@@ -20,7 +20,7 @@ export const NodeSchema = z.object({
   id: z.string(),
   parentId: z.string().nullable().optional(),
   initialNodeId: z.string().nullable().optional(),
-  label: z.string().optional(),
+  label: z.string().nullable().optional(),
   data: z.any(),
   x: z.number().optional(),
   y: z.number().optional(),
