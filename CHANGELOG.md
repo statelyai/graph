@@ -1,5 +1,14 @@
 # @statelyai/graph
 
+## 0.11.1
+
+### Patch Changes
+
+- [`1480565`](https://github.com/statelyai/graph/commit/14805658942ca5a8e2f2c2dbfe274d98d6d73edd) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add Mermaid Ishikawa conversion and improve Mermaid v11.13 sequence and ER parsing.
+
+- [`18588bd`](https://github.com/statelyai/graph/commit/18588bd4f65976a8c0405bd691e87adcd66ea7ed) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Preserve ports and edge port references in GraphML round-trips, allow nullable
+  node labels in `GraphSchema`
+
 ## 0.11.0
 
 ### Minor Changes
