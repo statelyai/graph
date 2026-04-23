@@ -26,6 +26,7 @@ describe('format support matrix', () => {
         'mermaid/class',
         'mermaid/er',
         'mermaid/flowchart',
+        'mermaid/ishikawa',
         'mermaid/mindmap',
         'mermaid/sequence',
         'mermaid/state',

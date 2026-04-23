@@ -213,7 +213,7 @@ const imported = fromGEXF(gexfXmlString);    // GEXF (Gephi)
 
 <!-- supported format adapters derived from src/formats/* subdirectories -->
 
-**Supported formats:** Cytoscape.js JSON, D3.js JSON, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block), ELK, xyflow, adjacency list, and edge list.
+**Supported formats:** Cytoscape.js JSON, D3.js JSON, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block, Ishikawa), ELK, xyflow, adjacency list, and edge list.
 
 Each bidirectional format also has a converter object:
 

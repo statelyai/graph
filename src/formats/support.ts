@@ -266,6 +266,21 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     ],
   },
   {
+    id: 'mermaid/ishikawa',
+    importPath: '@statelyai/graph/mermaid',
+    features: {
+      directed: 'full',
+      undirected: 'none',
+      hierarchy: 'full',
+      ports: 'none',
+      visual: 'none',
+      style: 'none',
+      weight: 'none',
+      roundTrip: 'partial',
+    },
+    notes: ['Indentation is preserved as hierarchy; renderer-specific fishbone layout is not represented.'],
+  },
+  {
     id: 'mermaid/mindmap',
     importPath: '@statelyai/graph/mermaid',
     features: {

@@ -22,8 +22,22 @@ export interface SequenceNodeData {
 export interface SequenceEdgeData {
   kind: 'message' | 'activation' | 'deactivation';
   stroke?: 'solid' | 'dotted';
-  arrowType?: 'filled' | 'open' | 'cross' | 'async';
+  arrowType?:
+    | 'filled'
+    | 'open'
+    | 'cross'
+    | 'async'
+    | 'half-top'
+    | 'half-bottom'
+    | 'half-reverse-top'
+    | 'half-reverse-bottom'
+    | 'stick-half-top'
+    | 'stick-half-bottom'
+    | 'stick-half-reverse-top'
+    | 'stick-half-reverse-bottom';
   bidirectional?: boolean;
+  centralSource?: boolean;
+  centralTarget?: boolean;
   sequenceNumber?: number;
 }
 
@@ -69,7 +83,7 @@ type SequenceEdge = GraphEdge<SequenceEdgeData>;
 
 interface ArrowInfo {
   stroke: 'solid' | 'dotted';
-  arrowType: 'filled' | 'open' | 'cross' | 'async';
+  arrowType: NonNullable<SequenceEdgeData['arrowType']>;
   bidirectional: boolean;
 }
 
@@ -81,23 +95,48 @@ const ARROW_PATTERNS: [string, ArrowInfo][] = [
   ['-->', { stroke: 'dotted', arrowType: 'open', bidirectional: false }],
   ['--x', { stroke: 'dotted', arrowType: 'cross', bidirectional: false }],
   ['--)', { stroke: 'dotted', arrowType: 'async', bidirectional: false }],
+  ['--|\\', { stroke: 'dotted', arrowType: 'half-top', bidirectional: false }],
+  ['--|/', { stroke: 'dotted', arrowType: 'half-bottom', bidirectional: false }],
+  ['/|--', { stroke: 'dotted', arrowType: 'half-reverse-top', bidirectional: false }],
+  ['\\|--', { stroke: 'dotted', arrowType: 'half-reverse-bottom', bidirectional: false }],
+  ['--\\\\', { stroke: 'dotted', arrowType: 'stick-half-top', bidirectional: false }],
+  ['--//', { stroke: 'dotted', arrowType: 'stick-half-bottom', bidirectional: false }],
+  ['//--', { stroke: 'dotted', arrowType: 'stick-half-reverse-top', bidirectional: false }],
+  ['\\\\--', { stroke: 'dotted', arrowType: 'stick-half-reverse-bottom', bidirectional: false }],
   ['->>', { stroke: 'solid', arrowType: 'filled', bidirectional: false }],
   ['->', { stroke: 'solid', arrowType: 'open', bidirectional: false }],
   ['-x', { stroke: 'solid', arrowType: 'cross', bidirectional: false }],
   ['-)', { stroke: 'solid', arrowType: 'async', bidirectional: false }],
+  ['-|\\', { stroke: 'solid', arrowType: 'half-top', bidirectional: false }],
+  ['-|/', { stroke: 'solid', arrowType: 'half-bottom', bidirectional: false }],
+  ['/|-', { stroke: 'solid', arrowType: 'half-reverse-top', bidirectional: false }],
+  ['\\|-', { stroke: 'solid', arrowType: 'half-reverse-bottom', bidirectional: false }],
+  ['-\\\\', { stroke: 'solid', arrowType: 'stick-half-top', bidirectional: false }],
+  ['-//', { stroke: 'solid', arrowType: 'stick-half-bottom', bidirectional: false }],
+  ['//-', { stroke: 'solid', arrowType: 'stick-half-reverse-top', bidirectional: false }],
+  ['\\\\-', { stroke: 'solid', arrowType: 'stick-half-reverse-bottom', bidirectional: false }],
 ];
 
-function parseArrow(arrow: string): ArrowInfo | undefined {
+function getEscapedRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getParsedArrow(arrow: string): ArrowInfo | undefined {
   for (const [pattern, info] of ARROW_PATTERNS) {
     if (arrow === pattern) return info;
   }
   return undefined;
 }
 
+const ARROW_PATTERN_SOURCE = ARROW_PATTERNS
+  .map(([pattern]) => getEscapedRegExp(pattern))
+  .join('|');
+
 // Regex to match a message line: Actor arrow Actor: message
-// Captures: [1] source (may end with +/-), [2] arrow, [3] target (may start with +/-), [4] message
-const MESSAGE_RE =
-  /^(\S+?)\s*(<<-->>|<<->>|-->>|-->|--x|--\)|->>|->|-x|-\))\s*(\S+?)\s*:\s*(.*)$/;
+// Captures: [1] source (may end with +/-), [2] arrow, [3] target-center marker, [4] target (may start with +/-), [5] message
+const MESSAGE_RE = new RegExp(
+  `^(\\S+?)\\s*(${ARROW_PATTERN_SOURCE})(\\(\\))?\\s*(\\S+?)\\s*:\\s*(.*)$`,
+);
 
 // --- Parser ---
 
@@ -380,8 +419,15 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
     if (msgMatch) {
       let sourceId = msgMatch[1];
       const arrowStr = msgMatch[2];
-      let targetId = msgMatch[3];
-      const messageText = msgMatch[4].trim();
+      const centralTarget = msgMatch[3] === '()';
+      let targetId = msgMatch[4];
+      const messageText = msgMatch[5].trim();
+
+      let centralSource = false;
+      if (sourceId.endsWith('()')) {
+        centralSource = true;
+        sourceId = sourceId.slice(0, -2);
+      }
 
       // Handle activation shorthand: +/- suffix on target
       let activationOnTarget: 'activation' | 'deactivation' | null = null;
@@ -405,7 +451,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
       ensureNode(sourceId);
       ensureNode(targetId);
 
-      const arrowInfo = parseArrow(arrowStr);
+      const arrowInfo = getParsedArrow(arrowStr);
       if (!arrowInfo) continue; // skip unparseable arrows
 
       const edgeId = generateEdgeId(sourceId, targetId, edgeCounter++);
@@ -414,6 +460,8 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
         stroke: arrowInfo.stroke,
         arrowType: arrowInfo.arrowType,
         ...(arrowInfo.bidirectional && { bidirectional: true }),
+        ...(centralSource && { centralSource: true }),
+        ...(centralTarget && { centralTarget: true }),
         ...(autonumber && { sequenceNumber: ++seqNum }),
       };
 
@@ -527,12 +575,28 @@ const ARROW_MAP: Record<string, Record<string, string>> = {
     filled: '->>',
     cross: '-x',
     async: '-)',
+    'half-top': '-|\\',
+    'half-bottom': '-|/',
+    'half-reverse-top': '/|-',
+    'half-reverse-bottom': '\\|-',
+    'stick-half-top': '-\\\\',
+    'stick-half-bottom': '-//',
+    'stick-half-reverse-top': '//-',
+    'stick-half-reverse-bottom': '\\\\-',
   },
   dotted: {
     open: '-->',
     filled: '-->>',
     cross: '--x',
     async: '--)',
+    'half-top': '--|\\',
+    'half-bottom': '--|/',
+    'half-reverse-top': '/|--',
+    'half-reverse-bottom': '\\|--',
+    'stick-half-top': '--\\\\',
+    'stick-half-bottom': '--//',
+    'stick-half-reverse-top': '//--',
+    'stick-half-reverse-bottom': '\\\\--',
   },
 };
 
@@ -777,10 +841,13 @@ export function toMermaidSequence(graph: MermaidSequenceGraph): string {
       } else {
         arrow = ARROW_MAP[stroke]?.[arrowType] ?? '->>';
       }
+      if (d.centralTarget) {
+        arrow += '()';
+      }
 
       const label = edge.label ? `: ${escapeMermaidLabel(edge.label)}` : ':';
       lines.push(
-        `${indent()}${edge.sourceId}${arrow}${edge.targetId}${label}`,
+        `${indent()}${edge.sourceId}${d.centralSource ? '()' : ''}${arrow}${edge.targetId}${label}`,
       );
     }
 

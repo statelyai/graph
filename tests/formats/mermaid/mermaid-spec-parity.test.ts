@@ -543,6 +543,23 @@ describe('Sequence diagram spec-parity', () => {
       // Bidirectional (Mermaid linetype: 6, 7)
       { syntax: 'A<<->>B: msg', stroke: 'solid', arrowType: 'filled', bidirectional: true, description: 'solid bidirectional' },
       { syntax: 'A<<-->>B: msg', stroke: 'dotted', arrowType: 'filled', bidirectional: true, description: 'dotted bidirectional' },
+      // Half arrows and stick half arrows (Mermaid v11.13)
+      { syntax: 'A-|\\B: msg', stroke: 'solid', arrowType: 'half-top', description: 'solid top half arrowhead' },
+      { syntax: 'A--|\\B: msg', stroke: 'dotted', arrowType: 'half-top', description: 'dotted top half arrowhead' },
+      { syntax: 'A-|/B: msg', stroke: 'solid', arrowType: 'half-bottom', description: 'solid bottom half arrowhead' },
+      { syntax: 'A--|/B: msg', stroke: 'dotted', arrowType: 'half-bottom', description: 'dotted bottom half arrowhead' },
+      { syntax: 'A/|-B: msg', stroke: 'solid', arrowType: 'half-reverse-top', description: 'solid reverse top half arrowhead' },
+      { syntax: 'A/|--B: msg', stroke: 'dotted', arrowType: 'half-reverse-top', description: 'dotted reverse top half arrowhead' },
+      { syntax: 'A\\|-B: msg', stroke: 'solid', arrowType: 'half-reverse-bottom', description: 'solid reverse bottom half arrowhead' },
+      { syntax: 'A\\|--B: msg', stroke: 'dotted', arrowType: 'half-reverse-bottom', description: 'dotted reverse bottom half arrowhead' },
+      { syntax: 'A-\\\\B: msg', stroke: 'solid', arrowType: 'stick-half-top', description: 'solid top stick half arrowhead' },
+      { syntax: 'A--\\\\B: msg', stroke: 'dotted', arrowType: 'stick-half-top', description: 'dotted top stick half arrowhead' },
+      { syntax: 'A-//B: msg', stroke: 'solid', arrowType: 'stick-half-bottom', description: 'solid bottom stick half arrowhead' },
+      { syntax: 'A--//B: msg', stroke: 'dotted', arrowType: 'stick-half-bottom', description: 'dotted bottom stick half arrowhead' },
+      { syntax: 'A//-B: msg', stroke: 'solid', arrowType: 'stick-half-reverse-top', description: 'solid reverse top stick half arrowhead' },
+      { syntax: 'A//--B: msg', stroke: 'dotted', arrowType: 'stick-half-reverse-top', description: 'dotted reverse top stick half arrowhead' },
+      { syntax: 'A\\\\-B: msg', stroke: 'solid', arrowType: 'stick-half-reverse-bottom', description: 'solid reverse bottom stick half arrowhead' },
+      { syntax: 'A\\\\--B: msg', stroke: 'dotted', arrowType: 'stick-half-reverse-bottom', description: 'dotted reverse bottom stick half arrowhead' },
     ];
 
     for (const spec of SEQUENCE_ARROW_SPEC) {
@@ -572,6 +589,25 @@ describe('Sequence diagram spec-parity', () => {
         }
       });
     }
+
+    it('parses and round-trips central lifeline connections', () => {
+      const graph = fromMermaidSequence(`
+sequenceDiagram
+    Alice->>()John: Hello John
+    Alice()->>John: How are you?
+    John()->>()Alice: Great!
+      `);
+
+      expect(graph.edges[0].data.centralTarget).toBe(true);
+      expect(graph.edges[1].data.centralSource).toBe(true);
+      expect(graph.edges[2].data.centralSource).toBe(true);
+      expect(graph.edges[2].data.centralTarget).toBe(true);
+
+      const output = toMermaidSequence(graph);
+      expect(output).toContain('Alice->>()John: Hello John');
+      expect(output).toContain('Alice()->>John: How are you?');
+      expect(output).toContain('John()->>()Alice: Great!');
+    });
   });
 
   describe('participant type exhaustive coverage', () => {

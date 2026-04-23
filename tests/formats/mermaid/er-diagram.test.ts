@@ -58,6 +58,20 @@ erDiagram
       });
     });
 
+    it('parses Mermaid v11.13 one-cardinality alias', () => {
+      const graph = fromMermaidER(`
+erDiagram
+    CUSTOMER 1--1 PROFILE : owns
+      `);
+
+      expect(graph.edges).toHaveLength(1);
+      expect(graph.edges[0].data).toMatchObject({
+        sourceCardinality: 'one',
+        targetCardinality: 'one',
+        identifying: true,
+      });
+    });
+
     it('parses entity attributes', () => {
       const graph = fromMermaidER(`
 erDiagram

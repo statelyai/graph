@@ -44,6 +44,7 @@ type EREdge = GraphEdge<EREdgeData>;
 
 const LEFT_CARDINALITY: Record<string, EREdgeData['sourceCardinality']> = {
   '||': 'one',
+  '1': 'one',
   '|o': 'zero-or-one',
   '}|': 'one-or-more',
   '}o': 'zero-or-more',
@@ -51,6 +52,7 @@ const LEFT_CARDINALITY: Record<string, EREdgeData['sourceCardinality']> = {
 
 const RIGHT_CARDINALITY: Record<string, EREdgeData['targetCardinality']> = {
   '||': 'one',
+  '1': 'one',
   'o|': 'zero-or-one',
   '|{': 'one-or-more',
   'o{': 'zero-or-more',
@@ -70,35 +72,31 @@ const CARDINALITY_TO_RIGHT: Record<string, string> = {
   'zero-or-more': 'o{',
 };
 
-function parseERRelationship(symbol: string): {
+function getParsedERRelationship(symbol: string): {
   sourceCardinality: EREdgeData['sourceCardinality'];
   targetCardinality: EREdgeData['targetCardinality'];
   identifying: boolean;
 } | null {
-  // Try all combinations: 2-char left + 2-char line + 2-char right
-  if (symbol.length < 6) return null;
-
-  const left = symbol.slice(0, 2);
-  const mid = symbol.slice(2, 4);
-  const right = symbol.slice(4, 6);
-
-  const srcCard = LEFT_CARDINALITY[left];
-  const tgtCard = RIGHT_CARDINALITY[right];
-  if (!srcCard || !tgtCard) return null;
-
-  let identifying: boolean;
-  if (mid === '--') identifying = true;
-  else if (mid === '..') identifying = false;
-  else return null;
-
-  return { sourceCardinality: srcCard, targetCardinality: tgtCard, identifying };
+  for (const left of Object.keys(LEFT_CARDINALITY).sort((a, b) => b.length - a.length)) {
+    for (const mid of ['--', '..']) {
+      for (const right of Object.keys(RIGHT_CARDINALITY).sort((a, b) => b.length - a.length)) {
+        if (symbol !== `${left}${mid}${right}`) continue;
+        return {
+          sourceCardinality: LEFT_CARDINALITY[left],
+          targetCardinality: RIGHT_CARDINALITY[right],
+          identifying: mid === '--',
+        };
+      }
+    }
+  }
+  return null;
 }
 
 // --- Parser ---
 
 // ER relationship line: ENTITY1 ||--o{ ENTITY2 : "label"
 const ER_LINE_RE =
-  /^(\S+)\s+([|}{o.][|}{o.][-.][-.][|}{o.][|}{o.])\s+(\S+)\s*:\s*"?([^"]*)"?\s*$/;
+  /^(\S+)\s+([|}{o1.]{1,2}[-.][-.][|}{o1.]{1,2})\s+(\S+)\s*:\s*"?([^"]*)"?\s*$/;
 
 /**
  * Parses a Mermaid ER diagram string into a Graph.
@@ -191,7 +189,7 @@ export function fromMermaidER(input: string): MermaidERGraph {
       ensureNode(leftEntity);
       ensureNode(rightEntity);
 
-      const rel = parseERRelationship(symbol);
+      const rel = getParsedERRelationship(symbol);
       if (rel) {
         const edgeId = generateEdgeId(leftEntity, rightEntity, edgeCounter++);
         edges.push({

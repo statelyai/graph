@@ -27,6 +27,8 @@ import {
   fromMermaidMindmap, toMermaidMindmap, mermaidMindmapConverter,
   // Block diagram
   fromMermaidBlock, toMermaidBlock, mermaidBlockConverter,
+  // Ishikawa diagram
+  fromMermaidIshikawa, toMermaidIshikawa, mermaidIshikawaConverter,
 } from '@statelyai/graph/mermaid';
 ```
 
@@ -228,3 +230,25 @@ const mermaid = toMermaidBlock(graph);
 ```
 
 **Types:** `BlockNodeData` (span), `BlockEdgeData` (stroke, arrowType), `BlockGraphData` (columns)
+
+### Ishikawa Diagram
+
+Indentation-based cause hierarchy. The first node is the effect/problem; indented lines become cause nodes under the nearest less-indented parent.
+
+```ts
+const graph = fromMermaidIshikawa(`ishikawa-beta
+Blurry Photo
+    Process
+        Out of focus
+        Shutter speed too slow
+    User
+        Shaky hands
+`);
+// a graph containing:
+// nodes: - Blurry Photo - Process - Out of focus - Shutter speed too slow - User - Shaky hands
+// edges: - (Blurry Photo -> Process) - (Process -> Out of focus) - (Process -> Shutter speed too slow) - (Blurry Photo -> User) - (User -> Shaky hands)
+
+const mermaid = toMermaidIshikawa(graph);
+```
+
+**Types:** `IshikawaNodeData` (kind), `IshikawaEdgeData`, `IshikawaGraphData`

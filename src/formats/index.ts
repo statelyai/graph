@@ -74,6 +74,10 @@ export {
   fromMermaidBlock,
   toMermaidBlock,
   mermaidBlockConverter,
+  // Ishikawa diagram
+  fromMermaidIshikawa,
+  toMermaidIshikawa,
+  mermaidIshikawaConverter,
 } from './mermaid';
 export type {
   SequenceNodeData,
@@ -98,4 +102,7 @@ export type {
   BlockNodeData,
   BlockEdgeData,
   BlockGraphData,
+  IshikawaNodeData,
+  IshikawaEdgeData,
+  IshikawaGraphData,
 } from './mermaid';

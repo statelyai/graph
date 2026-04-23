@@ -89,3 +89,16 @@ export type {
   BlockEdgeData,
   BlockGraphData,
 } from './block';
+
+// Ishikawa diagram
+export {
+  fromMermaidIshikawa,
+  toMermaidIshikawa,
+  mermaidIshikawaConverter,
+} from './ishikawa';
+export type {
+  MermaidIshikawaGraph,
+  IshikawaNodeData,
+  IshikawaEdgeData,
+  IshikawaGraphData,
+} from './ishikawa';
