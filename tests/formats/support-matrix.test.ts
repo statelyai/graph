@@ -50,4 +50,10 @@ describe('format support matrix', () => {
     expect(state?.features.roundTrip).toBe('partial');
     expect(state?.notes.join('\n')).toContain('notes');
   });
+
+  it('marks structured adapters with full port fidelity', () => {
+    for (const id of ['cytoscape', 'd3', 'gexf', 'gml', 'graphml', 'jgf']) {
+      expect(getFormatSupportEntry(id)?.features.ports).toBe('full');
+    }
+  });
 });

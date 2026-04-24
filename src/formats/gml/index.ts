@@ -48,6 +48,9 @@ export function toGML(graph: Graph): string {
       lines.push(`${indent}  initialNodeId ${gmlString(node.initialNodeId)}`);
     if (node.data !== undefined)
       lines.push(`${indent}  data ${gmlString(JSON.stringify(node.data))}`);
+    if (node.ports !== undefined) {
+      lines.push(`${indent}  ports ${gmlString(JSON.stringify(node.ports))}`);
+    }
     if (node.shape) lines.push(`${indent}  shape ${gmlString(node.shape)}`);
     if (node.color) lines.push(`${indent}  color ${gmlString(node.color)}`);
     if (
@@ -88,6 +91,12 @@ export function toGML(graph: Graph): string {
     if (edge.label) lines.push(`    label ${gmlString(edge.label)}`);
     if (edge.data !== undefined)
       lines.push(`    data ${gmlString(JSON.stringify(edge.data))}`);
+    if (edge.sourcePort !== undefined) {
+      lines.push(`    sourcePort ${gmlString(edge.sourcePort)}`);
+    }
+    if (edge.targetPort !== undefined) {
+      lines.push(`    targetPort ${gmlString(edge.targetPort)}`);
+    }
     if (edge.color) lines.push(`    color ${gmlString(edge.color)}`);
     lines.push('  ]');
   }
@@ -153,6 +162,7 @@ export function fromGML(gml: string): Graph {
         initialNodeId: n['initialNodeId'] ?? null,
         label: n['label'] ?? '',
         data: n['data'] !== undefined ? tryParseJSON(n['data']) : undefined,
+        ...(n['ports'] !== undefined && { ports: tryParseJSON(n['ports']) }),
         ...(n['shape'] && { shape: n['shape'] }),
         ...(n['color'] && { color: n['color'] }),
         ...(gfx?.x !== undefined && { x: gfx.x }),
@@ -177,6 +187,12 @@ export function fromGML(gml: string): Graph {
       targetId: String(e['target'] ?? ''),
       label: e['label'] ?? '',
       data: e['data'] !== undefined ? tryParseJSON(e['data']) : undefined,
+      ...(e['sourcePort'] !== undefined && {
+        sourcePort: String(e['sourcePort']),
+      }),
+      ...(e['targetPort'] !== undefined && {
+        targetPort: String(e['targetPort']),
+      }),
       ...(e['color'] && { color: e['color'] }),
     });
   }

@@ -48,6 +48,7 @@ export function toD3Graph(graph: Graph): D3Graph {
       if (n.y !== undefined) node.y = n.y;
       if (n.color) node.color = n.color;
       if (n.shape) node.shape = n.shape;
+      if (n.ports !== undefined) node.ports = n.ports;
       return node;
     }),
     links: graph.edges.map((e) => {
@@ -59,6 +60,8 @@ export function toD3Graph(graph: Graph): D3Graph {
       if (e.label) link.label = e.label;
       if (e.data !== undefined) link.data = e.data;
       if (e.color) link.color = e.color;
+      if (e.sourcePort !== undefined) link.sourcePort = e.sourcePort;
+      if (e.targetPort !== undefined) link.targetPort = e.targetPort;
       return link;
     }),
   };
@@ -103,6 +106,7 @@ export function fromD3Graph(d3: D3Graph): Graph {
       ...(n.y !== undefined && { y: n.y }),
       ...(n.color && { color: n.color }),
       ...(n.shape && { shape: n.shape }),
+      ...(n.ports !== undefined && { ports: n.ports }),
     })),
     edges: d3.links.map((l, i) => ({
       type: 'edge' as const,
@@ -112,6 +116,8 @@ export function fromD3Graph(d3: D3Graph): Graph {
       label: l.label ?? '',
       data: l.data,
       ...(l.color && { color: l.color }),
+      ...(l.sourcePort !== undefined && { sourcePort: l.sourcePort }),
+      ...(l.targetPort !== undefined && { targetPort: l.targetPort }),
     })),
   };
 }

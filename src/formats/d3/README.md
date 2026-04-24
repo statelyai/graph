@@ -56,6 +56,10 @@ const imported = fromD3Graph({
 
 Handles D3's mutated link objects where `source`/`target` may be node objects (after simulation) or strings.
 
+<!-- D3 fidelity notes derived from src/formats/d3/index.ts -->
+
+Also preserves `ports`, `sourcePort`, and `targetPort` through the loose `{ nodes, links }` object shape.
+
 ### `d3Converter`
 
 Pre-built `GraphFormatConverter<D3Graph>`:

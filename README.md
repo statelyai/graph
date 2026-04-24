@@ -139,6 +139,30 @@ getPorts(graph, 'fetch'); // [{ name: 'result', ... }]
 getEdgesByPort(graph, 'render', 'input'); // [e1]
 ```
 
+## Schema Validation
+
+<!-- validation helpers exported from src/schemas.ts -->
+
+Use the `@statelyai/graph/schemas` subpath when you want runtime validation or JSON Schema generation.
+
+```ts
+import {
+  GraphSchema,
+  getGraphIssues,
+  isGraph,
+} from '@statelyai/graph/schemas';
+
+const unknownValue: unknown = JSON.parse(input);
+
+if (isGraph(unknownValue)) {
+  // fully typed Graph
+} else {
+  console.error(getGraphIssues(unknownValue));
+}
+
+const parsed = GraphSchema.parse(unknownValue);
+```
+
 ## Algorithms
 
 <!-- algorithm functions exported from src/algorithms.ts -->
@@ -223,6 +247,33 @@ import { cytoscapeConverter } from '@statelyai/graph/cytoscape';
 const cyto = cytoscapeConverter.to(graph);
 const back = cytoscapeConverter.from(cyto);
 ```
+
+## Format Support
+
+<!-- format support matrix derived from src/formats/support.ts -->
+
+| Format | Hierarchy | Ports | Visual | Round-trip | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `adjacency-list` | none | none | none | partial | Connectivity only; edge metadata is lost. |
+| `cytoscape` | partial | full | partial | partial | Ports round-trip through element data. |
+| `d3` | none | full | partial | partial | Ports round-trip through node/link objects. |
+| `dot` | partial | partial | partial | partial | `:port:compass` mapping is incomplete. |
+| `edge-list` | none | none | none | partial | Endpoints only. |
+| `elk` | full | full | full | partial | Best for layout exchange. |
+| `gexf` | none | full | partial | partial | Ports round-trip via custom attributes. |
+| `gml` | none | full | partial | partial | Ports round-trip through JSON-stringified metadata. |
+| `graphml` | none | full | partial | partial | Ports round-trip through `<data>` fields. |
+| `jgf` | none | full | none | partial | Ports round-trip through metadata. |
+| `tgf` | none | none | none | partial | Minimal ids and labels only. |
+| `xyflow` | none | full | full | partial | Ports map directly to handles. |
+| `mermaid/block` | partial | none | partial | partial | Syntax-driven, not port-aware. |
+| `mermaid/class` | none | none | none | partial | Class syntax is stored conservatively. |
+| `mermaid/er` | none | none | none | partial | Focuses on entities and cardinality. |
+| `mermaid/flowchart` | partial | none | partial | partial | `linkStyle` indices are fragile. |
+| `mermaid/ishikawa` | full | none | none | partial | Preserves hierarchy, not fishbone layout. |
+| `mermaid/mindmap` | full | none | partial | partial | Icon syntax is not fully re-emitted. |
+| `mermaid/sequence` | partial | none | none | partial | Actor links and menu syntax are incomplete. |
+| `mermaid/state` | full | none | partial | partial | State notes are still lossy. |
 
 Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
 

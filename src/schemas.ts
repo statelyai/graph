@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { Graph, GraphEdge, GraphNode, GraphPort } from './types';
 
 const StyleSchema = z.record(z.string(), z.union([z.string(), z.number()]));
 const PortDirectionSchema = z.enum(['in', 'out', 'inout']);
@@ -60,3 +61,60 @@ export const GraphSchema = z.object({
   direction: z.enum(['up', 'down', 'left', 'right']).optional(),
   style: StyleSchema.optional(),
 });
+
+export interface GraphValidationIssue {
+  code: string;
+  message: string;
+  path: Array<string | number>;
+}
+
+function getValidationIssues<T>(
+  schema: z.ZodType<T>,
+  value: unknown,
+): GraphValidationIssue[] {
+  const result = schema.safeParse(value);
+
+  if (result.success) {
+    return [];
+  }
+
+  return result.error.issues.map((issue) => ({
+    code: issue.code,
+    message: issue.message,
+    path: issue.path.map((segment) =>
+      typeof segment === 'symbol' ? String(segment) : segment,
+    ),
+  }));
+}
+
+export function isGraphPort(value: unknown): value is GraphPort {
+  return PortSchema.safeParse(value).success;
+}
+
+export function isGraphNode(value: unknown): value is GraphNode {
+  return NodeSchema.safeParse(value).success;
+}
+
+export function isGraphEdge(value: unknown): value is GraphEdge {
+  return EdgeSchema.safeParse(value).success;
+}
+
+export function isGraph(value: unknown): value is Graph {
+  return GraphSchema.safeParse(value).success;
+}
+
+export function getGraphPortIssues(value: unknown): GraphValidationIssue[] {
+  return getValidationIssues(PortSchema, value);
+}
+
+export function getGraphNodeIssues(value: unknown): GraphValidationIssue[] {
+  return getValidationIssues(NodeSchema, value);
+}
+
+export function getGraphEdgeIssues(value: unknown): GraphValidationIssue[] {
+  return getValidationIssues(EdgeSchema, value);
+}
+
+export function getGraphIssues(value: unknown): GraphValidationIssue[] {
+  return getValidationIssues(GraphSchema, value);
+}

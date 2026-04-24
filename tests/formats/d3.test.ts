@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toD3Graph, fromD3Graph } from '../../src/formats/d3';
 import type { Graph } from '../../src/types';
+import { getFullyFeaturedGraphFixture } from '../fixtures';
 
 const sampleGraph: Graph = {
   id: 'test',
@@ -63,5 +64,16 @@ describe('D3.js JSON', () => {
     const graph = fromD3Graph({ nodes: [], links: [] });
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
+  });
+
+  it('round-trips ports and edge port references', () => {
+    const graph = getFullyFeaturedGraphFixture();
+    const parsed = fromD3Graph(toD3Graph(graph));
+
+    expect(parsed.nodes.find((n) => n.id === 'child-a')?.ports).toEqual(
+      graph.nodes.find((n) => n.id === 'child-a')?.ports,
+    );
+    expect(parsed.edges.find((e) => e.id === 'e1')?.sourcePort).toBe('out');
+    expect(parsed.edges.find((e) => e.id === 'e1')?.targetPort).toBe('in');
   });
 });

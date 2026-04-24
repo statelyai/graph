@@ -29,7 +29,9 @@ async function main(): Promise<void> {
   const tempDir = await mkdtemp(join(tmpdir(), 'statelyai-graph-smoke-'));
   const consumerDir = join(tempDir, 'consumer');
   const coreCheckPath = join(consumerDir, 'check-core.mjs');
+  const coreTypesPath = join(consumerDir, 'check-core.ts');
   const optionalCheckPath = join(consumerDir, 'check-optional.mjs');
+  const optionalTypesPath = join(consumerDir, 'check-optional.ts');
 
   try {
     await mkdir(consumerDir, { recursive: true });
@@ -47,6 +49,10 @@ async function main(): Promise<void> {
     );
 
     execFileSync('pnpm', ['add', '--ignore-workspace', tarballPath], {
+      cwd: consumerDir,
+      stdio: 'inherit',
+    });
+    execFileSync('pnpm', ['add', '--ignore-workspace', '--save-dev', 'typescript'], {
       cwd: consumerDir,
       stdio: 'inherit',
     });
@@ -117,6 +123,53 @@ assert.match(flowchart, /flowchart/i);
       stdio: 'inherit',
     });
 
+    await writeFile(
+      coreTypesPath,
+      `
+import { createGraph, type Graph } from '@statelyai/graph';
+import { getTopologicalSort } from '@statelyai/graph/algorithms';
+import { getFormatSupportEntry } from '@statelyai/graph/format-support';
+import { getNeighbors } from '@statelyai/graph/queries';
+
+const graph: Graph = createGraph({
+  nodes: [{ id: 'a' }, { id: 'b' }],
+  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+});
+
+const topo = getTopologicalSort(graph);
+const support = getFormatSupportEntry('graphml');
+const neighbors = getNeighbors(graph, 'a');
+
+if (topo && support && neighbors.length > 0) {
+  topo[0]?.id;
+  support.features.ports;
+  neighbors[0]?.id;
+}
+      `.trimStart(),
+    );
+
+    execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'tsc',
+        '--noEmit',
+        '--moduleResolution',
+        'bundler',
+        '--module',
+        'preserve',
+        '--target',
+        'esnext',
+        '--strict',
+        '--skipLibCheck',
+        coreTypesPath,
+      ],
+      {
+        cwd: consumerDir,
+        stdio: 'inherit',
+      },
+    );
+
     execFileSync(
       'pnpm',
       ['add', '--ignore-workspace', 'dotparser', 'fast-xml-parser', 'zod'],
@@ -134,7 +187,7 @@ import { createGraph } from '@statelyai/graph';
 import { toDOT, fromDOT } from '@statelyai/graph/dot';
 import { toGEXF, fromGEXF } from '@statelyai/graph/gexf';
 import { toGraphML, fromGraphML } from '@statelyai/graph/graphml';
-import { GraphSchema } from '@statelyai/graph/schemas';
+import { GraphSchema, getGraphIssues, isGraph } from '@statelyai/graph/schemas';
 
 const graph = createGraph({
   id: 'optional',
@@ -146,6 +199,8 @@ assert.equal(fromDOT(toDOT(graph)).edges.length, 1);
 assert.equal(fromGEXF(toGEXF(graph)).edges.length, 1);
 assert.equal(fromGraphML(toGraphML(graph)).edges.length, 1);
 assert.equal(GraphSchema.safeParse(graph).success, true);
+assert.equal(isGraph(graph), true);
+assert.deepEqual(getGraphIssues(graph), []);
       `.trimStart(),
     );
 
@@ -153,6 +208,50 @@ assert.equal(GraphSchema.safeParse(graph).success, true);
       cwd: consumerDir,
       stdio: 'inherit',
     });
+
+    await writeFile(
+      optionalTypesPath,
+      `
+import { createGraph } from '@statelyai/graph';
+import { fromDOT, toDOT } from '@statelyai/graph/dot';
+import { getGraphIssues, isGraph, type GraphValidationIssue } from '@statelyai/graph/schemas';
+
+const graph = createGraph({
+  nodes: [{ id: 'a' }, { id: 'b' }],
+  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+});
+
+const dot = toDOT(graph);
+const issues: GraphValidationIssue[] = getGraphIssues(graph);
+const parsed = fromDOT(dot);
+
+if (isGraph(parsed) && issues.length === 0) {
+  parsed.edges[0]?.id;
+}
+      `.trimStart(),
+    );
+
+    execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'tsc',
+        '--noEmit',
+        '--moduleResolution',
+        'bundler',
+        '--module',
+        'preserve',
+        '--target',
+        'esnext',
+        '--strict',
+        '--skipLibCheck',
+        optionalTypesPath,
+      ],
+      {
+        cwd: consumerDir,
+        stdio: 'inherit',
+      },
+    );
 
     console.log('Package smoke test passed');
   } finally {

@@ -62,7 +62,9 @@ const imported = fromCytoscapeJSON({
 // edges: - e0 (sensor -> controller) - e1 (controller -> actuator)
 ```
 
-Preserves: `parentId` (as `parent`), position (`x`/`y`), `shape`, `color`, `width`, `height`, `label`, node/edge `data`, graph `direction`.
+<!-- Cytoscape fidelity notes derived from src/formats/cytoscape/index.ts -->
+
+Preserves: `parentId` (as `parent`), position (`x`/`y`), `shape`, `color`, `width`, `height`, `label`, `ports`, `sourcePort`, `targetPort`, node/edge `data`, graph `direction`.
 
 ### `cytoscapeConverter`
 

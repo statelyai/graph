@@ -2,7 +2,19 @@ import { describe, it, expect, expectTypeOf } from 'vitest';
 import * as z from 'zod';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { GraphSchema, NodeSchema, EdgeSchema } from '../src/schemas';
+import {
+  GraphSchema,
+  NodeSchema,
+  EdgeSchema,
+  getGraphEdgeIssues,
+  getGraphIssues,
+  getGraphNodeIssues,
+  getGraphPortIssues,
+  isGraph,
+  isGraphEdge,
+  isGraphNode,
+  isGraphPort,
+} from '../src/schemas';
 import { createGraph } from '../src/graph';
 import type { GraphNode, GraphEdge, Graph } from '../src/types';
 import { getFullyFeaturedGraphFixture } from './fixtures';
@@ -128,5 +140,55 @@ describe('Zod schemas', () => {
     expect(nodeJsonSchema.properties).toHaveProperty('ports');
     expect(edgeJsonSchema.properties).toHaveProperty('sourcePort');
     expect(edgeJsonSchema.properties).toHaveProperty('targetPort');
+  });
+
+  it('exposes non-Zod validation helpers', () => {
+    const graph = getFullyFeaturedGraphFixture();
+
+    expect(isGraph(graph)).toBe(true);
+    expect(isGraphNode(graph.nodes[1])).toBe(true);
+    expect(isGraphEdge(graph.edges[0])).toBe(true);
+    expect(isGraphPort(graph.nodes[1].ports?.[0])).toBe(true);
+    expect(getGraphIssues(graph)).toEqual([]);
+  });
+
+  it('reports simplified validation issues', () => {
+    expect(getGraphIssues({ id: 'g' })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['type'],
+        }),
+        expect.objectContaining({
+          path: ['nodes'],
+        }),
+        expect.objectContaining({
+          path: ['edges'],
+        }),
+      ]),
+    );
+    expect(getGraphNodeIssues({ type: 'node' })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['id'],
+        }),
+      ]),
+    );
+    expect(getGraphEdgeIssues({ type: 'edge', id: 'e1' })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['sourceId'],
+        }),
+        expect.objectContaining({
+          path: ['targetId'],
+        }),
+      ]),
+    );
+    expect(getGraphPortIssues({})).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['name'],
+        }),
+      ]),
+    );
   });
 });

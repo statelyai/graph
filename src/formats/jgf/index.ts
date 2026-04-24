@@ -68,6 +68,7 @@ export function toJGF(graph: Graph): JGFGraph {
         if (n.height !== undefined) meta.height = n.height;
         if (n.shape) meta.shape = n.shape;
         if (n.color) meta.color = n.color;
+        if (n.ports !== undefined) meta.ports = n.ports;
         return {
           id: n.id,
           ...(n.label && { label: n.label }),
@@ -78,6 +79,8 @@ export function toJGF(graph: Graph): JGFGraph {
         const meta: Record<string, any> = {};
         if (e.data !== undefined) meta.data = e.data;
         if (e.color) meta.color = e.color;
+        if (e.sourcePort !== undefined) meta.sourcePort = e.sourcePort;
+        if (e.targetPort !== undefined) meta.targetPort = e.targetPort;
         return {
           id: e.id,
           source: e.sourceId,
@@ -139,6 +142,7 @@ export function fromJGF(jgf: JGFGraph): Graph {
       ...(n.metadata?.height !== undefined && { height: n.metadata.height }),
       ...(n.metadata?.shape && { shape: n.metadata.shape }),
       ...(n.metadata?.color && { color: n.metadata.color }),
+      ...(n.metadata?.ports !== undefined && { ports: n.metadata.ports }),
     })),
     edges: g.edges.map((e, i) => ({
       type: 'edge' as const,
@@ -148,6 +152,12 @@ export function fromJGF(jgf: JGFGraph): Graph {
       label: e.label ?? '',
       data: e.metadata?.data,
       ...(e.metadata?.color && { color: e.metadata.color }),
+      ...(e.metadata?.sourcePort !== undefined && {
+        sourcePort: e.metadata.sourcePort,
+      }),
+      ...(e.metadata?.targetPort !== undefined && {
+        targetPort: e.metadata.targetPort,
+      }),
     })),
   };
 }

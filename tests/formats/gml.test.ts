@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toGML, fromGML } from '../../src/formats/gml';
 import type { Graph } from '../../src/types';
+import { getFullyFeaturedGraphFixture } from '../fixtures';
 
 const sampleGraph: Graph = {
   id: 'test',
@@ -116,5 +117,16 @@ graph [
     const graph = fromGML(gml);
     expect(graph.nodes).toHaveLength(1);
     expect(graph.nodes[0].label).toBe('A');
+  });
+
+  it('round-trips ports and edge port references', () => {
+    const graph = getFullyFeaturedGraphFixture();
+    const parsed = fromGML(toGML(graph));
+
+    expect(parsed.nodes.find((n) => n.id === 'child-a')?.ports).toEqual(
+      graph.nodes.find((n) => n.id === 'child-a')?.ports,
+    );
+    expect(parsed.edges.find((e) => e.id === 'e1')?.sourcePort).toBe('out');
+    expect(parsed.edges.find((e) => e.id === 'e1')?.targetPort).toBe('in');
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toCytoscapeJSON, fromCytoscapeJSON } from '../../src/formats/cytoscape';
 import type { Graph } from '../../src/types';
+import { getFullyFeaturedGraphFixture } from '../fixtures';
 
 const sampleGraph: Graph = {
   id: 'test',
@@ -70,5 +71,16 @@ describe('Cytoscape.js JSON', () => {
     const graph = fromCytoscapeJSON({ elements: { nodes: [], edges: [] } });
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
+  });
+
+  it('round-trips ports and edge port references', () => {
+    const graph = getFullyFeaturedGraphFixture();
+    const parsed = fromCytoscapeJSON(toCytoscapeJSON(graph));
+
+    expect(parsed.nodes.find((n) => n.id === 'child-a')?.ports).toEqual(
+      graph.nodes.find((n) => n.id === 'child-a')?.ports,
+    );
+    expect(parsed.edges.find((e) => e.id === 'e1')?.sourcePort).toBe('out');
+    expect(parsed.edges.find((e) => e.id === 'e1')?.targetPort).toBe('in');
   });
 });

@@ -65,7 +65,9 @@ const imported = fromGML(`graph [
 
 ### `toGML(graph): string`
 
-Preserves: `label`, `data` (JSON-stringified), `shape`, `color`, visual properties in `graphics [x, y, w, h]` blocks. Compound graphs use nested `node [ ... node [ ] ]` blocks.
+<!-- GML fidelity notes derived from src/formats/gml/index.ts -->
+
+Preserves: `label`, `data` (JSON-stringified), `ports` (JSON-stringified), `sourcePort`, `targetPort`, `shape`, `color`, and visual properties in `graphics [x, y, w, h]` blocks. Compound graphs use nested `node [ ... node [ ] ]` blocks.
 
 ### `fromGML(gml): string`
 

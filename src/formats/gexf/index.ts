@@ -11,10 +11,13 @@ export function toGEXF(graph: Graph): string {
     { '@_id': 'a_initialNodeId', '@_title': 'initialNodeId', '@_type': 'string' },
     { '@_id': 'a_data', '@_title': 'data', '@_type': 'string' },
     { '@_id': 'a_shape', '@_title': 'shape', '@_type': 'string' },
+    { '@_id': 'a_ports', '@_title': 'ports', '@_type': 'string' },
   ];
 
   const edgeAttrs = [
     { '@_id': 'a_edgeData', '@_title': 'data', '@_type': 'string' },
+    { '@_id': 'a_sourcePort', '@_title': 'sourcePort', '@_type': 'string' },
+    { '@_id': 'a_targetPort', '@_title': 'targetPort', '@_type': 'string' },
   ];
 
   const nodes = graph.nodes.map((n) => {
@@ -33,6 +36,12 @@ export function toGEXF(graph: Graph): string {
       });
     if (n.shape)
       attvalues.push({ '@_for': 'a_shape', '@_value': n.shape });
+    if (n.ports !== undefined) {
+      attvalues.push({
+        '@_for': 'a_ports',
+        '@_value': JSON.stringify(n.ports),
+      });
+    }
 
     const node: any = {
       '@_id': n.id,
@@ -74,10 +83,24 @@ export function toGEXF(graph: Graph): string {
     if (e.label) edge['@_label'] = e.label;
     if (e.data !== undefined) {
       edge.attvalues = {
-        attvalue: [
-          { '@_for': 'a_edgeData', '@_value': JSON.stringify(e.data) },
-        ],
+        attvalue: [{ '@_for': 'a_edgeData', '@_value': JSON.stringify(e.data) }],
       };
+    }
+    const edgeAttvalues = edge.attvalues?.attvalue ?? [];
+    if (e.sourcePort !== undefined) {
+      edgeAttvalues.push({
+        '@_for': 'a_sourcePort',
+        '@_value': e.sourcePort,
+      });
+    }
+    if (e.targetPort !== undefined) {
+      edgeAttvalues.push({
+        '@_for': 'a_targetPort',
+        '@_value': e.targetPort,
+      });
+    }
+    if (edgeAttvalues.length > 0) {
+      edge.attvalues = { attvalue: edgeAttvalues };
     }
     if (e.color) {
       const hex = e.color.replace('#', '');
@@ -194,6 +217,9 @@ export function fromGEXF(xml: string): Graph {
             : undefined,
       };
       if (attvals['shape']) (node as any).shape = attvals['shape'];
+      if (attvals['ports'] !== undefined) {
+        node.ports = tryParseJSON(attvals['ports']);
+      }
 
       // Viz properties
       const pos = n['viz:position'];
@@ -241,6 +267,12 @@ export function fromGEXF(xml: string): Graph {
         attvals['data'] !== undefined
           ? tryParseJSON(attvals['data'])
           : undefined,
+      ...(attvals['sourcePort'] !== undefined && {
+        sourcePort: attvals['sourcePort'],
+      }),
+      ...(attvals['targetPort'] !== undefined && {
+        targetPort: attvals['targetPort'],
+      }),
     };
     const color = e['viz:color'];
     if (color) {

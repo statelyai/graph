@@ -61,11 +61,14 @@ const imported = fromGEXF(`<?xml version="1.0" encoding="UTF-8"?>
 
 ### `toGEXF(graph): string`
 
+<!-- GEXF fidelity notes derived from src/formats/gexf/index.ts -->
+
 Produces GEXF 1.3 XML with:
 - Node/edge attributes via `<attvalues>`
 - Hierarchy via `pid` attribute
 - Visual properties via `viz:color`, `viz:position`, `viz:size`
-- JSON-serialized `data` in attribute values
+- JSON-serialized node `data` and `ports` in attribute values
+- Edge `sourcePort` and `targetPort` stored as custom attributes
 
 ### `fromGEXF(xml): Graph`
 
@@ -73,7 +76,7 @@ Parses:
 - `<attributes>` declarations and `<attvalues>` on nodes/edges
 - `@pid` and nested `<nodes>` for hierarchy
 - `viz:color`, `viz:position`, `viz:size`
-- JSON-encoded data fields
+- JSON-encoded `data` and `ports` fields
 
 ### `gexfConverter`
 

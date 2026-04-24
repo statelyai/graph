@@ -61,6 +61,7 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
         if (n.height !== undefined) data.height = n.height;
         if (n.shape) data.shape = n.shape;
         if (n.color) data.color = n.color;
+        if (n.ports !== undefined) data.ports = n.ports;
 
         const node: CytoscapeNode = { data };
         if (n.x !== undefined && n.y !== undefined) {
@@ -77,6 +78,8 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
         if (e.label) data.label = e.label;
         if (e.data !== undefined) data.edgeData = e.data;
         if (e.color) data.color = e.color;
+        if (e.sourcePort !== undefined) data.sourcePort = e.sourcePort;
+        if (e.targetPort !== undefined) data.targetPort = e.targetPort;
         return { data } as CytoscapeEdge;
       }),
     },
@@ -129,6 +132,7 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
       ...(n.data.height !== undefined && { height: n.data.height }),
       ...(n.data.shape && { shape: n.data.shape }),
       ...(n.data.color && { color: n.data.color }),
+      ...(n.data.ports !== undefined && { ports: n.data.ports }),
     })),
     edges: cyto.elements.edges.map((e, i) => ({
       type: 'edge' as const,
@@ -138,6 +142,8 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
       label: e.data.label ?? '',
       data: e.data.edgeData,
       ...(e.data.color && { color: e.data.color }),
+      ...(e.data.sourcePort !== undefined && { sourcePort: e.data.sourcePort }),
+      ...(e.data.targetPort !== undefined && { targetPort: e.data.targetPort }),
     })),
   };
 }

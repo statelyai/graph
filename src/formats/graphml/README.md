@@ -60,14 +60,16 @@ const imported = fromGraphML(`<?xml version="1.0" encoding="UTF-8"?>
 
 ### `toGraphML(graph): string`
 
+<!-- GraphML fidelity notes derived from src/formats/graphml/index.ts -->
+
 Produces GraphML XML with:
-- `<key>` declarations for label, parentId, data, x, y, width, height, shape, color
+- `<key>` declarations for label, parentId, initialNodeId, data, style, x, y, width, height, shape, color, weight, ports, sourcePort, and targetPort
 - `<data>` elements on nodes, edges, and the graph
-- JSON-serialized `data` fields
+- JSON-serialized `data`, `style`, and `ports` fields
 
 ### `fromGraphML(xml): Graph`
 
-Parses `<key>` declarations and `<data>` elements. JSON-encoded data fields are auto-parsed.
+Parses `<key>` declarations and `<data>` elements. JSON-encoded `data`, `style`, and `ports` fields are auto-parsed.
 
 ### `graphmlConverter`
 
