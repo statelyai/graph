@@ -270,15 +270,15 @@ const back = cytoscapeConverter.from(cyto);
 | Format              | Hierarchy | Ports   | Visual  | Round-trip | Notes                                                                      |
 | ------------------- | --------- | ------- | ------- | ---------- | -------------------------------------------------------------------------- |
 | `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                  |
-| `cytoscape`         | full      | full    | partial | partial    | Ports round-trip through element data.                                     |
-| `d3`                | none      | full    | partial | partial    | Ports round-trip through node/link objects.                                |
+| `cytoscape`         | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through element data.            |
+| `d3`                | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through the loose JSON shape.    |
 | `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete. |
 | `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                            |
 | `elk`               | full      | full    | full    | partial    | Best for layout exchange.                                                  |
-| `gexf`              | full      | full    | partial | partial    | Ports round-trip via custom attributes.                                    |
-| `gml`               | full      | full    | partial | partial    | Ports round-trip through JSON-stringified metadata.                        |
+| `gexf`              | full      | full    | full    | full       | Custom attributes preserve metadata beyond the standard viz module.        |
+| `gml`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through direct and JSON fields.  |
 | `graphml`           | full      | full    | partial | partial    | Ports round-trip through `<data>` fields.                                  |
-| `jgf`               | full      | full    | none    | partial    | Ports round-trip through metadata.                                         |
+| `jgf`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through `metadata` objects.      |
 | `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                               |
 | `xyflow`            | none      | full    | full    | partial    | Ports map directly to handles.                                             |
 | `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                             |

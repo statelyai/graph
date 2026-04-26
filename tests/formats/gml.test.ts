@@ -121,6 +121,7 @@ graph [
 
   it('round-trips ports and edge port references', () => {
     expectFixtureRoundTrip((graph) => fromGML(toGML(graph)), {
+      graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
       nodeKeys: [
         'parentId',
         'initialNodeId',
@@ -132,9 +133,22 @@ graph [
         'height',
         'shape',
         'color',
+        'style',
         'ports',
       ],
-      edgeKeys: ['label', 'data', 'color', 'sourcePort', 'targetPort'],
+      edgeKeys: [
+        'label',
+        'weight',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'color',
+        'style',
+        'sourcePort',
+        'targetPort',
+      ],
     });
   });
 });

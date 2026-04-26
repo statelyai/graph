@@ -62,4 +62,10 @@ describe('format support matrix', () => {
       expect(getFormatSupportEntry(id)?.features.hierarchy).toBe('full');
     }
   });
+
+  it('marks lossless metadata adapters as full round-trip', () => {
+    for (const id of ['cytoscape', 'd3', 'gexf', 'gml', 'jgf']) {
+      expect(getFormatSupportEntry(id)?.features.roundTrip).toBe('full');
+    }
+  });
 });

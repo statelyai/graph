@@ -31,6 +31,8 @@ describe('D3.js JSON', () => {
     const d3 = toD3Graph(sampleGraph);
     const parsed = fromD3Graph(d3);
 
+    expect(parsed.id).toBe('test');
+    expect(parsed.type).toBe('directed');
     expect(parsed.nodes).toHaveLength(2);
     expect(parsed.edges).toHaveLength(1);
     expect(parsed.edges[0].sourceId).toBe('a');
@@ -68,9 +70,34 @@ describe('D3.js JSON', () => {
 
   it('round-trips ports and edge port references', () => {
     expectFixtureRoundTrip((graph) => fromD3Graph(toD3Graph(graph)), {
-      includeGraphIdentity: false,
-      nodeKeys: ['label', 'data', 'x', 'y', 'shape', 'color', 'ports'],
-      edgeKeys: ['label', 'data', 'color', 'sourcePort', 'targetPort'],
+      graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
+      nodeKeys: [
+        'parentId',
+        'initialNodeId',
+        'label',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'shape',
+        'color',
+        'style',
+        'ports',
+      ],
+      edgeKeys: [
+        'label',
+        'weight',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'color',
+        'style',
+        'sourcePort',
+        'targetPort',
+      ],
     });
   });
 });

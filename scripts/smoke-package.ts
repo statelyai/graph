@@ -452,6 +452,21 @@ async function main(): Promise<void> {
       stdio: 'inherit',
     });
 
+    const installedPackageDir = join(
+      consumerDir,
+      'node_modules',
+      '@statelyai',
+      'graph',
+    );
+    const schemaFiles = ['graph.schema.json', 'node.schema.json', 'edge.schema.json'];
+    for (const schemaFile of schemaFiles) {
+      const schemaText = await readFile(
+        join(installedPackageDir, 'schemas', schemaFile),
+        'utf8',
+      );
+      JSON.parse(schemaText);
+    }
+
     await writeFile(
       optionalTypesPath,
       buildTypeCheckScript(optionalExportKeys, exportChecks),

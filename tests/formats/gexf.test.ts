@@ -111,11 +111,25 @@ describe('GEXF', () => {
         'x',
         'y',
         'width',
+        'height',
         'shape',
         'color',
+        'style',
         'ports',
       ],
-      edgeKeys: ['label', 'data', 'color', 'sourcePort', 'targetPort'],
+      edgeKeys: [
+        'label',
+        'weight',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'color',
+        'style',
+        'sourcePort',
+        'targetPort',
+      ],
     });
   });
 });

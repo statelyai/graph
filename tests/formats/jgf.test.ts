@@ -84,7 +84,7 @@ describe('JGF', () => {
 
   it('round-trips ports and edge port references', () => {
     expectFixtureRoundTrip((graph) => fromJGF(toJGF(graph)), {
-      graphKeys: ['initialNodeId', 'data', 'direction'],
+      graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
       nodeKeys: [
         'parentId',
         'initialNodeId',
@@ -96,9 +96,22 @@ describe('JGF', () => {
         'height',
         'shape',
         'color',
+        'style',
         'ports',
       ],
-      edgeKeys: ['label', 'data', 'color', 'sourcePort', 'targetPort'],
+      edgeKeys: [
+        'label',
+        'weight',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'color',
+        'style',
+        'sourcePort',
+        'targetPort',
+      ],
     });
   });
 });

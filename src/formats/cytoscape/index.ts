@@ -47,6 +47,7 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
     graphData.initialNodeId = graph.initialNodeId;
   if (graph.data !== undefined) graphData.graphData = graph.data;
   if (graph.direction) graphData.direction = graph.direction;
+  if (graph.style !== undefined) graphData.style = graph.style;
 
   return {
     ...(Object.keys(graphData).length > 0 && { data: graphData }),
@@ -61,6 +62,7 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
         if (n.height !== undefined) data.height = n.height;
         if (n.shape) data.shape = n.shape;
         if (n.color) data.color = n.color;
+        if (n.style !== undefined) data.style = n.style;
         if (n.ports !== undefined) data.ports = n.ports;
 
         const node: CytoscapeNode = { data };
@@ -77,7 +79,13 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
         };
         if (e.label) data.label = e.label;
         if (e.data !== undefined) data.edgeData = e.data;
+        if (e.weight !== undefined) data.weight = e.weight;
+        if (e.x !== undefined) data.x = e.x;
+        if (e.y !== undefined) data.y = e.y;
+        if (e.width !== undefined) data.width = e.width;
+        if (e.height !== undefined) data.height = e.height;
         if (e.color) data.color = e.color;
+        if (e.style !== undefined) data.style = e.style;
         if (e.sourcePort !== undefined) data.sourcePort = e.sourcePort;
         if (e.targetPort !== undefined) data.targetPort = e.targetPort;
         return { data } as CytoscapeEdge;
@@ -120,6 +128,7 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
     initialNodeId: cyto.data?.initialNodeId ?? null,
     data: cyto.data?.graphData,
     ...(cyto.data?.direction && { direction: cyto.data.direction }),
+    ...(cyto.data?.style !== undefined && { style: cyto.data.style }),
     nodes: cyto.elements.nodes.map((n) => ({
       type: 'node' as const,
       id: n.data.id,
@@ -132,6 +141,7 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
       ...(n.data.height !== undefined && { height: n.data.height }),
       ...(n.data.shape && { shape: n.data.shape }),
       ...(n.data.color && { color: n.data.color }),
+      ...(n.data.style !== undefined && { style: n.data.style }),
       ...(n.data.ports !== undefined && { ports: n.data.ports }),
     })),
     edges: cyto.elements.edges.map((e, i) => ({
@@ -141,7 +151,13 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
       targetId: e.data.target,
       label: e.data.label ?? '',
       data: e.data.edgeData,
+      ...(e.data.weight !== undefined && { weight: e.data.weight }),
+      ...(e.data.x !== undefined && { x: e.data.x }),
+      ...(e.data.y !== undefined && { y: e.data.y }),
+      ...(e.data.width !== undefined && { width: e.data.width }),
+      ...(e.data.height !== undefined && { height: e.data.height }),
       ...(e.data.color && { color: e.data.color }),
+      ...(e.data.style !== undefined && { style: e.data.style }),
       ...(e.data.sourcePort !== undefined && { sourcePort: e.data.sourcePort }),
       ...(e.data.targetPort !== undefined && { targetPort: e.data.targetPort }),
     })),

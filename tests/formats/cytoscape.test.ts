@@ -75,7 +75,7 @@ describe('Cytoscape.js JSON', () => {
 
   it('round-trips ports and edge port references', () => {
     expectFixtureRoundTrip((graph) => fromCytoscapeJSON(toCytoscapeJSON(graph)), {
-      graphKeys: ['initialNodeId', 'data', 'direction'],
+      graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
       nodeKeys: [
         'parentId',
         'initialNodeId',
@@ -87,9 +87,22 @@ describe('Cytoscape.js JSON', () => {
         'height',
         'shape',
         'color',
+        'style',
         'ports',
       ],
-      edgeKeys: ['label', 'data', 'color', 'sourcePort', 'targetPort'],
+      edgeKeys: [
+        'label',
+        'weight',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'color',
+        'style',
+        'sourcePort',
+        'targetPort',
+      ],
     });
   });
 });

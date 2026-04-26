@@ -11,11 +11,20 @@ export function toGEXF(graph: Graph): string {
     { '@_id': 'a_initialNodeId', '@_title': 'initialNodeId', '@_type': 'string' },
     { '@_id': 'a_data', '@_title': 'data', '@_type': 'string' },
     { '@_id': 'a_shape', '@_title': 'shape', '@_type': 'string' },
+    { '@_id': 'a_width', '@_title': 'width', '@_type': 'double' },
+    { '@_id': 'a_height', '@_title': 'height', '@_type': 'double' },
+    { '@_id': 'a_style', '@_title': 'style', '@_type': 'string' },
     { '@_id': 'a_ports', '@_title': 'ports', '@_type': 'string' },
   ];
 
   const edgeAttrs = [
     { '@_id': 'a_edgeData', '@_title': 'data', '@_type': 'string' },
+    { '@_id': 'a_edgeWeight', '@_title': 'weight', '@_type': 'double' },
+    { '@_id': 'a_edgeX', '@_title': 'x', '@_type': 'double' },
+    { '@_id': 'a_edgeY', '@_title': 'y', '@_type': 'double' },
+    { '@_id': 'a_edgeWidth', '@_title': 'width', '@_type': 'double' },
+    { '@_id': 'a_edgeHeight', '@_title': 'height', '@_type': 'double' },
+    { '@_id': 'a_edgeStyle', '@_title': 'style', '@_type': 'string' },
     { '@_id': 'a_sourcePort', '@_title': 'sourcePort', '@_type': 'string' },
     { '@_id': 'a_targetPort', '@_title': 'targetPort', '@_type': 'string' },
   ];
@@ -36,6 +45,18 @@ export function toGEXF(graph: Graph): string {
       });
     if (n.shape)
       attvalues.push({ '@_for': 'a_shape', '@_value': n.shape });
+    if (n.width !== undefined) {
+      attvalues.push({ '@_for': 'a_width', '@_value': n.width });
+    }
+    if (n.height !== undefined) {
+      attvalues.push({ '@_for': 'a_height', '@_value': n.height });
+    }
+    if (n.style !== undefined) {
+      attvalues.push({
+        '@_for': 'a_style',
+        '@_value': JSON.stringify(n.style),
+      });
+    }
     if (n.ports !== undefined) {
       attvalues.push({
         '@_for': 'a_ports',
@@ -87,6 +108,27 @@ export function toGEXF(graph: Graph): string {
       };
     }
     const edgeAttvalues = edge.attvalues?.attvalue ?? [];
+    if (e.weight !== undefined) {
+      edgeAttvalues.push({ '@_for': 'a_edgeWeight', '@_value': e.weight });
+    }
+    if (e.x !== undefined) {
+      edgeAttvalues.push({ '@_for': 'a_edgeX', '@_value': e.x });
+    }
+    if (e.y !== undefined) {
+      edgeAttvalues.push({ '@_for': 'a_edgeY', '@_value': e.y });
+    }
+    if (e.width !== undefined) {
+      edgeAttvalues.push({ '@_for': 'a_edgeWidth', '@_value': e.width });
+    }
+    if (e.height !== undefined) {
+      edgeAttvalues.push({ '@_for': 'a_edgeHeight', '@_value': e.height });
+    }
+    if (e.style !== undefined) {
+      edgeAttvalues.push({
+        '@_for': 'a_edgeStyle',
+        '@_value': JSON.stringify(e.style),
+      });
+    }
     if (e.sourcePort !== undefined) {
       edgeAttvalues.push({
         '@_for': 'a_sourcePort',
@@ -128,6 +170,9 @@ export function toGEXF(graph: Graph): string {
         ...(graph.direction && { '@_direction': graph.direction }),
         ...(graph.data !== undefined && {
           '@_data': JSON.stringify(graph.data),
+        }),
+        ...(graph.style !== undefined && {
+          '@_style': JSON.stringify(graph.style),
         }),
         attributes: [
           { '@_class': 'node', attribute: nodeAttrs },
@@ -208,6 +253,9 @@ export function fromGEXF(xml: string): Graph {
             : undefined,
       };
       if (attvals['shape']) (node as any).shape = attvals['shape'];
+      if (attvals['style'] !== undefined) {
+        node.style = tryParseJSON(attvals['style']);
+      }
       if (attvals['ports'] !== undefined) {
         node.ports = tryParseJSON(attvals['ports']);
       }
@@ -222,6 +270,12 @@ export function fromGEXF(xml: string): Graph {
       if (size) {
         node.width = Number(size['@_value'] ?? 0);
         node.height = Number(size['@_value'] ?? 0);
+      }
+      if (attvals['width'] !== undefined) {
+        node.width = Number(attvals['width']);
+      }
+      if (attvals['height'] !== undefined) {
+        node.height = Number(attvals['height']);
       }
       const color = n['viz:color'];
       if (color) {
@@ -258,6 +312,20 @@ export function fromGEXF(xml: string): Graph {
         attvals['data'] !== undefined
           ? tryParseJSON(attvals['data'])
           : undefined,
+      ...(attvals['weight'] !== undefined && {
+        weight: Number(attvals['weight']),
+      }),
+      ...(attvals['x'] !== undefined && { x: Number(attvals['x']) }),
+      ...(attvals['y'] !== undefined && { y: Number(attvals['y']) }),
+      ...(attvals['width'] !== undefined && {
+        width: Number(attvals['width']),
+      }),
+      ...(attvals['height'] !== undefined && {
+        height: Number(attvals['height']),
+      }),
+      ...(attvals['style'] !== undefined && {
+        style: tryParseJSON(attvals['style']),
+      }),
       ...(attvals['sourcePort'] !== undefined && {
         sourcePort: attvals['sourcePort'],
       }),
@@ -286,6 +354,9 @@ export function fromGEXF(xml: string): Graph {
         ? tryParseJSON(String(graphEl['@_data']))
         : (undefined as any),
     ...(graphEl['@_direction'] && { direction: graphEl['@_direction'] }),
+    ...(graphEl['@_style'] !== undefined && {
+      style: tryParseJSON(String(graphEl['@_style'])),
+    }),
   };
 }
 

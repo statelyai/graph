@@ -30,6 +30,16 @@ export function toGML(graph: Graph): string {
   lines.push('graph [');
   lines.push(`  directed ${graph.type === 'directed' ? 1 : 0}`);
   if (graph.id) lines.push(`  id ${gmlString(graph.id)}`);
+  if (graph.initialNodeId) {
+    lines.push(`  initialNodeId ${gmlString(graph.initialNodeId)}`);
+  }
+  if (graph.data !== undefined) {
+    lines.push(`  data ${gmlString(JSON.stringify(graph.data))}`);
+  }
+  if (graph.direction) lines.push(`  direction ${gmlString(graph.direction)}`);
+  if (graph.style !== undefined) {
+    lines.push(`  style ${gmlString(JSON.stringify(graph.style))}`);
+  }
 
   // Build children map for hierarchical nesting
   const childrenMap = new Map<string | null, GraphNode[]>();
@@ -53,6 +63,9 @@ export function toGML(graph: Graph): string {
     }
     if (node.shape) lines.push(`${indent}  shape ${gmlString(node.shape)}`);
     if (node.color) lines.push(`${indent}  color ${gmlString(node.color)}`);
+    if (node.style !== undefined) {
+      lines.push(`${indent}  style ${gmlString(JSON.stringify(node.style))}`);
+    }
     if (
       node.x !== undefined ||
       node.y !== undefined ||
@@ -91,6 +104,7 @@ export function toGML(graph: Graph): string {
     if (edge.label) lines.push(`    label ${gmlString(edge.label)}`);
     if (edge.data !== undefined)
       lines.push(`    data ${gmlString(JSON.stringify(edge.data))}`);
+    if (edge.weight !== undefined) lines.push(`    weight ${edge.weight}`);
     if (edge.sourcePort !== undefined) {
       lines.push(`    sourcePort ${gmlString(edge.sourcePort)}`);
     }
@@ -98,6 +112,22 @@ export function toGML(graph: Graph): string {
       lines.push(`    targetPort ${gmlString(edge.targetPort)}`);
     }
     if (edge.color) lines.push(`    color ${gmlString(edge.color)}`);
+    if (edge.style !== undefined) {
+      lines.push(`    style ${gmlString(JSON.stringify(edge.style))}`);
+    }
+    if (
+      edge.x !== undefined ||
+      edge.y !== undefined ||
+      edge.width !== undefined ||
+      edge.height !== undefined
+    ) {
+      lines.push('    graphics [');
+      if (edge.x !== undefined) lines.push(`      x ${edge.x}`);
+      if (edge.y !== undefined) lines.push(`      y ${edge.y}`);
+      if (edge.width !== undefined) lines.push(`      w ${edge.width}`);
+      if (edge.height !== undefined) lines.push(`      h ${edge.height}`);
+      lines.push('    ]');
+    }
     lines.push('  ]');
   }
 
@@ -165,6 +195,7 @@ export function fromGML(gml: string): Graph {
         ...(n['ports'] !== undefined && { ports: tryParseJSON(n['ports']) }),
         ...(n['shape'] && { shape: n['shape'] }),
         ...(n['color'] && { color: n['color'] }),
+        ...(n['style'] !== undefined && { style: tryParseJSON(n['style']) }),
         ...(gfx?.x !== undefined && { x: gfx.x }),
         ...(gfx?.y !== undefined && { y: gfx.y }),
         ...(gfx?.w !== undefined && { width: gfx.w }),
@@ -180,6 +211,7 @@ export function fromGML(gml: string): Graph {
 
   const edgeEntries = asArray(graphBlock['edge']);
   for (const e of edgeEntries) {
+    const gfx = e['graphics'];
     edges.push({
       type: 'edge',
       id: String(e['id'] ?? `e${edges.length}`),
@@ -187,6 +219,7 @@ export function fromGML(gml: string): Graph {
       targetId: String(e['target'] ?? ''),
       label: e['label'] ?? '',
       data: e['data'] !== undefined ? tryParseJSON(e['data']) : undefined,
+      ...(e['weight'] !== undefined && { weight: Number(e['weight']) }),
       ...(e['sourcePort'] !== undefined && {
         sourcePort: String(e['sourcePort']),
       }),
@@ -194,16 +227,30 @@ export function fromGML(gml: string): Graph {
         targetPort: String(e['targetPort']),
       }),
       ...(e['color'] && { color: e['color'] }),
+      ...(e['style'] !== undefined && { style: tryParseJSON(e['style']) }),
+      ...(gfx?.x !== undefined && { x: gfx.x }),
+      ...(gfx?.y !== undefined && { y: gfx.y }),
+      ...(gfx?.w !== undefined && { width: gfx.w }),
+      ...(gfx?.h !== undefined && { height: gfx.h }),
     });
   }
 
   return {
     id: graphId,
     type: directed ? 'directed' : 'undirected',
-    initialNodeId: null,
+    initialNodeId: graphBlock['initialNodeId'] ?? null,
     nodes,
     edges,
-    data: undefined as any,
+    data:
+      graphBlock['data'] !== undefined
+        ? tryParseJSON(graphBlock['data'])
+        : (undefined as any),
+    ...(graphBlock['direction'] && {
+      direction: String(graphBlock['direction']) as Graph['direction'],
+    }),
+    ...(graphBlock['style'] !== undefined && {
+      style: tryParseJSON(graphBlock['style']),
+    }),
   };
 }
 
