@@ -1,5 +1,13 @@
 # @statelyai/graph
 
+## 0.12.1
+
+### Patch Changes
+
+- [`450d7da`](https://github.com/statelyai/graph/commit/450d7da0fb18e6ab72b16d596b30bfda3a4814ef) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Preserve graph, node, and edge metadata more fully across D3, Cytoscape, GML,
+  GEXF, and JGF adapters, and verify shipped schema JSON files in package smoke
+  tests.
+
 ## 0.12.0
 
 ### Minor Changes
