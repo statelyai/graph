@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { toGraphML, fromGraphML } from '../../src/formats/graphml';
 import type { Graph } from '../../src/types';
 import { getFullyFeaturedGraphFixture } from '../fixtures';
+import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
@@ -56,10 +57,36 @@ describe('GraphML', () => {
   });
 
   it('round-trips a fully featured graph without serialization drift', () => {
-    const graph = getFullyFeaturedGraphFixture();
-    const parsed = fromGraphML(toGraphML(graph));
-
-    expect(parsed).toEqual(graph);
+    expectFixtureRoundTrip((graph) => fromGraphML(toGraphML(graph)), {
+      graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
+      nodeKeys: [
+        'parentId',
+        'initialNodeId',
+        'label',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'shape',
+        'color',
+        'style',
+        'ports',
+      ],
+      edgeKeys: [
+        'label',
+        'weight',
+        'data',
+        'x',
+        'y',
+        'width',
+        'height',
+        'color',
+        'style',
+        'sourcePort',
+        'targetPort',
+      ],
+    });
   });
 
   it('handles undirected graphs', () => {

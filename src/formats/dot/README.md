@@ -65,7 +65,7 @@ const imported = fromDOT(`digraph deploy {
 
 ### `toDOT(graph): string`
 
-Uses `digraph`/`->` for directed graphs, `graph`/`--` for undirected. Preserves: `label`, `shape` (mapped to DOT names), `color` (as `fillcolor`), `direction` (as `rankdir`), edge `color`.
+Uses `digraph`/`->` for directed graphs, `graph`/`--` for undirected. Preserves: `label`, `shape` (mapped to DOT names), `color` (as `fillcolor`), `direction` (as `rankdir`), edge `color`, and edge `sourcePort` / `targetPort` as `node:port` endpoints.
 
 ### `fromDOT(dot): Graph`
 
@@ -73,15 +73,16 @@ Parses:
 - `digraph`/`graph` → directed/undirected
 - Node attributes: `label`, `shape` (mapped back), `fillcolor`/`color`
 - Edge attributes: `label`, `color`
+- Edge port ids from `node:port` endpoints
 - Edge chains (`a -> b -> c` → 2 edges)
 - `subgraph` → compound node with `parentId`
 - `rankdir` → `direction`
 - `node [...]` / `edge [...]` default attributes
 - Auto-creates nodes referenced in edges
 
-**Not mapped:**
+**Not fully mapped:**
 - HTML labels (`<...>`) — stored as raw string
-- Port syntax (`:port:compass`)
+- Compass points in port syntax (`:port:compass`)
 - `rank=same` and layout hints beyond `rankdir`
 - `style` attribute (beyond color extraction)
 

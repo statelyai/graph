@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toGEXF, fromGEXF } from '../../src/formats/gexf';
 import type { Graph } from '../../src/types';
-import { getFullyFeaturedGraphFixture } from '../fixtures';
+import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
@@ -101,13 +101,21 @@ describe('GEXF', () => {
   });
 
   it('round-trips ports and edge port references', () => {
-    const graph = getFullyFeaturedGraphFixture();
-    const parsed = fromGEXF(toGEXF(graph));
-
-    expect(parsed.nodes.find((n) => n.id === 'child-a')?.ports).toEqual(
-      graph.nodes.find((n) => n.id === 'child-a')?.ports,
-    );
-    expect(parsed.edges.find((e) => e.id === 'e1')?.sourcePort).toBe('out');
-    expect(parsed.edges.find((e) => e.id === 'e1')?.targetPort).toBe('in');
+    expectFixtureRoundTrip((graph) => fromGEXF(toGEXF(graph)), {
+      graphKeys: ['initialNodeId', 'data', 'direction'],
+      nodeKeys: [
+        'parentId',
+        'initialNodeId',
+        'label',
+        'data',
+        'x',
+        'y',
+        'width',
+        'shape',
+        'color',
+        'ports',
+      ],
+      edgeKeys: ['label', 'data', 'color', 'sourcePort', 'targetPort'],
+    });
   });
 });

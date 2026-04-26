@@ -40,7 +40,7 @@ describe('format support matrix', () => {
     expect(dot).toBeDefined();
     expect(dot?.features.ports).toBe('partial');
     expect(dot?.features.roundTrip).toBe('partial');
-    expect(dot?.notes.join('\n')).toContain('Port syntax');
+    expect(dot?.notes.join('\n')).toContain('compass');
   });
 
   it('captures known Mermaid state limitations', () => {
@@ -54,6 +54,12 @@ describe('format support matrix', () => {
   it('marks structured adapters with full port fidelity', () => {
     for (const id of ['cytoscape', 'd3', 'gexf', 'gml', 'graphml', 'jgf']) {
       expect(getFormatSupportEntry(id)?.features.ports).toBe('full');
+    }
+  });
+
+  it('captures structured hierarchy support accurately', () => {
+    for (const id of ['cytoscape', 'gexf', 'gml', 'graphml', 'jgf']) {
+      expect(getFormatSupportEntry(id)?.features.hierarchy).toBe('full');
     }
   });
 });

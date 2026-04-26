@@ -115,20 +115,6 @@ export function toGEXF(graph: Graph): string {
     return edge;
   });
 
-  const graphData: any[] = [];
-  if (graph.initialNodeId) {
-    graphData.push({
-      '@_for': 'a_initialNodeId',
-      '@_value': graph.initialNodeId,
-    });
-  }
-  if (graph.data !== undefined) {
-    graphData.push({
-      '@_for': 'a_data',
-      '@_value': JSON.stringify(graph.data),
-    });
-  }
-
   const obj: any = {
     '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
     gexf: {
@@ -138,6 +124,11 @@ export function toGEXF(graph: Graph): string {
       graph: {
         '@_defaultedgetype': graph.type === 'directed' ? 'directed' : 'undirected',
         ...(graph.id && { '@_id': graph.id }),
+        ...(graph.initialNodeId && { '@_initialNodeId': graph.initialNodeId }),
+        ...(graph.direction && { '@_direction': graph.direction }),
+        ...(graph.data !== undefined && {
+          '@_data': JSON.stringify(graph.data),
+        }),
         attributes: [
           { '@_class': 'node', attribute: nodeAttrs },
           { '@_class': 'edge', attribute: edgeAttrs },
@@ -287,10 +278,14 @@ export function fromGEXF(xml: string): Graph {
   return {
     id: String(graphEl['@_id'] ?? ''),
     type: graphType,
-    initialNodeId: null,
+    initialNodeId: graphEl['@_initialNodeId'] ?? null,
     nodes,
     edges,
-    data: undefined as any,
+    data:
+      graphEl['@_data'] !== undefined
+        ? tryParseJSON(String(graphEl['@_data']))
+        : (undefined as any),
+    ...(graphEl['@_direction'] && { direction: graphEl['@_direction'] }),
   };
 }
 

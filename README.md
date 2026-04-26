@@ -1,7 +1,3 @@
----
-title: '@statelyai/graph'
----
-
 # @statelyai/graph
 
 A TypeScript graph library built on plain JSON objects. Supports directed/undirected graphs, hierarchical nodes, graph algorithms, visual properties, and serialization to DOT, GraphML, Mermaid, and more.
@@ -18,14 +14,14 @@ Optional peers are only needed for specific adapters:
 
 <!-- optional peer dependencies derived from package.json#peerDependencies -->
 
-| Package | Needed for |
-| --- | --- |
+| Package           | Needed for                                          |
+| ----------------- | --------------------------------------------------- |
 | `fast-xml-parser` | `@statelyai/graph/gexf`, `@statelyai/graph/graphml` |
-| `dotparser` | `@statelyai/graph/dot` parsing |
-| `cytoscape` | Cytoscape integration tests and consumer typing |
-| `d3-force` | D3 force integration tests and consumer typing |
-| `elkjs` | `@statelyai/graph/elk` |
-| `zod` | `@statelyai/graph/schemas` |
+| `dotparser`       | `@statelyai/graph/dot` parsing                      |
+| `cytoscape`       | Cytoscape integration tests and consumer typing     |
+| `d3-force`        | D3 force integration tests and consumer typing      |
+| `elkjs`           | `@statelyai/graph/elk`                              |
+| `zod`             | `@statelyai/graph/schemas`                          |
 
 ## Highlights
 
@@ -43,7 +39,12 @@ Optional peers are only needed for specific adapters:
 Graphs are plain JSON-serializable objects. All operations are standalone functions — no classes, no DOM, no rendering engine.
 
 ```ts
-import { createGraph, addNode, addEdge, getShortestPath } from '@statelyai/graph';
+import {
+  createGraph,
+  addNode,
+  addEdge,
+  getShortestPath,
+} from '@statelyai/graph';
 
 const graph = createGraph({
   nodes: [
@@ -70,12 +71,17 @@ const path = getShortestPath(graph, { from: 'a', to: 'c' });
 Look up, add, delete, and update nodes and edges. Query neighbors, predecessors, successors, degree, and more.
 
 ```ts
-import { getNode, deleteNode, getNeighbors, getSources } from '@statelyai/graph';
+import {
+  getNode,
+  deleteNode,
+  getNeighbors,
+  getSources,
+} from '@statelyai/graph';
 
-const node = getNode(graph, 'a');       // lookup by id
-deleteNode(graph, 'd');                 // removes node + connected edges
+const node = getNode(graph, 'a'); // lookup by id
+deleteNode(graph, 'd'); // removes node + connected edges
 const neighbors = getNeighbors(graph, 'a'); // adjacent nodes
-const roots = getSources(graph);        // nodes with no incoming edges
+const roots = getSources(graph); // nodes with no incoming edges
 ```
 
 Batch operations (`addEntities`, `deleteEntities`, `updateEntities`) let you apply multiple changes at once.
@@ -96,14 +102,14 @@ const graph = createGraph({
     { id: 'c' },
   ],
   edges: [
-    { id: 'e1', sourceId: 'a', targetId: 'b' },   // resolves to a -> b1
+    { id: 'e1', sourceId: 'a', targetId: 'b' }, // resolves to a -> b1
     { id: 'e2', sourceId: 'b1', targetId: 'b2' },
-    { id: 'e3', sourceId: 'b', targetId: 'c' },    // expands from all leaves of b
+    { id: 'e3', sourceId: 'b', targetId: 'c' }, // expands from all leaves of b
   ],
 });
 
 const children = getChildren(graph, 'b'); // [b1, b2]
-const flat = flatten(graph);              // only leaf nodes, edges resolved
+const flat = flatten(graph); // only leaf nodes, edges resolved
 ```
 
 ## Ports
@@ -146,11 +152,7 @@ getEdgesByPort(graph, 'render', 'input'); // [e1]
 Use the `@statelyai/graph/schemas` subpath when you want runtime validation or JSON Schema generation.
 
 ```ts
-import {
-  GraphSchema,
-  getGraphIssues,
-  isGraph,
-} from '@statelyai/graph/schemas';
+import { GraphSchema, getGraphIssues, isGraph } from '@statelyai/graph/schemas';
 
 const unknownValue: unknown = JSON.parse(input);
 
@@ -171,27 +173,40 @@ Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, s
 
 ```ts
 import {
-  bfs, dfs, hasPath, isAcyclic,
-  getShortestPath, getCycles, getTopologicalSort,
-  getConnectedComponents, getMinimumSpanningTree,
-  getPageRank, getLabelPropagationCommunities,
-  genGirvanNewmanCommunities, getBridges, isIsomorphic,
+  bfs,
+  dfs,
+  hasPath,
+  isAcyclic,
+  getShortestPath,
+  getCycles,
+  getTopologicalSort,
+  getConnectedComponents,
+  getMinimumSpanningTree,
+  getPageRank,
+  getLabelPropagationCommunities,
+  genGirvanNewmanCommunities,
+  getBridges,
+  isIsomorphic,
 } from '@statelyai/graph';
 
-for (const node of bfs(graph, 'a')) { /* breadth-first */ }
-for (const node of dfs(graph, 'a')) { /* depth-first */ }
+for (const node of bfs(graph, 'a')) {
+  /* breadth-first */
+}
+for (const node of dfs(graph, 'a')) {
+  /* depth-first */
+}
 
-hasPath(graph, 'a', 'c');                          // reachability
-isAcyclic(graph);                                  // cycle check
-getShortestPath(graph, { from: 'a', to: 'c' });   // single shortest path
-getTopologicalSort(graph);                         // topological order (or null)
-getConnectedComponents(graph);                     // connected components
-getMinimumSpanningTree(graph, { weight: e => e.data?.weight ?? 1 }); // MST
-getPageRank(graph);                                // link analysis scores
-getLabelPropagationCommunities(graph);             // community detection
-[...genGirvanNewmanCommunities(graph)];            // lazy community splits
-getBridges(graph);                                 // bridge edges
-isIsomorphic(graph, otherGraph);                   // structural equivalence
+hasPath(graph, 'a', 'c'); // reachability
+isAcyclic(graph); // cycle check
+getShortestPath(graph, { from: 'a', to: 'c' }); // single shortest path
+getTopologicalSort(graph); // topological order (or null)
+getConnectedComponents(graph); // connected components
+getMinimumSpanningTree(graph, { weight: (e) => e.data?.weight ?? 1 }); // MST
+getPageRank(graph); // link analysis scores
+getLabelPropagationCommunities(graph); // community detection
+[...genGirvanNewmanCommunities(graph)]; // lazy community splits
+getBridges(graph); // bridge edges
+isIsomorphic(graph, otherGraph); // structural equivalence
 ```
 
 ## Diff & Walks
@@ -229,10 +244,10 @@ import { fromGEXF } from '@statelyai/graph/gexf';
 import { toCytoscapeJSON } from '@statelyai/graph/cytoscape';
 import { toD3Graph } from '@statelyai/graph/d3';
 
-const dot = toDOT(graph);                   // Graphviz DOT
-const cytoData = toCytoscapeJSON(graph);     // Cytoscape.js JSON
-const d3Data = toD3Graph(graph);             // D3.js { nodes, links }
-const imported = fromGEXF(gexfXmlString);    // GEXF (Gephi)
+const dot = toDOT(graph); // Graphviz DOT
+const cytoData = toCytoscapeJSON(graph); // Cytoscape.js JSON
+const d3Data = toD3Graph(graph); // D3.js { nodes, links }
+const imported = fromGEXF(gexfXmlString); // GEXF (Gephi)
 ```
 
 <!-- supported format adapters derived from src/formats/* subdirectories -->
@@ -252,28 +267,28 @@ const back = cytoscapeConverter.from(cyto);
 
 <!-- format support matrix derived from src/formats/support.ts -->
 
-| Format | Hierarchy | Ports | Visual | Round-trip | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `adjacency-list` | none | none | none | partial | Connectivity only; edge metadata is lost. |
-| `cytoscape` | partial | full | partial | partial | Ports round-trip through element data. |
-| `d3` | none | full | partial | partial | Ports round-trip through node/link objects. |
-| `dot` | partial | partial | partial | partial | `:port:compass` mapping is incomplete. |
-| `edge-list` | none | none | none | partial | Endpoints only. |
-| `elk` | full | full | full | partial | Best for layout exchange. |
-| `gexf` | none | full | partial | partial | Ports round-trip via custom attributes. |
-| `gml` | none | full | partial | partial | Ports round-trip through JSON-stringified metadata. |
-| `graphml` | none | full | partial | partial | Ports round-trip through `<data>` fields. |
-| `jgf` | none | full | none | partial | Ports round-trip through metadata. |
-| `tgf` | none | none | none | partial | Minimal ids and labels only. |
-| `xyflow` | none | full | full | partial | Ports map directly to handles. |
-| `mermaid/block` | partial | none | partial | partial | Syntax-driven, not port-aware. |
-| `mermaid/class` | none | none | none | partial | Class syntax is stored conservatively. |
-| `mermaid/er` | none | none | none | partial | Focuses on entities and cardinality. |
-| `mermaid/flowchart` | partial | none | partial | partial | `linkStyle` indices are fragile. |
-| `mermaid/ishikawa` | full | none | none | partial | Preserves hierarchy, not fishbone layout. |
-| `mermaid/mindmap` | full | none | partial | partial | Icon syntax is not fully re-emitted. |
-| `mermaid/sequence` | partial | none | none | partial | Actor links and menu syntax are incomplete. |
-| `mermaid/state` | full | none | partial | partial | State notes are still lossy. |
+| Format              | Hierarchy | Ports   | Visual  | Round-trip | Notes                                                                      |
+| ------------------- | --------- | ------- | ------- | ---------- | -------------------------------------------------------------------------- |
+| `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                  |
+| `cytoscape`         | full      | full    | partial | partial    | Ports round-trip through element data.                                     |
+| `d3`                | none      | full    | partial | partial    | Ports round-trip through node/link objects.                                |
+| `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete. |
+| `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                            |
+| `elk`               | full      | full    | full    | partial    | Best for layout exchange.                                                  |
+| `gexf`              | full      | full    | partial | partial    | Ports round-trip via custom attributes.                                    |
+| `gml`               | full      | full    | partial | partial    | Ports round-trip through JSON-stringified metadata.                        |
+| `graphml`           | full      | full    | partial | partial    | Ports round-trip through `<data>` fields.                                  |
+| `jgf`               | full      | full    | none    | partial    | Ports round-trip through metadata.                                         |
+| `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                               |
+| `xyflow`            | none      | full    | full    | partial    | Ports map directly to handles.                                             |
+| `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                             |
+| `mermaid/class`     | none      | none    | none    | partial    | Class syntax is stored conservatively.                                     |
+| `mermaid/er`        | none      | none    | none    | partial    | Focuses on entities and cardinality.                                       |
+| `mermaid/flowchart` | partial   | none    | partial | partial    | `linkStyle` indices are fragile.                                           |
+| `mermaid/ishikawa`  | full      | none    | none    | partial    | Preserves hierarchy, not fishbone layout.                                  |
+| `mermaid/mindmap`   | full      | none    | partial | partial    | Icon syntax is not fully re-emitted.                                       |
+| `mermaid/sequence`  | partial   | none    | none    | partial    | Actor links and menu syntax are incomplete.                                |
+| `mermaid/state`     | full      | none    | partial | partial    | State notes are still lossy.                                               |
 
 Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
 

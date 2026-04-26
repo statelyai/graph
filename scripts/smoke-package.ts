@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,10 +8,349 @@ type PackResult = {
   filename: string;
 };
 
+type PackageJson = {
+  exports: Record<string, string>;
+};
+
+type ExportCheck = {
+  phase: 'core' | 'optional';
+  runtime: string[];
+  types: string[];
+};
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, '..');
 
+function getExportSpecifier(exportKey: string): string {
+  return exportKey === '.'
+    ? '@statelyai/graph'
+    : `@statelyai/graph/${exportKey.slice(2)}`;
+}
+
+function buildRuntimeCheckScript(
+  exportKeys: string[],
+  exportChecks: Record<string, ExportCheck>,
+): string {
+  const importLines = exportKeys.map(
+    (key, index) =>
+      `const m${index + 1} = await import(${JSON.stringify(getExportSpecifier(key))});`,
+  );
+  const assertionBlocks = exportKeys.map((key, index) =>
+    [
+      '{',
+      ...exportChecks[key].runtime.map((line) =>
+        line.replaceAll('$MOD', `m${index + 1}`),
+      ),
+      '}',
+    ].join('\n'),
+  );
+
+  return `
+import assert from 'node:assert/strict';
+const m0 = await import('@statelyai/graph');
+${importLines.join('\n')}
+
+${assertionBlocks.join('\n\n')}
+  `.trimStart();
+}
+
+function buildTypeCheckScript(
+  exportKeys: string[],
+  exportChecks: Record<string, ExportCheck>,
+): string {
+  const importLines = exportKeys.map(
+    (key, index) =>
+      `import * as m${index + 1} from ${JSON.stringify(getExportSpecifier(key))};`,
+  );
+  const assertionBlocks = exportKeys.map((key, index) =>
+    [
+      '{',
+      ...exportChecks[key].types.map((line) =>
+        line.replaceAll('$MOD', `m${index + 1}`),
+      ),
+      '}',
+    ].join('\n'),
+  );
+
+  return `
+import * as m0 from '@statelyai/graph';
+${importLines.join('\n')}
+
+${assertionBlocks.join('\n\n')}
+  `.trimStart();
+}
+
 async function main(): Promise<void> {
+  const packageJson = JSON.parse(
+    await readFile(join(rootDir, 'package.json'), 'utf8'),
+  ) as PackageJson;
+  const publishedExportKeys = Object.keys(packageJson.exports).filter(
+    (key) => key !== './package.json',
+  );
+  const exportChecks: Record<string, ExportCheck> = {
+    '.': {
+      phase: 'core',
+      runtime: [
+        `assert.equal(typeof $MOD.createGraph, 'function');`,
+        `assert.equal(typeof $MOD.createVisualGraph, 'function');`,
+        `const graph = $MOD.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }, { id: 'e2', sourceId: 'b', targetId: 'c' }] });`,
+        `const visualGraph = $MOD.createVisualGraph(graph);`,
+        `assert.deepEqual([graph.id, visualGraph.nodes.length], ['', 3]);`,
+        `assert.deepEqual([ $MOD.getShortestPath(graph, { from: 'a', to: 'c' })?.source.id, ...($MOD.getShortestPath(graph, { from: 'a', to: 'c' })?.steps.map((step) => step.node.id) ?? []) ], ['a', 'b', 'c']);`,
+      ],
+      types: [
+        `const graph: m0.Graph = $MOD.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `graph.nodes[0]?.id;`,
+      ],
+    },
+    './algorithms': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }, { id: 'e2', sourceId: 'b', targetId: 'c' }] });`,
+        `assert.equal(typeof $MOD.getTopologicalSort, 'function');`,
+        `assert.equal(typeof $MOD.getConnectedComponents, 'function');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const topo = $MOD.getTopologicalSort(graph);`,
+        `topo?.[0]?.id;`,
+      ],
+    },
+    './format-support': {
+      phase: 'core',
+      runtime: [
+        `assert.equal($MOD.getFormatSupportEntry('dot')?.features.roundTrip, 'partial');`,
+      ],
+      types: [
+        `const support = $MOD.getFormatSupportEntry('graphml');`,
+        `support?.features.ports;`,
+      ],
+    },
+    './adjacency-list': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }, { id: 'e2', sourceId: 'b', targetId: 'c' }] });`,
+        `assert.deepEqual($MOD.toAdjacencyList(graph), { a: ['b'], b: ['c'], c: [] });`,
+        `assert.equal($MOD.fromAdjacencyList($MOD.toAdjacencyList(graph)).edges.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const adjacency = $MOD.toAdjacencyList(graph);`,
+        `adjacency.a?.[0];`,
+      ],
+    },
+    './converter': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }, { id: 'e2', sourceId: 'b', targetId: 'c' }] });`,
+        `assert.deepEqual($MOD.adjacencyListConverter.to(graph), { a: ['b'], b: ['c'], c: [] });`,
+        `assert.deepEqual($MOD.edgeListConverter.to(graph), [['a', 'b'], ['b', 'c']]);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const edgeList = $MOD.edgeListConverter.to(graph);`,
+        `edgeList[0]?.[0];`,
+      ],
+    },
+    './cytoscape': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromCytoscapeJSON($MOD.toCytoscapeJSON(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const cyto = $MOD.toCytoscapeJSON(graph);`,
+        `cyto.elements.nodes[0]?.data.id;`,
+      ],
+    },
+    './d3': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromD3Graph($MOD.toD3Graph(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const d3 = $MOD.toD3Graph(graph);`,
+        `d3.links[0]?.source;`,
+      ],
+    },
+    './dot': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', sourcePort: 'out', targetId: 'b', targetPort: 'in' }] });`,
+        `assert.equal($MOD.fromDOT($MOD.toDOT(graph)).edges[0]?.sourcePort, 'out');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const dot = $MOD.toDOT(graph);`,
+        `dot.toUpperCase();`,
+      ],
+    },
+    './edge-list': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }, { id: 'e2', sourceId: 'b', targetId: 'c' }] });`,
+        `assert.deepEqual($MOD.toEdgeList(graph), [['a', 'b'], ['b', 'c']]);`,
+        `assert.equal($MOD.fromEdgeList($MOD.toEdgeList(graph)).edges.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const edgeList = $MOD.toEdgeList(graph);`,
+        `edgeList[0]?.[1];`,
+      ],
+    },
+    './elk': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createVisualGraph({ nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }, { id: 'b', x: 20, y: 0, width: 10, height: 10 }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', width: 0, height: 0 }] });`,
+        `assert.equal($MOD.fromELK($MOD.toELK(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createVisualGraph({ nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }, { id: 'b', x: 20, y: 0, width: 10, height: 10 }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', width: 0, height: 0 }] });`,
+        `const elkGraph = $MOD.toELK(graph);`,
+        `elkGraph.children?.[0]?.id;`,
+      ],
+    },
+    './gexf': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ id: 'g', initialNodeId: 'a', direction: 'right', data: { ok: true }, nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const parsed = $MOD.fromGEXF($MOD.toGEXF(graph));`,
+        `assert.equal(parsed.initialNodeId, 'a');`,
+        `assert.deepEqual(parsed.data, { ok: true });`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const xml = $MOD.toGEXF(graph);`,
+        `xml.toUpperCase();`,
+      ],
+    },
+    './gml': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b', parentId: 'a' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromGML($MOD.toGML(graph)).nodes[1]?.parentId, 'a');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b', parentId: 'a' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const gml = $MOD.toGML(graph);`,
+        `gml.toUpperCase();`,
+      ],
+    },
+    './graphml': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', ports: [{ name: 'out' }] }, { id: 'b', ports: [{ name: 'in' }] }], edges: [{ id: 'e1', sourceId: 'a', sourcePort: 'out', targetId: 'b', targetPort: 'in' }] });`,
+        `assert.equal($MOD.fromGraphML($MOD.toGraphML(graph)).edges[0]?.targetPort, 'in');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const xml = $MOD.toGraphML(graph);`,
+        `xml.toUpperCase();`,
+      ],
+    },
+    './jgf': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ initialNodeId: 'a', nodes: [{ id: 'a' }, { id: 'b', parentId: 'a' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromJGF($MOD.toJGF(graph)).nodes[1]?.parentId, 'a');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const jgf = $MOD.toJGF(graph);`,
+        `jgf.graph.nodes[0]?.id;`,
+      ],
+    },
+    './mermaid': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.match($MOD.toMermaidFlowchart(graph), /flowchart/i);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const flowchart = $MOD.toMermaidFlowchart(graph);`,
+        `flowchart.toUpperCase();`,
+      ],
+    },
+    './tgf': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromTGF($MOD.toTGF(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const tgf = $MOD.toTGF(graph);`,
+        `tgf.toUpperCase();`,
+      ],
+    },
+    './xyflow': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createVisualGraph({ nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }, { id: 'b', x: 20, y: 0, width: 10, height: 10 }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', width: 0, height: 0 }] });`,
+        `assert.equal($MOD.fromXYFlow($MOD.toXYFlow(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createVisualGraph({ nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }, { id: 'b', x: 20, y: 0, width: 10, height: 10 }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', width: 0, height: 0 }] });`,
+        `const flow = $MOD.toXYFlow(graph);`,
+        `flow.nodes[0]?.id;`,
+      ],
+    },
+    './queries': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.getNeighbors(graph, 'a')[0]?.id, 'b');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const neighbors = $MOD.getNeighbors(graph, 'a');`,
+        `neighbors[0]?.id;`,
+      ],
+    },
+    './schemas': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.GraphSchema.safeParse(graph).success, true);`,
+        `assert.equal($MOD.isGraph(graph), true);`,
+        `assert.deepEqual($MOD.getGraphIssues(graph), []);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const issues: $MOD.GraphValidationIssue[] = $MOD.getGraphIssues(graph);`,
+        `issues[0]?.message;`,
+      ],
+    },
+  };
+  const missingChecks = publishedExportKeys.filter((key) => !(key in exportChecks));
+  const staleChecks = Object.keys(exportChecks).filter(
+    (key) => !publishedExportKeys.includes(key),
+  );
+
+  if (missingChecks.length > 0 || staleChecks.length > 0) {
+    throw new Error(
+      [
+        missingChecks.length > 0
+          ? `Missing smoke-package coverage for exports: ${missingChecks.join(', ')}`
+          : '',
+        staleChecks.length > 0
+          ? `Stale smoke-package coverage for non-exported subpaths: ${staleChecks.join(', ')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  }
+  const coreExportKeys = publishedExportKeys.filter(
+    (key) => exportChecks[key].phase === 'core',
+  );
+  const optionalExportKeys = publishedExportKeys.filter(
+    (key) => exportChecks[key].phase === 'optional',
+  );
   const packOutput = execFileSync('npm', ['pack', '--json', '--ignore-scripts'], {
     cwd: rootDir,
     encoding: 'utf8',
@@ -59,63 +398,7 @@ async function main(): Promise<void> {
 
     await writeFile(
       coreCheckPath,
-      `
-import assert from 'node:assert/strict';
-import { createGraph, createVisualGraph, getShortestPath } from '@statelyai/graph';
-import { getTopologicalSort, getConnectedComponents } from '@statelyai/graph/algorithms';
-import { toAdjacencyList, fromAdjacencyList } from '@statelyai/graph/adjacency-list';
-import { adjacencyListConverter, edgeListConverter } from '@statelyai/graph/converter';
-import { toCytoscapeJSON, fromCytoscapeJSON } from '@statelyai/graph/cytoscape';
-import { toD3Graph, fromD3Graph } from '@statelyai/graph/d3';
-import { toEdgeList, fromEdgeList } from '@statelyai/graph/edge-list';
-import { toELK, fromELK } from '@statelyai/graph/elk';
-import { getFormatSupportEntry } from '@statelyai/graph/format-support';
-import { toGML, fromGML } from '@statelyai/graph/gml';
-import { toJGF, fromJGF } from '@statelyai/graph/jgf';
-import { toMermaidFlowchart } from '@statelyai/graph/mermaid';
-import { getNeighbors } from '@statelyai/graph/queries';
-import { toTGF, fromTGF } from '@statelyai/graph/tgf';
-import { toXYFlow, fromXYFlow } from '@statelyai/graph/xyflow';
-
-const graph = createGraph({
-  nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
-  edges: [
-    { id: 'e1', sourceId: 'a', targetId: 'b' },
-    { id: 'e2', sourceId: 'b', targetId: 'c' },
-  ],
-});
-const visualGraph = createVisualGraph(graph);
-
-assert.equal(typeof getShortestPath, 'function');
-assert.equal(typeof getTopologicalSort, 'function');
-assert.equal(typeof getConnectedComponents, 'function');
-assert.equal(typeof getNeighbors, 'function');
-assert.equal(getFormatSupportEntry('dot')?.features.roundTrip, 'partial');
-
-assert.deepEqual(
-  [
-    getShortestPath(graph, { from: 'a', to: 'c' })?.source.id,
-    ...(getShortestPath(graph, { from: 'a', to: 'c' })?.steps.map((step) => step.node.id) ?? []),
-  ],
-  ['a', 'b', 'c'],
-);
-assert.deepEqual(toAdjacencyList(graph), { a: ['b'], b: ['c'], c: [] });
-assert.equal(fromAdjacencyList(toAdjacencyList(graph)).edges.length, 2);
-assert.deepEqual(toEdgeList(graph), [['a', 'b'], ['b', 'c']]);
-assert.equal(fromEdgeList(toEdgeList(graph)).edges.length, 2);
-assert.deepEqual(adjacencyListConverter.to(graph), { a: ['b'], b: ['c'], c: [] });
-assert.deepEqual(edgeListConverter.to(graph), [['a', 'b'], ['b', 'c']]);
-assert.equal(fromCytoscapeJSON(toCytoscapeJSON(graph)).edges.length, 2);
-assert.equal(fromD3Graph(toD3Graph(graph)).edges.length, 2);
-assert.equal(fromELK(toELK(visualGraph)).edges.length, 2);
-assert.equal(fromGML(toGML(graph)).edges.length, 2);
-assert.equal(fromJGF(toJGF(graph)).edges.length, 2);
-assert.equal(fromTGF(toTGF(graph)).edges.length, 2);
-assert.equal(fromXYFlow(toXYFlow(visualGraph)).edges.length, 2);
-
-const flowchart = toMermaidFlowchart(graph);
-assert.match(flowchart, /flowchart/i);
-      `.trimStart(),
+      buildRuntimeCheckScript(coreExportKeys, exportChecks),
     );
 
     execFileSync('node', [coreCheckPath], {
@@ -125,27 +408,7 @@ assert.match(flowchart, /flowchart/i);
 
     await writeFile(
       coreTypesPath,
-      `
-import { createGraph, type Graph } from '@statelyai/graph';
-import { getTopologicalSort } from '@statelyai/graph/algorithms';
-import { getFormatSupportEntry } from '@statelyai/graph/format-support';
-import { getNeighbors } from '@statelyai/graph/queries';
-
-const graph: Graph = createGraph({
-  nodes: [{ id: 'a' }, { id: 'b' }],
-  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
-});
-
-const topo = getTopologicalSort(graph);
-const support = getFormatSupportEntry('graphml');
-const neighbors = getNeighbors(graph, 'a');
-
-if (topo && support && neighbors.length > 0) {
-  topo[0]?.id;
-  support.features.ports;
-  neighbors[0]?.id;
-}
-      `.trimStart(),
+      buildTypeCheckScript(coreExportKeys, exportChecks),
     );
 
     execFileSync(
@@ -181,27 +444,7 @@ if (topo && support && neighbors.length > 0) {
 
     await writeFile(
       optionalCheckPath,
-      `
-import assert from 'node:assert/strict';
-import { createGraph } from '@statelyai/graph';
-import { toDOT, fromDOT } from '@statelyai/graph/dot';
-import { toGEXF, fromGEXF } from '@statelyai/graph/gexf';
-import { toGraphML, fromGraphML } from '@statelyai/graph/graphml';
-import { GraphSchema, getGraphIssues, isGraph } from '@statelyai/graph/schemas';
-
-const graph = createGraph({
-  id: 'optional',
-  nodes: [{ id: 'a' }, { id: 'b' }],
-  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
-});
-
-assert.equal(fromDOT(toDOT(graph)).edges.length, 1);
-assert.equal(fromGEXF(toGEXF(graph)).edges.length, 1);
-assert.equal(fromGraphML(toGraphML(graph)).edges.length, 1);
-assert.equal(GraphSchema.safeParse(graph).success, true);
-assert.equal(isGraph(graph), true);
-assert.deepEqual(getGraphIssues(graph), []);
-      `.trimStart(),
+      buildRuntimeCheckScript(optionalExportKeys, exportChecks),
     );
 
     execFileSync('node', [optionalCheckPath], {
@@ -211,24 +454,7 @@ assert.deepEqual(getGraphIssues(graph), []);
 
     await writeFile(
       optionalTypesPath,
-      `
-import { createGraph } from '@statelyai/graph';
-import { fromDOT, toDOT } from '@statelyai/graph/dot';
-import { getGraphIssues, isGraph, type GraphValidationIssue } from '@statelyai/graph/schemas';
-
-const graph = createGraph({
-  nodes: [{ id: 'a' }, { id: 'b' }],
-  edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
-});
-
-const dot = toDOT(graph);
-const issues: GraphValidationIssue[] = getGraphIssues(graph);
-const parsed = fromDOT(dot);
-
-if (isGraph(parsed) && issues.length === 0) {
-  parsed.edges[0]?.id;
-}
-      `.trimStart(),
+      buildTypeCheckScript(optionalExportKeys, exportChecks),
     );
 
     execFileSync(

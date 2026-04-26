@@ -15,6 +15,10 @@ function escapeLabel(label: string): string {
   return label.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+function formatEndpoint(id: string, port?: string): string {
+  return `${escapeId(id)}${port ? `:${escapeId(port)}` : ''}`;
+}
+
 const DIRECTION_TO_RANKDIR: Record<string, string> = {
   down: 'TB',
   up: 'BT',
@@ -85,7 +89,9 @@ export function toDOT(graph: Graph): string {
     if (edge.label) attrs.push(`label="${escapeLabel(edge.label)}"`);
     if (edge.color) attrs.push(`color="${escapeLabel(edge.color)}"`);
     const attrStr = attrs.length > 0 ? ` [${attrs.join(', ')}]` : '';
-    lines.push(`  ${escapeId(edge.sourceId)} ${edgeOp} ${escapeId(edge.targetId)}${attrStr};`);
+    lines.push(
+      `  ${formatEndpoint(edge.sourceId, edge.sourcePort)} ${edgeOp} ${formatEndpoint(edge.targetId, edge.targetPort)}${attrStr};`,
+    );
   }
 
   lines.push('}');
@@ -116,6 +122,16 @@ const DOT_TO_SHAPE: Record<string, string> = {
 
 interface AttrMap {
   [key: string]: string;
+}
+
+interface EndpointRef {
+  id: string;
+  port?: string;
+}
+
+function getPortId(nodeId: unknown): string | undefined {
+  const port = (nodeId as { port?: { id?: unknown } }).port;
+  return typeof port?.id === 'string' ? port.id : undefined;
 }
 
 function attrsToMap(attrList: { id: string; eq: string | number }[]): AttrMap {
@@ -280,11 +296,16 @@ export function fromDOT(dot: string): Graph {
           // Walk edge_list: each consecutive pair forms edges between endpoint sets.
           // DOT allows node IDs or subgraphs as endpoints; subgraphs expand to all
           // contained nodes (e.g., A -> {B C} == A->B and A->C).
-          const endpointGroups: string[][] = [];
+          const endpointGroups: EndpointRef[][] = [];
           for (const item of stmt.edge_list) {
             if (item.type === 'node_id') {
               ensureNode(item.id, parentId, nd);
-              endpointGroups.push([item.id]);
+              endpointGroups.push([
+                {
+                  id: item.id,
+                  ...(getPortId(item) && { port: getPortId(item) }),
+                },
+              ]);
             } else if (item.type === 'subgraph') {
               walkChildren(item.children, parentId, nd, ed);
               const subNodeIds = getNodeIdsFromSubgraph(item.children);
@@ -292,7 +313,7 @@ export function fromDOT(dot: string): Graph {
                 ensureNode(subNodeId, parentId, nd);
               }
               if (subNodeIds.length > 0) {
-                endpointGroups.push(subNodeIds);
+                endpointGroups.push(subNodeIds.map((id) => ({ id })));
               }
             }
           }
@@ -300,15 +321,17 @@ export function fromDOT(dot: string): Graph {
           for (let i = 0; i < endpointGroups.length - 1; i++) {
             const left = endpointGroups[i];
             const right = endpointGroups[i + 1];
-            for (const sourceId of left) {
-              for (const targetId of right) {
+            for (const source of left) {
+              for (const target of right) {
                 const edge: GraphEdge = {
                   type: 'edge',
                   id: `e${edgeIdx++}`,
-                  sourceId,
-                  targetId,
+                  sourceId: source.id,
+                  targetId: target.id,
                   label: mergedEdgeAttrs['label'] ?? '',
                   data: undefined as any,
+                  ...(source.port && { sourcePort: source.port }),
+                  ...(target.port && { targetPort: target.port }),
                   ...(mergedEdgeAttrs['color'] && {
                     color: mergedEdgeAttrs['color'],
                   }),
@@ -350,7 +373,7 @@ export function fromDOT(dot: string): Graph {
   walkChildren(root.children, null, {}, {});
 
   // TODO: HTML labels (<...>) are stored as-is in the label string
-  // TODO: Port syntax (:port:compass) is ignored
+  // TODO: Compass points in port syntax (:port:compass) are ignored
   // TODO: rank=same and other layout hints beyond rankdir are ignored
 
   return {

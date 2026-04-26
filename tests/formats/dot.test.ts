@@ -42,6 +42,33 @@ describe('toDOT', () => {
     expect(dot).toContain('a -- b');
   });
 
+  it('exports edge port references', () => {
+    const g: Graph = {
+      id: 'ports',
+      type: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: '', data: undefined },
+        { type: 'node', id: 'b', parentId: null, initialNodeId: null, label: '', data: undefined },
+      ],
+      edges: [
+        {
+          type: 'edge',
+          id: 'e1',
+          sourceId: 'a',
+          sourcePort: 'out',
+          targetId: 'b',
+          targetPort: 'in',
+          label: '',
+          data: undefined,
+        },
+      ],
+      data: undefined,
+    };
+    const dot = toDOT(g);
+    expect(dot).toContain('a:out -> b:in');
+  });
+
   it('escapes special characters in ids', () => {
     const g: Graph = {
       id: 'my graph',
@@ -127,6 +154,13 @@ describe('fromDOT', () => {
     const g = fromDOT(`digraph G { a -> b [label="next" color="red"]; }`);
     expect(g.edges[0].label).toBe('next');
     expect(g.edges[0].color).toBe('red');
+  });
+
+  it('parses edge source and target ports', () => {
+    const g = fromDOT('digraph G { a:out -> b:in [label="go"]; }');
+    expect(g.edges[0].sourcePort).toBe('out');
+    expect(g.edges[0].targetPort).toBe('in');
+    expect(g.edges[0].label).toBe('go');
   });
 
   it('parses edge chains (a -> b -> c)', () => {
@@ -292,5 +326,35 @@ describe('dotConverter', () => {
     expect(restored.edges[0].sourceId).toBe('a');
     expect(restored.edges[0].targetId).toBe('b');
     expect(restored.edges[0].label).toBe('next');
+  });
+
+  it('round-trips edge port references', () => {
+    const g: Graph = {
+      id: 'ports',
+      type: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: undefined },
+        { type: 'node', id: 'b', parentId: null, initialNodeId: null, label: 'B', data: undefined },
+      ],
+      edges: [
+        {
+          type: 'edge',
+          id: 'e0',
+          sourceId: 'a',
+          sourcePort: 'out',
+          targetId: 'b',
+          targetPort: 'in',
+          label: 'next',
+          data: undefined,
+        },
+      ],
+      data: undefined,
+    };
+
+    const restored = dotConverter.from(dotConverter.to(g));
+
+    expect(restored.edges[0].sourcePort).toBe('out');
+    expect(restored.edges[0].targetPort).toBe('in');
   });
 });

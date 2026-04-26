@@ -40,7 +40,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     features: {
       directed: 'full',
       undirected: 'full',
-      hierarchy: 'partial',
+      hierarchy: 'full',
       ports: 'full',
       visual: 'partial',
       style: 'partial',
@@ -84,7 +84,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       roundTrip: 'partial',
     },
     notes: [
-      'Port syntax (`:port:compass`) is not fully mapped.',
+      'Edge port ids round-trip, but compass points and node port definitions are not mapped.',
       'HTML labels and layout hints beyond `rankdir` are lossy.',
     ],
   },
@@ -124,7 +124,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     features: {
       directed: 'full',
       undirected: 'full',
-      hierarchy: 'none',
+      hierarchy: 'full',
       ports: 'full',
       visual: 'partial',
       style: 'partial',
@@ -142,7 +142,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     features: {
       directed: 'full',
       undirected: 'full',
-      hierarchy: 'none',
+      hierarchy: 'full',
       ports: 'full',
       visual: 'partial',
       style: 'partial',
@@ -160,7 +160,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     features: {
       directed: 'full',
       undirected: 'full',
-      hierarchy: 'none',
+      hierarchy: 'full',
       ports: 'full',
       visual: 'partial',
       style: 'partial',
@@ -178,7 +178,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     features: {
       directed: 'full',
       undirected: 'full',
-      hierarchy: 'none',
+      hierarchy: 'full',
       ports: 'full',
       visual: 'none',
       style: 'none',
