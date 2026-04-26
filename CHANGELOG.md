@@ -1,5 +1,19 @@
 # @statelyai/graph
 
+## 0.12.0
+
+### Minor Changes
+
+- [`09fe970`](https://github.com/statelyai/graph/commit/09fe970af7fc800d15816d6453043b3777cb2ff9) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add runtime schema validation helpers, improve port round-tripping across
+  structured format adapters, extend package smoke coverage to type-check public
+  subpath imports, and document format support and validation usage in the README.
+
+### Patch Changes
+
+- [`b4b2195`](https://github.com/statelyai/graph/commit/b4b2195fa38d06799bf9f215f58888c261440ce9) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Preserve graph metadata in GEXF, round-trip DOT edge port references, tighten
+  structured format parity tests, and derive package smoke coverage from the
+  published export map.
+
 ## 0.11.1
 
 ### Patch Changes

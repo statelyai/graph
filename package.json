@@ -2,7 +2,7 @@
   "name": "@statelyai/graph",
   "packageManager": "pnpm@10.28.2",
   "type": "module",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "A TypeScript-first graph library with plain JSON-serializable objects",
   "author": "David Khourshid <david@stately.ai>",
   "license": "MIT",
