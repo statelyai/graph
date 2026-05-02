@@ -78,16 +78,23 @@ export function fromMermaidState(input: string): MermaidStateGraph {
   const regionCounters = new Map<string, number>();
 
   function ensureNode(id: string): StateNode {
-    if (!nodeMap.has(id)) {
-      nodeMap.set(id, {
-        type: 'node',
-        id,
-        parentId: parentStack[parentStack.length - 1],
-        initialNodeId: null,
-        label: id, // stateId IS the label
-        data: {},
-      });
+    const parentId = parentStack[parentStack.length - 1];
+    const existing = nodeMap.get(id);
+    if (existing) {
+      if (parentId && existing.parentId === null && existing.id !== parentId) {
+        existing.parentId = parentId;
+      }
+      return existing;
     }
+
+    nodeMap.set(id, {
+      type: 'node',
+      id,
+      parentId,
+      initialNodeId: null,
+      label: id, // stateId IS the label
+      data: {},
+    });
     return nodeMap.get(id)!;
   }
 
@@ -135,6 +142,19 @@ export function fromMermaidState(input: string): MermaidStateGraph {
     if (compositeMatch && line.includes('{')) {
       const stateId = compositeMatch[1];
       ensureNode(stateId);
+      parentStack.push(stateId);
+      continue;
+    }
+
+    // Composite state with description: state "description" as stateId {
+    const compositeStateAsMatch = line.match(
+      /^state\s+"([^"]+)"\s+as\s+(\S+)\s*\{\s*$/,
+    );
+    if (compositeStateAsMatch) {
+      const description = compositeStateAsMatch[1];
+      const stateId = compositeStateAsMatch[2];
+      const node = ensureNode(stateId);
+      node.data.description = description;
       parentStack.push(stateId);
       continue;
     }
@@ -259,12 +279,27 @@ export function fromMermaidState(input: string): MermaidStateGraph {
     // Note
     // TODO: notes stored on nodeData but not fully round-trippable
     const noteMatch = line.match(
-      /^note\s+(left|right)\s+of\s+(\S+)\s*:\s*(.+)$/i,
+      /^note\s+(left|right)\s+of\s+(\S+)\s*(?::\s*(.*))?$/i,
     );
     if (noteMatch) {
       const position = noteMatch[1].toLowerCase() as 'left' | 'right';
       const stateId = noteMatch[2];
-      const text = noteMatch[3].trim();
+      const inlineText = noteMatch[3]?.trim();
+      const text =
+        inlineText && inlineText.length > 0
+          ? inlineText
+          : (() => {
+              const content: string[] = [];
+              while (i + 1 < lines.length) {
+                i++;
+                const noteLine = lines[i].trim();
+                if (/^end\s+note$/i.test(noteLine)) {
+                  break;
+                }
+                content.push(noteLine);
+              }
+              return content.join('\n').trim();
+            })();
       const node = ensureNode(stateId);
       if (!node.data.notes) node.data.notes = [];
       node.data.notes.push({ position, text });

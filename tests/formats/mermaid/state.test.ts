@@ -48,6 +48,40 @@ stateDiagram-v2
       expect(graph.nodes[0].data.description).toBe('This is a description');
     });
 
+    it('parses state "description" as stateId composite syntax', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    state "IDEA" as Idea {
+        Drafting --> Refining
+    }
+      `);
+      expect(graph.nodes.find((n) => n.id === 'Idea')!.data.description).toBe(
+        'IDEA',
+      );
+      expect(graph.nodes.find((n) => n.id === 'Drafting')!.parentId).toBe(
+        'Idea',
+      );
+      expect(graph.nodes.find((n) => n.id === 'Refining')!.parentId).toBe(
+        'Idea',
+      );
+    });
+
+    it('reparents states first referenced outside their composite state', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idea --> SpecDrafting : generate spec
+    state "SPEC" as Spec {
+        SpecDrafting --> SpecReview
+    }
+      `);
+      expect(graph.nodes.find((n) => n.id === 'SpecDrafting')!.parentId).toBe(
+        'Spec',
+      );
+      expect(graph.nodes.find((n) => n.id === 'SpecReview')!.parentId).toBe(
+        'Spec',
+      );
+    });
+
     it('parses [*] start pseudo-node', () => {
       const graph = fromMermaidState(`
 stateDiagram-v2
@@ -140,6 +174,24 @@ stateDiagram-v2
         position: 'right',
         text: 'This is idle',
       });
+    });
+
+    it('parses multiline notes without creating note text states', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    Idle --> Active
+    note right of Active
+        First line
+        Second line
+    end note
+      `);
+      const active = graph.nodes.find((n) => n.id === 'Active')!;
+      expect(active.data.notes).toEqual([
+        { position: 'right', text: 'First line\nSecond line' },
+      ]);
+      expect(graph.nodes.some((n) => n.id === 'note')).toBe(false);
+      expect(graph.nodes.some((n) => n.id === 'end')).toBe(false);
+      expect(graph.nodes.some((n) => n.id === 'First')).toBe(false);
     });
 
     it('parses concurrent states with -- separator', () => {
