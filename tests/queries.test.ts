@@ -112,6 +112,21 @@ describe('Neighbor queries', () => {
     const n = getNeighbors(g, 'b');
     expect(n.map((x) => x.id).sort()).toEqual(['a', 'c']);
   });
+
+  it('observes same-count direct endpoint mutations', () => {
+    const g = makeDirectedGraph();
+
+    expect(getSuccessors(g, 'a').map((node) => node.id).sort()).toEqual([
+      'b',
+      'c',
+    ]);
+
+    g.edges[0].sourceId = 'd';
+    g.edges[0].targetId = 'c';
+
+    expect(getSuccessors(g, 'a').map((node) => node.id)).toEqual(['c']);
+    expect(getSuccessors(g, 'd').map((node) => node.id)).toEqual(['c']);
+  });
 });
 
 describe('Degree queries', () => {

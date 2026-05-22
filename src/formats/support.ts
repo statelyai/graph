@@ -18,6 +18,13 @@ export interface FormatSupportEntry {
   notes: string[];
 }
 
+/**
+ * Round-trip support is allowed to use adapter-specific graph, node, and edge
+ * `data` metadata when the target format has no native field for a source
+ * concept. A `partial` value means the adapter still drops meaningful source
+ * information instead of preserving it as metadata.
+ */
+
 export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
   {
     id: 'adjacency-list',
@@ -112,11 +119,13 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       hierarchy: 'full',
       ports: 'full',
       visual: 'full',
-      style: 'partial',
-      weight: 'none',
-      roundTrip: 'partial',
+      style: 'full',
+      weight: 'full',
+      roundTrip: 'full',
     },
-    notes: ['Optimized for layout exchange with ELK rather than exact styling parity.'],
+    notes: [
+      'ELK-native layout fields are preserved directly; graph, node, port, and edge metadata round-trip through reserved layout options.',
+    ],
   },
   {
     id: 'gexf',
@@ -211,14 +220,16 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     features: {
       directed: 'full',
       undirected: 'partial',
-      hierarchy: 'none',
+      hierarchy: 'full',
       ports: 'full',
       visual: 'full',
-      style: 'partial',
-      weight: 'none',
-      roundTrip: 'partial',
+      style: 'full',
+      weight: 'full',
+      roundTrip: 'full',
     },
-    notes: ['Ports map cleanly to handles, but styling remains adapter-specific.'],
+    notes: [
+      'xyflow-native fields are preserved directly; graph, node, edge, style, weight, and port metadata round-trip through reserved data fields.',
+    ],
   },
   {
     id: 'mermaid/block',
@@ -339,9 +350,11 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       visual: 'partial',
       style: 'partial',
       weight: 'none',
-      roundTrip: 'partial',
+      roundTrip: 'full',
     },
-    notes: ['State notes are stored, but not fully round-trippable as separate graph entities.'],
+    notes: [
+      'State-specific syntax such as notes, classes, descriptions, directions, hierarchy, and parallel regions round-trips through node and graph data.',
+    ],
   },
 ];
 

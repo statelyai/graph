@@ -150,6 +150,7 @@
               },
               "required": [
                 "name",
+                "direction",
                 "data"
               ],
               "additionalProperties": false

@@ -173,6 +173,7 @@ stateDiagram-v2
       expect(node.data.notes![0]).toEqual({
         position: 'right',
         text: 'This is idle',
+        format: 'inline',
       });
     });
 
@@ -187,7 +188,7 @@ stateDiagram-v2
       `);
       const active = graph.nodes.find((n) => n.id === 'Active')!;
       expect(active.data.notes).toEqual([
-        { position: 'right', text: 'First line\nSecond line' },
+        { position: 'right', text: 'First line\nSecond line', format: 'block' },
       ]);
       expect(graph.nodes.some((n) => n.id === 'note')).toBe(false);
       expect(graph.nodes.some((n) => n.id === 'end')).toBe(false);
@@ -417,6 +418,68 @@ stateDiagram-v2
         data: { diagramType: 'stateDiagram' },
       });
       expect(output).toContain('state "Loading data" as s1');
+    });
+
+    it('serializes composite states with descriptions as one declaration', () => {
+      const output = toMermaidState({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          {
+            type: 'node',
+            id: 'Idea',
+            parentId: null,
+            initialNodeId: null,
+            label: 'Idea',
+            data: { description: 'IDEA' },
+          },
+          {
+            type: 'node',
+            id: 'Drafting',
+            parentId: 'Idea',
+            initialNodeId: null,
+            label: 'Drafting',
+            data: {},
+          },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('state "IDEA" as Idea {');
+      expect(output).not.toContain('state Idea {');
+    });
+
+    it('serializes block notes', () => {
+      const output = toMermaidState({
+        id: '',
+        type: 'directed',
+        initialNodeId: null,
+        nodes: [
+          {
+            type: 'node',
+            id: 'Active',
+            parentId: null,
+            initialNodeId: null,
+            label: 'Active',
+            data: {
+              notes: [
+                {
+                  position: 'right',
+                  text: 'First line\nSecond line',
+                  format: 'block',
+                },
+              ],
+            },
+          },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('note right of Active\n');
+      expect(output).toContain('First line\n');
+      expect(output).toContain('Second line\n');
+      expect(output).toContain('end note');
     });
 
     it('serializes parallel states with -- separator', () => {

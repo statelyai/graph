@@ -20,7 +20,7 @@ describe('createGraphPort', () => {
     expect(port).toEqual({
       name: 'out',
       direction: 'inout',
-      data: undefined,
+      data: null,
     });
   });
 

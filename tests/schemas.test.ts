@@ -14,6 +14,7 @@ import {
   isGraphEdge,
   isGraphNode,
   isGraphPort,
+  validateGraph,
 } from '../src/schemas';
 import { createGraph } from '../src/graph';
 import type { GraphNode, GraphEdge, Graph } from '../src/types';
@@ -150,6 +151,92 @@ describe('Zod schemas', () => {
     expect(isGraphEdge(graph.edges[0])).toBe(true);
     expect(isGraphPort(graph.nodes[1].ports?.[0])).toBe(true);
     expect(getGraphIssues(graph)).toEqual([]);
+  });
+
+  it('validateGraph() combines shape and graph invariant validation', () => {
+    const graph = {
+      id: 'g1',
+      type: 'directed',
+      initialNodeId: 'missing-initial',
+      nodes: [
+        {
+          type: 'node',
+          id: 'a',
+          parentId: null,
+          initialNodeId: null,
+          label: null,
+          data: null,
+          ports: [
+            { name: 'out', direction: 'out', data: null },
+            { name: 'out', direction: 'in', data: null },
+          ],
+        },
+        {
+          type: 'node',
+          id: 'a',
+          parentId: 'missing-parent',
+          initialNodeId: null,
+          label: null,
+          data: null,
+        },
+      ],
+      edges: [
+        {
+          type: 'edge',
+          id: 'e1',
+          sourceId: 'a',
+          targetId: 'missing-target',
+          sourcePort: 'missing-port',
+          label: null,
+          data: null,
+        },
+      ],
+      data: null,
+    };
+
+    expect(validateGraph(graph).map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        'missing_initial_node',
+        'duplicate_node_id',
+        'duplicate_port_name',
+        'missing_parent',
+        'missing_target_node',
+        'missing_source_port',
+      ]),
+    );
+    expect(isGraph(graph)).toBe(false);
+  });
+
+  it('validateGraph() reports parent cycles', () => {
+    const graph = {
+      id: 'g1',
+      type: 'directed',
+      initialNodeId: null,
+      nodes: [
+        {
+          type: 'node',
+          id: 'a',
+          parentId: 'b',
+          initialNodeId: null,
+          label: null,
+          data: null,
+        },
+        {
+          type: 'node',
+          id: 'b',
+          parentId: 'a',
+          initialNodeId: null,
+          label: null,
+          data: null,
+        },
+      ],
+      edges: [],
+      data: null,
+    };
+
+    expect(validateGraph(graph).map((issue) => issue.code)).toContain(
+      'parent_cycle',
+    );
   });
 
   it('reports simplified validation issues', () => {

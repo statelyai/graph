@@ -1,6 +1,6 @@
 # @statelyai/graph
 
-A TypeScript graph library built on plain JSON objects. Supports directed/undirected graphs, hierarchical nodes, graph algorithms, visual properties, and serialization to DOT, GraphML, Mermaid, and more.
+A TypeScript graph library for JSON-serializable graph IR. Use it to validate, analyze, transform, and round-trip directed, undirected, hierarchical, port-aware, and visual graphs across tools.
 
 Made from our experience at [stately.ai](https://stately.ai), where we build visual tools for complex systems.
 
@@ -25,13 +25,13 @@ Optional peers are only needed for specific adapters:
 
 ## Highlights
 
-- Plain JSON graphs with no runtime wrappers required
+- Plain JSON graphs with no runtime wrappers required; omitted `data` defaults to `null`
 - Standalone functions with a consistent `get*`/`gen*`/`is*`/`add*` naming model
 - Directed, undirected, hierarchical, and visual graph support
 - Ports for node-editor and dataflow-style graphs
 - Algorithms for traversal, paths, centrality, communities, connectivity, isomorphism, ordering, MST, and walks
 - Diff/patch utilities for graph state changes
-- Multi-format conversion via package subpaths
+- Multi-format conversion via package subpaths, with fidelity claims tested against fixtures
 - Small, fast test suite with broad format coverage
 
 ## Quick Start
@@ -149,17 +149,17 @@ getEdgesByPort(graph, 'render', 'input'); // [e1]
 
 <!-- validation helpers exported from src/schemas.ts -->
 
-Use the `@statelyai/graph/schemas` subpath when you want runtime validation or JSON Schema generation.
+Use the `@statelyai/graph/schemas` subpath when you want runtime validation or JSON Schema generation. `validateGraph()` combines shape checks with graph invariants such as duplicate ids, dangling edges, missing parents, missing initial nodes, duplicate ports, invalid port references, and parent cycles.
 
 ```ts
-import { GraphSchema, getGraphIssues, isGraph } from '@statelyai/graph/schemas';
+import { GraphSchema, isGraph, validateGraph } from '@statelyai/graph/schemas';
 
 const unknownValue: unknown = JSON.parse(input);
 
 if (isGraph(unknownValue)) {
   // fully typed Graph
 } else {
-  console.error(getGraphIssues(unknownValue));
+  console.error(validateGraph(unknownValue));
 }
 
 const parsed = GraphSchema.parse(unknownValue);
@@ -263,6 +263,11 @@ const cyto = cytoscapeConverter.to(graph);
 const back = cytoscapeConverter.from(cyto);
 ```
 
+Round-trip fidelity may use adapter-specific graph, node, and edge `data`
+metadata when the target format does not have a native field for a source
+concept. A `partial` round-trip entry means the adapter still drops meaningful
+source information instead of preserving it as metadata.
+
 ## Format Support
 
 <!-- format support matrix derived from src/formats/support.ts -->
@@ -274,13 +279,13 @@ const back = cytoscapeConverter.from(cyto);
 | `d3`                | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through the loose JSON shape.    |
 | `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete. |
 | `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                            |
-| `elk`               | full      | full    | full    | partial    | Best for layout exchange.                                                  |
+| `elk`               | full      | full    | full    | full       | Metadata round-trips through reserved layout options.                      |
 | `gexf`              | full      | full    | full    | full       | Custom attributes preserve metadata beyond the standard viz module.        |
 | `gml`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through direct and JSON fields.  |
 | `graphml`           | full      | full    | partial | partial    | Ports round-trip through `<data>` fields.                                  |
 | `jgf`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through `metadata` objects.      |
 | `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                               |
-| `xyflow`            | none      | full    | full    | partial    | Ports map directly to handles.                                             |
+| `xyflow`            | full      | full    | full    | full       | Metadata round-trips through reserved data fields.                         |
 | `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                             |
 | `mermaid/class`     | none      | none    | none    | partial    | Class syntax is stored conservatively.                                     |
 | `mermaid/er`        | none      | none    | none    | partial    | Focuses on entities and cardinality.                                       |
@@ -288,7 +293,7 @@ const back = cytoscapeConverter.from(cyto);
 | `mermaid/ishikawa`  | full      | none    | none    | partial    | Preserves hierarchy, not fishbone layout.                                  |
 | `mermaid/mindmap`   | full      | none    | partial | partial    | Icon syntax is not fully re-emitted.                                       |
 | `mermaid/sequence`  | partial   | none    | none    | partial    | Actor links and menu syntax are incomplete.                                |
-| `mermaid/state`     | full      | none    | partial | partial    | State notes are still lossy.                                               |
+| `mermaid/state`     | full      | none    | partial | full       | State syntax round-trips through graph and node data.                      |
 
 Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
 
@@ -327,19 +332,22 @@ The repo includes runnable examples under [`examples/`](./examples):
 ```bash
 pnpm install
 pnpm verify
+pnpm bench
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor conventions, format-module checklist, and release notes guidance.
 
 ## Why this library?
 
-Graph file formats define how to _store_ graphs. Visualization libraries define how to _render_ them. This library is the computational layer in between: plain JSON objects in, algorithms and mutations, plain JSON objects out.
+Graph file formats define how to _store_ graphs. Visualization libraries define how to _render_ them. This library is the trusted interchange and analysis layer in between: plain JSON objects in, validation, algorithms, transforms, diffing, and format-preserving conversion out.
 
 ```
 GEXF file → fromGEXF() → Graph → run algorithms, mutate → toCytoscapeJSON() → render
 ```
 
 Your `Graph` is a plain object that survives `JSON.stringify`, `structuredClone`, `postMessage`, and `localStorage` without adapters.
+
+A canonical graph is a deterministic projection of a graph for comparison, hashing, snapshots, or caches. A future pure helper would return a new graph with stable node/edge ordering and normalized optional fields. A hash would be a digest of that canonical JSON. A summary would be a small structural report, for example node count, edge count, roots, sinks, component count, compound depth, port count, and whether the graph is acyclic. A pure `sortGraph()` would return a sorted copy and never mutate the input.
 
 ## License
 

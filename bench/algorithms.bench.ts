@@ -1,12 +1,19 @@
 import { bench, describe } from 'vitest';
 import {
+  createVisualGraph,
   createGraph,
+  getBetweennessCentrality,
   getAllPairsShortestPaths,
   getConnectedComponents,
+  getEdgesByPort,
+  getLCA,
+  getPageRank,
   getShortestPaths,
+  getTopologicalSort,
+  isIsomorphic,
 } from '../src';
 
-function createBenchmarkGraph(nodeCount: number) {
+function createSparseDag(nodeCount: number) {
   const nodes = Array.from({ length: nodeCount }, (_, index) => ({
     id: `n${index}`,
   }));
@@ -33,19 +40,157 @@ function createBenchmarkGraph(nodeCount: number) {
   return createGraph({ nodes, edges });
 }
 
-const mediumGraph = createBenchmarkGraph(250);
-const denseishGraph = createBenchmarkGraph(120);
+function createDenseDirectedGraph(nodeCount: number) {
+  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+    id: `n${index}`,
+  }));
+  const edges = [];
+
+  for (let source = 0; source < nodeCount; source++) {
+    for (let offset = 1; offset <= 8; offset++) {
+      const target = source + offset;
+      if (target >= nodeCount) continue;
+      edges.push({
+        id: `e${source}_${target}`,
+        sourceId: `n${source}`,
+        targetId: `n${target}`,
+        weight: offset,
+      });
+    }
+  }
+
+  return createGraph({ nodes, edges });
+}
+
+function createCompoundGraph(parentCount: number, childrenPerParent: number) {
+  const nodes = [];
+  const edges = [];
+
+  for (let parent = 0; parent < parentCount; parent++) {
+    const parentId = `p${parent}`;
+    nodes.push({ id: parentId, initialNodeId: `${parentId}_c0` });
+
+    for (let child = 0; child < childrenPerParent; child++) {
+      const childId = `${parentId}_c${child}`;
+      nodes.push({ id: childId, parentId });
+      if (child > 0) {
+        edges.push({
+          id: `${parentId}_e${child}`,
+          sourceId: `${parentId}_c${child - 1}`,
+          targetId: childId,
+        });
+      }
+    }
+
+    if (parent > 0) {
+      edges.push({
+        id: `between${parent}`,
+        sourceId: `p${parent - 1}`,
+        targetId: parentId,
+      });
+    }
+  }
+
+  return createGraph({ nodes, edges });
+}
+
+function createMultiEdgeGraph(nodeCount: number, edgesPerPair: number) {
+  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+    id: `n${index}`,
+  }));
+  const edges = [];
+
+  for (let index = 0; index < nodeCount - 1; index++) {
+    for (let edge = 0; edge < edgesPerPair; edge++) {
+      edges.push({
+        id: `e${index}_${edge}`,
+        sourceId: `n${index}`,
+        targetId: `n${index + 1}`,
+        weight: edge + 1,
+      });
+    }
+  }
+
+  return createGraph({ nodes, edges });
+}
+
+function createPortHeavyGraph(nodeCount: number, portsPerNode: number) {
+  const nodes = Array.from({ length: nodeCount }, (_, index) => ({
+    id: `n${index}`,
+    x: index * 12,
+    y: index * 8,
+    width: 100,
+    height: 50,
+    ports: Array.from({ length: portsPerNode }, (_, port) => ({
+      name: `p${port}`,
+      direction: port % 2 === 0 ? 'out' as const : 'in' as const,
+      x: port * 4,
+      y: port * 2,
+      width: 8,
+      height: 8,
+    })),
+  }));
+  const edges = [];
+
+  for (let index = 0; index < nodeCount - 1; index++) {
+    const port = index % portsPerNode;
+    edges.push({
+      id: `e${index}`,
+      sourceId: `n${index}`,
+      targetId: `n${index + 1}`,
+      sourcePort: `p${port}`,
+      targetPort: `p${(port + 1) % portsPerNode}`,
+    });
+  }
+
+  return createVisualGraph({ nodes, edges });
+}
+
+const sparseDag = createSparseDag(180);
+const denseDirected = createDenseDirectedGraph(60);
+const allPairsDag = createSparseDag(60);
+const compoundGraph = createCompoundGraph(24, 6);
+const multiEdgeGraph = createMultiEdgeGraph(20, 3);
+const portHeavyGraph = createPortHeavyGraph(90, 6);
+const BENCH_OPTIONS = {
+  time: 100,
+  warmupTime: 20,
+};
 
 describe('graph algorithms', () => {
-  bench('getConnectedComponents(250 nodes)', () => {
-    getConnectedComponents(mediumGraph);
-  });
+  bench('getConnectedComponents(sparse DAG, 180 nodes)', () => {
+    getConnectedComponents(sparseDag);
+  }, BENCH_OPTIONS);
 
-  bench('getShortestPaths(250 nodes)', () => {
-    getShortestPaths(mediumGraph, { from: 'n0' });
-  });
+  bench('getTopologicalSort(sparse DAG, 180 nodes)', () => {
+    getTopologicalSort(sparseDag);
+  }, BENCH_OPTIONS);
 
-  bench('getAllPairsShortestPaths(120 nodes)', () => {
-    getAllPairsShortestPaths(denseishGraph);
-  });
+  bench('getShortestPaths(sparse DAG, 180 nodes)', () => {
+    getShortestPaths(sparseDag, { from: 'n0' });
+  }, BENCH_OPTIONS);
+
+  bench('getAllPairsShortestPaths(sparse DAG, 60 nodes)', () => {
+    getAllPairsShortestPaths(allPairsDag);
+  }, BENCH_OPTIONS);
+
+  bench('getPageRank(dense directed, 60 nodes)', () => {
+    getPageRank(denseDirected);
+  }, BENCH_OPTIONS);
+
+  bench('getBetweennessCentrality(multi-edge, 20 nodes)', () => {
+    getBetweennessCentrality(multiEdgeGraph);
+  }, BENCH_OPTIONS);
+
+  bench('isIsomorphic(multi-edge, 20 nodes)', () => {
+    isIsomorphic(multiEdgeGraph, multiEdgeGraph);
+  }, BENCH_OPTIONS);
+
+  bench('getLCA(compound graph, 168 nodes)', () => {
+    getLCA(compoundGraph, 'p12_c3', 'p12_c7');
+  }, BENCH_OPTIONS);
+
+  bench('getEdgesByPort(port-heavy visual graph, 90 nodes)', () => {
+    getEdgesByPort(portHeavyGraph, 'n80', 'p2');
+  }, BENCH_OPTIONS);
 });

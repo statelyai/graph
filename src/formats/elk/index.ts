@@ -14,6 +14,38 @@ import type {
 } from '../../types';
 import { getChildren } from '../../queries';
 
+const STATELYAI_METADATA_KEY = 'statelyai.metadata';
+
+interface ElkMetadata {
+  graph?: Partial<VisualGraph>;
+  node?: Partial<VisualNode>;
+  port?: Partial<VisualPort>;
+  edge?: Partial<VisualEdge>;
+}
+
+function addMetadata<T extends { layoutOptions?: Record<string, unknown> }>(
+  target: T,
+  metadata: ElkMetadata,
+): T {
+  target.layoutOptions = {
+    ...(target.layoutOptions ?? {}),
+    [STATELYAI_METADATA_KEY]: JSON.stringify(metadata),
+  };
+  return target;
+}
+
+function readMetadata(value: {
+  layoutOptions?: Record<string, unknown>;
+}): ElkMetadata | undefined {
+  const raw = value.layoutOptions?.[STATELYAI_METADATA_KEY];
+  if (typeof raw !== 'string') return undefined;
+  try {
+    return JSON.parse(raw) as ElkMetadata;
+  } catch {
+    return undefined;
+  }
+}
+
 export type {
   ElkNode,
   ElkExtendedEdge,
@@ -55,7 +87,23 @@ function convertEdge(edge: VisualEdge): ElkExtendedEdge {
   if (edge.label) {
     elkEdge.labels = [{ text: edge.label }];
   }
-  return elkEdge;
+  return addMetadata(elkEdge, {
+    edge: {
+      sourceId: edge.sourceId,
+      targetId: edge.targetId,
+      sourcePort: edge.sourcePort,
+      targetPort: edge.targetPort,
+      label: edge.label,
+      data: edge.data,
+      weight: edge.weight,
+      color: edge.color,
+      style: edge.style,
+      x: edge.x,
+      y: edge.y,
+      width: edge.width,
+      height: edge.height,
+    },
+  });
 }
 
 function convertPort(port: VisualPort): ElkPort {
@@ -75,7 +123,12 @@ function convertPort(port: VisualPort): ElkPort {
         port.direction === 'in' ? 'WEST' : 'EAST',
     };
   }
-  return elkPort;
+  return addMetadata(elkPort, {
+    port: {
+      data: port.data,
+      style: port.style,
+    },
+  });
 }
 
 function convertNode(graph: VisualGraph, node: VisualNode): ElkNode {
@@ -92,6 +145,15 @@ function convertNode(graph: VisualGraph, node: VisualNode): ElkNode {
   if (node.ports && node.ports.length > 0) {
     elkNode.ports = node.ports.map(convertPort);
   }
+  addMetadata(elkNode, {
+    node: {
+      initialNodeId: node.initialNodeId,
+      data: node.data,
+      shape: node.shape,
+      color: node.color,
+      style: node.style,
+    },
+  });
 
   const children = getChildren(graph as Graph, node.id) as VisualNode[];
   if (children.length > 0) {
@@ -150,6 +212,16 @@ export function toELK(graph: VisualGraph): ElkNode {
   if (elkDir) {
     root.layoutOptions = { 'elk.direction': elkDir };
   }
+  addMetadata(root, {
+    graph: {
+      id: graph.id,
+      type: graph.type,
+      initialNodeId: graph.initialNodeId,
+      data: graph.data,
+      direction: graph.direction,
+      style: graph.style,
+    },
+  });
 
   // Root-level nodes (no parent)
   const roots = getChildren(graph as Graph, null) as VisualNode[];
@@ -194,22 +266,33 @@ function flattenElkNodes(
     for (const child of elkNode.children) {
       const label =
         (child.labels as ElkLabel[] | undefined)?.[0]?.text ?? '';
+      const metadata = readMetadata(child)?.node;
       const node: VisualNode = {
         type: 'node',
         id: child.id,
         parentId,
-        initialNodeId: null,
+        initialNodeId:
+          metadata && 'initialNodeId' in metadata
+            ? (metadata.initialNodeId as string | null)
+            : null,
         label,
-        data: undefined as any,
+        data:
+          metadata && 'data' in metadata
+            ? metadata.data
+            : (undefined as any),
         x: child.x ?? 0,
         y: child.y ?? 0,
         width: child.width ?? 0,
         height: child.height ?? 0,
+        ...(metadata?.shape !== undefined && { shape: metadata.shape }),
+        ...(metadata?.color !== undefined && { color: metadata.color }),
+        ...(metadata?.style !== undefined && { style: metadata.style }),
       };
       // Parse ELK ports
       if (child.ports && child.ports.length > 0) {
         node.ports = (child.ports as ElkPort[]).map((elkPort): VisualPort => {
           portOwner.set(elkPort.id, child.id);
+          const metadata = readMetadata(elkPort)?.port;
           const sideOpt =
             elkPort.layoutOptions?.['org.eclipse.elk.port.side'];
           let direction: 'in' | 'out' | 'inout' = 'inout';
@@ -220,11 +303,15 @@ function flattenElkNodes(
             direction,
             label:
               (elkPort.labels as ElkLabel[] | undefined)?.[0]?.text,
-            data: undefined as any,
+            data:
+              metadata && 'data' in metadata
+                ? metadata.data
+                : (undefined as any),
             x: elkPort.x ?? 0,
             y: elkPort.y ?? 0,
             width: elkPort.width ?? 0,
             height: elkPort.height ?? 0,
+            ...(metadata?.style !== undefined && { style: metadata.style }),
           };
         });
       }
@@ -238,22 +325,36 @@ function flattenElkNodes(
       for (const source of elkEdge.sources) {
         for (const target of elkEdge.targets) {
           // Resolve: if source/target is a port ID, map to node + port
+          const metadata = readMetadata(elkEdge)?.edge;
           const sourceNodeId = portOwner.get(source);
           const targetNodeId = portOwner.get(target);
           const edge: VisualEdge = {
             type: 'edge',
             id: elkEdge.id ?? `e${edgeIdx.value++}`,
-            sourceId: sourceNodeId ?? source,
-            targetId: targetNodeId ?? target,
-            label: (elkEdge.labels as ElkLabel[] | undefined)?.[0]?.text ?? '',
-            data: undefined as any,
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
+            sourceId: metadata?.sourceId ?? sourceNodeId ?? source,
+            targetId: metadata?.targetId ?? targetNodeId ?? target,
+            label:
+              metadata && 'label' in metadata
+                ? (metadata.label as string | null)
+                : ((elkEdge.labels as ElkLabel[] | undefined)?.[0]?.text ?? ''),
+            data:
+              metadata && 'data' in metadata
+                ? metadata.data
+                : (undefined as any),
+            x: metadata?.x ?? 0,
+            y: metadata?.y ?? 0,
+            width: metadata?.width ?? 0,
+            height: metadata?.height ?? 0,
+            ...(metadata?.weight !== undefined && { weight: metadata.weight }),
+            ...(metadata?.color !== undefined && { color: metadata.color }),
+            ...(metadata?.style !== undefined && { style: metadata.style }),
           };
-          if (sourceNodeId) edge.sourcePort = source;
-          if (targetNodeId) edge.targetPort = target;
+          if (metadata && 'sourcePort' in metadata) {
+            edge.sourcePort = metadata.sourcePort;
+          } else if (sourceNodeId) edge.sourcePort = source;
+          if (metadata && 'targetPort' in metadata) {
+            edge.targetPort = metadata.targetPort;
+          } else if (targetNodeId) edge.targetPort = target;
           edges.push(edge);
         }
       }
@@ -298,17 +399,27 @@ export function fromELK(elkRoot: ElkNode): VisualGraph {
   }
 
   const elkDir = elkRoot.layoutOptions?.['elk.direction'];
+  const graphMetadata = readMetadata(elkRoot)?.graph;
   const direction: VisualGraph['direction'] =
-    (elkDir ? ELK_TO_DIRECTION[elkDir] : undefined) ?? 'down';
+    (graphMetadata?.direction as VisualGraph['direction'] | undefined) ??
+    (elkDir ? ELK_TO_DIRECTION[elkDir] : undefined) ??
+    'down';
 
   return {
-    id: elkRoot.id,
-    type: 'directed',
-    initialNodeId: null,
+    id: graphMetadata?.id ?? elkRoot.id,
+    type: graphMetadata?.type === 'undirected' ? 'undirected' : 'directed',
+    initialNodeId:
+      graphMetadata && 'initialNodeId' in graphMetadata
+        ? (graphMetadata.initialNodeId as string | null)
+        : null,
     nodes,
     edges: [...seenEdges.values()],
-    data: undefined as any,
+    data:
+      graphMetadata && 'data' in graphMetadata
+        ? graphMetadata.data
+        : (undefined as any),
     direction,
+    ...(graphMetadata?.style !== undefined && { style: graphMetadata.style }),
   };
 }
 

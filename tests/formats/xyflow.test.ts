@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toXYFlow, fromXYFlow } from '../../src/formats/xyflow';
 import type { VisualGraph } from '../../src/types';
+import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: VisualGraph = {
   id: '',
@@ -170,6 +171,42 @@ describe('xyflow', () => {
     expect(parsed.edges[0].sourceId).toBe('a');
     expect(parsed.edges[0].targetId).toBe('b');
     expect(parsed.edges[0].label).toBe('link');
+  });
+
+  it('round-trips graph metadata through reserved data fields', () => {
+    expectFixtureRoundTrip(
+      (graph) => fromXYFlow(toXYFlow(graph as VisualGraph)),
+      {
+        graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
+        nodeKeys: [
+          'parentId',
+          'initialNodeId',
+          'label',
+          'data',
+          'x',
+          'y',
+          'width',
+          'height',
+          'shape',
+          'color',
+          'style',
+          'ports',
+        ],
+        edgeKeys: [
+          'label',
+          'weight',
+          'data',
+          'x',
+          'y',
+          'width',
+          'height',
+          'color',
+          'style',
+          'sourcePort',
+          'targetPort',
+        ],
+      },
+    );
   });
 
   it('throws on null/undefined input', () => {

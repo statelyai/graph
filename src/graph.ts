@@ -32,7 +32,7 @@ import {
  * @example
  * ```ts
  * const port = createGraphPort({ name: 'output', direction: 'out' });
- * // { name: 'output', direction: 'out', data: undefined }
+ * // { name: 'output', direction: 'out', data: null }
  * ```
  */
 export function createGraphPort<P = any>(
@@ -42,7 +42,7 @@ export function createGraphPort<P = any>(
   const port: GraphPort<P> = {
     name: config.name,
     direction: config.direction ?? 'inout',
-    data: config.data as P,
+    data: (config.data ?? null) as P,
   };
   if (config.label !== undefined) port.label = config.label;
   if (config.x !== undefined) port.x = config.x;
@@ -86,7 +86,7 @@ export function createGraphNode<N = any, P = any>(
       initialNodeId: config.initialNodeId ?? null,
     }),
     label: config.label ?? null,
-    data: config.data as N,
+    data: (config.data ?? null) as N,
   };
   if (config.ports !== undefined && config.ports.length > 0) {
     validatePortNames(config.ports);
@@ -108,7 +108,7 @@ export function createGraphNode<N = any, P = any>(
  * @example
  * ```ts
  * const edge = createGraphEdge({ id: 'e1', sourceId: 'a', targetId: 'b' });
- * // { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', label: null, data: undefined }
+ * // { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', label: null, data: null }
  * ```
  */
 export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
@@ -123,7 +123,7 @@ export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
     sourceId: config.sourceId,
     targetId: config.targetId,
     label: config.label ?? null,
-    data: config.data as T,
+    data: (config.data ?? null) as T,
   };
   if (config.sourcePort !== undefined) edge.sourcePort = config.sourcePort;
   if (config.targetPort !== undefined) edge.targetPort = config.targetPort;
@@ -159,7 +159,7 @@ export function createGraph<N = any, E = any, G = any, P = any>(
     initialNodeId: config?.initialNodeId ?? null,
     nodes: (config?.nodes ?? []).map(createGraphNode),
     edges: (config?.edges ?? []).map(createGraphEdge),
-    data: (config?.data ?? undefined) as G,
+    data: (config?.data ?? null) as G,
   };
   if (config?.direction !== undefined) graph.direction = config.direction;
   if (config?.style !== undefined) graph.style = config.style;

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toELK, fromELK } from '../../src/formats/elk';
 import type { VisualGraph } from '../../src/types';
+import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const flatGraph: VisualGraph = {
   id: 'test',
@@ -46,7 +47,7 @@ describe('ELK', () => {
       expect(elk.children![0].id).toBe('a');
       expect(elk.children![0].labels).toEqual([{ text: 'A' }]);
       expect(elk.edges).toHaveLength(2);
-      expect(elk.edges![0]).toEqual({
+      expect(elk.edges![0]).toMatchObject({
         id: 'e1',
         sources: ['a'],
         targets: ['b'],
@@ -56,7 +57,7 @@ describe('ELK', () => {
 
     it('omits labels array for edges without label', () => {
       const elk = toELK(flatGraph);
-      expect(elk.edges![1]).toEqual({
+      expect(elk.edges![1]).toMatchObject({
         id: 'e2',
         sources: ['b'],
         targets: ['c'],
@@ -66,7 +67,7 @@ describe('ELK', () => {
     it('converts compound graph with hierarchy', () => {
       const elk = toELK(compoundGraph);
       expect(elk.id).toBe('compound');
-      expect(elk.layoutOptions).toEqual({ 'elk.direction': 'DOWN' });
+      expect(elk.layoutOptions).toMatchObject({ 'elk.direction': 'DOWN' });
 
       // Root has parent + outside nodes
       expect(elk.children).toHaveLength(2);
@@ -195,6 +196,39 @@ describe('ELK', () => {
       expect(parsed.edges).toHaveLength(2);
       const child1 = parsed.nodes.find((n) => n.id === 'child1')!;
       expect(child1.parentId).toBe('parent');
+    });
+
+    it('round-trips visual graph metadata through ELK layout options', () => {
+      expectFixtureRoundTrip((graph) => fromELK(toELK(graph as VisualGraph)), {
+        graphKeys: ['initialNodeId', 'data', 'direction', 'style'],
+        nodeKeys: [
+          'parentId',
+          'initialNodeId',
+          'label',
+          'data',
+          'x',
+          'y',
+          'width',
+          'height',
+          'shape',
+          'color',
+          'style',
+          'ports',
+        ],
+        edgeKeys: [
+          'label',
+          'weight',
+          'data',
+          'x',
+          'y',
+          'width',
+          'height',
+          'color',
+          'style',
+          'sourcePort',
+          'targetPort',
+        ],
+      });
     });
   });
 });

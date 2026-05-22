@@ -42,7 +42,7 @@ describe('createGraph', () => {
       type: 'node',
       id: 'a',
       label: 'A',
-      data: undefined,
+      data: null,
     });
     expect(g.data).toEqual({ name: 'test' });
   });
@@ -120,7 +120,7 @@ describe('createGraph', () => {
       initialNodeId: null,
       nodes: [],
       edges: [],
-      data: undefined,
+      data: null,
     };
     expect(g.nodes).toEqual([]);
   });

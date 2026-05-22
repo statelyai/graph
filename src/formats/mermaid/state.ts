@@ -15,8 +15,11 @@ import {
 export interface StateNodeData {
   description?: string;
   stateType?: 'choice' | 'fork' | 'join' | 'parallel';
-  // TODO: notes are stored but not round-trippable as separate graph entities
-  notes?: Array<{ position: 'left' | 'right'; text: string }>;
+  notes?: Array<{
+    position: 'left' | 'right';
+    text: string;
+    format?: 'inline' | 'block';
+  }>;
   isStart?: boolean;
   isEnd?: boolean;
   classes?: string[];
@@ -302,7 +305,11 @@ export function fromMermaidState(input: string): MermaidStateGraph {
             })();
       const node = ensureNode(stateId);
       if (!node.data.notes) node.data.notes = [];
-      node.data.notes.push({ position, text });
+      node.data.notes.push({
+        position,
+        text,
+        format: inlineText && inlineText.length > 0 ? 'inline' : 'block',
+      });
       continue;
     }
 
@@ -478,14 +485,11 @@ export function toMermaidState(graph: MermaidStateGraph): string {
         lines.push(`${indent}state ${node.id} <<${node.data.stateType}>>`);
       }
 
-      if (node.data?.description) {
-        lines.push(
-          `${indent}state "${escapeMermaidLabel(node.data.description)}" as ${node.id}`,
-        );
-      }
-
       if (isParent.has(node.id)) {
-        lines.push(`${indent}state ${node.id} {`);
+        const stateDecl = node.data?.description
+          ? `state "${escapeMermaidLabel(node.data.description)}" as ${node.id} {`
+          : `state ${node.id} {`;
+        lines.push(`${indent}${stateDecl}`);
         if (node.data?.direction) {
           const mDir = DIRECTION_TO_MERMAID[node.data.direction];
           if (mDir) lines.push(`${indent}    direction ${mDir}`);
@@ -503,14 +507,26 @@ export function toMermaidState(graph: MermaidStateGraph): string {
           writeNodes(node.id, indent + '    ');
         }
         lines.push(`${indent}}`);
+      } else if (node.data?.description) {
+        lines.push(
+          `${indent}state "${escapeMermaidLabel(node.data.description)}" as ${node.id}`,
+        );
       }
 
       // Emit notes
       if (node.data?.notes) {
         for (const note of node.data.notes) {
-          lines.push(
-            `${indent}note ${note.position} of ${node.id} : ${escapeMermaidLabel(note.text)}`,
-          );
+          if (note.format === 'block' || note.text.includes('\n')) {
+            lines.push(`${indent}note ${note.position} of ${node.id}`);
+            for (const noteLine of note.text.split('\n')) {
+              lines.push(`${indent}    ${escapeMermaidLabel(noteLine)}`);
+            }
+            lines.push(`${indent}end note`);
+          } else {
+            lines.push(
+              `${indent}note ${note.position} of ${node.id} : ${escapeMermaidLabel(note.text)}`,
+            );
+          }
         }
       }
     }

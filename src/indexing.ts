@@ -16,6 +16,9 @@ export interface GraphIndex {
   /** Staleness detection */
   nodeCount: number;
   edgeCount: number;
+  signature: string;
+  nodesRef: Graph['nodes'];
+  edgesRef: Graph['edges'];
 }
 
 // WeakMap cache
@@ -44,12 +47,23 @@ const indexes = new WeakMap<Graph, GraphIndex>();
  */
 export function getIndex(graph: Graph): GraphIndex {
   let idx = indexes.get(graph);
+  const sameStructure =
+    idx &&
+    idx.nodeCount === graph.nodes.length &&
+    idx.edgeCount === graph.edges.length;
+  const shouldCheckSignature =
+    idx !== undefined &&
+    sameStructure &&
+    idx.nodesRef === graph.nodes &&
+    idx.edgesRef === graph.edges;
+  const signature = shouldCheckSignature ? getIndexSignature(graph) : undefined;
   if (
     !idx ||
     idx.nodeCount !== graph.nodes.length ||
-    idx.edgeCount !== graph.edges.length
+    idx.edgeCount !== graph.edges.length ||
+    (signature !== undefined && idx.signature !== signature)
   ) {
-    idx = buildIndex(graph);
+    idx = buildIndex(graph, signature ?? getIndexSignature(graph));
     indexes.set(graph, idx);
   }
   return idx;
@@ -74,7 +88,18 @@ export function invalidateIndex(graph: Graph): void {
 
 // Full rebuild
 
-function buildIndex(graph: Graph): GraphIndex {
+function getIndexSignature(graph: Graph): string {
+  const nodeParts = graph.nodes.map(
+    (node) => `${node.id}\u0000${node.parentId ?? ''}`,
+  );
+  const edgeParts = graph.edges.map(
+    (edge) =>
+      `${edge.id}\u0000${edge.sourceId}\u0000${edge.targetId}`,
+  );
+  return `${nodeParts.join('\u0001')}\u0002${edgeParts.join('\u0001')}`;
+}
+
+function buildIndex(graph: Graph, signature: string): GraphIndex {
   const nodeById = new Map<string, number>();
   const edgeById = new Map<string, number>();
   const outEdges = new Map<string, string[]>();
@@ -107,6 +132,9 @@ function buildIndex(graph: Graph): GraphIndex {
     childNodes,
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
+    signature,
+    nodesRef: graph.nodes,
+    edgesRef: graph.edges,
   };
 }
 
@@ -126,6 +154,7 @@ export function indexAddNode(
   idx.childNodes.get(parent)!.push(node.id);
 
   idx.nodeCount++;
+  idx.signature = '';
 }
 
 export function indexRemoveNode(
@@ -153,6 +182,7 @@ export function indexRemoveNode(
   }
 
   idx.nodeCount--;
+  idx.signature = '';
 }
 
 export function indexAddEdge(
@@ -164,6 +194,7 @@ export function indexAddEdge(
   idx.outEdges.get(edge.sourceId)?.push(edge.id);
   idx.inEdges.get(edge.targetId)?.push(edge.id);
   idx.edgeCount++;
+  idx.signature = '';
 }
 
 export function indexRemoveEdge(
@@ -191,6 +222,7 @@ export function indexRemoveEdge(
   }
 
   idx.edgeCount--;
+  idx.signature = '';
 }
 
 /** Update childNodes index when a node's parentId changes. */
@@ -210,6 +242,7 @@ export function indexReparentNode(
   const np = newParentId ?? null;
   if (!idx.childNodes.has(np)) idx.childNodes.set(np, []);
   idx.childNodes.get(np)!.push(nodeId);
+  idx.signature = '';
 }
 
 /** Update adjacency lists when an edge's sourceId/targetId changes. */
@@ -237,4 +270,5 @@ export function indexUpdateEdgeEndpoints(
     }
     idx.inEdges.get(newTargetId)?.push(edgeId);
   }
+  idx.signature = '';
 }
