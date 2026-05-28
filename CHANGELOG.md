@@ -1,5 +1,15 @@
 # @statelyai/graph
 
+## 1.0.0
+
+### Major Changes
+
+- [`5acd7c3`](https://github.com/statelyai/graph/commit/5acd7c32a4d95897c3111d6fcbc982c406c861c6) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add graph and edge `mode` directedness, replacing graph `type`, and add D2 format support.
+
+  Graphs now use `mode: 'directed' | 'undirected' | 'bidirectional'` as the graph-level default, and edges may override it with their own `mode`. Traversal, path, and query logic resolves effective edge mode so mixed directedness works consistently.
+
+  Adds `@statelyai/graph/d2` with parsing and emitting for D2 syntax, including hierarchy, ports, styles, comments, classes, imports, and connector directedness.
+
 ## 0.13.0
 
 ### Minor Changes
