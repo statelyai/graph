@@ -176,6 +176,19 @@ async function main(): Promise<void> {
         `d3.links[0]?.source;`,
       ],
     },
+    './d2': {
+      phase: 'core',
+      runtime: [
+        `const graph = $MOD.fromD2('a -> b: hello');`,
+        `assert.equal(graph.edges[0]?.label, 'hello');`,
+        `assert.equal($MOD.fromD2($MOD.toD2(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = $MOD.fromD2('a -> b');`,
+        `const d2 = $MOD.toD2(graph);`,
+        `d2.toUpperCase();`,
+      ],
+    },
     './dot': {
       phase: 'optional',
       runtime: [
