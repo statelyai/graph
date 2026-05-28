@@ -63,7 +63,7 @@ const imported = fromGraphML(`<?xml version="1.0" encoding="UTF-8"?>
 <!-- GraphML fidelity notes derived from src/formats/graphml/index.ts -->
 
 Produces GraphML XML with:
-- `<key>` declarations for label, parentId, initialNodeId, data, style, x, y, width, height, shape, color, weight, ports, sourcePort, and targetPort
+- `<key>` declarations for label, parentId, initialNodeId, data, style, x, y, width, height, shape, color, weight, ports, sourcePort, targetPort, and edge mode
 - `<data>` elements on nodes, edges, and the graph
 - JSON-serialized `data`, `style`, and `ports` fields
 

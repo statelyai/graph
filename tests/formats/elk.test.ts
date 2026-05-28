@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const flatGraph: VisualGraph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   direction: 'down',
   nodes: [
@@ -22,7 +22,7 @@ const flatGraph: VisualGraph = {
 
 const compoundGraph: VisualGraph = {
   id: 'compound',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   direction: 'down',
   nodes: [

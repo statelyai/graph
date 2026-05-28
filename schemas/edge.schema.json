@@ -34,6 +34,14 @@
     "targetPort": {
       "type": "string"
     },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "directed",
+        "undirected",
+        "bidirectional"
+      ]
+    },
     "data": {},
     "x": {
       "type": "number"
@@ -62,6 +70,9 @@
           },
           {
             "type": "number"
+          },
+          {
+            "type": "boolean"
           }
         ]
       }

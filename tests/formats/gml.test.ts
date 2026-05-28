@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'Node A', data: { key: 'val' } },
@@ -44,7 +44,7 @@ describe('GML', () => {
     const parsed = fromGML(gml);
 
     expect(parsed.id).toBe('test');
-    expect(parsed.type).toBe('directed');
+    expect(parsed.mode).toBe('directed');
     expect(parsed.nodes).toHaveLength(3);
     expect(parsed.edges).toHaveLength(1);
 
@@ -59,10 +59,10 @@ describe('GML', () => {
   });
 
   it('handles undirected graphs', () => {
-    const gml = toGML({ ...sampleGraph, type: 'undirected' });
+    const gml = toGML({ ...sampleGraph, mode: 'undirected' });
     expect(gml).toContain('directed 0');
     const parsed = fromGML(gml);
-    expect(parsed.type).toBe('undirected');
+    expect(parsed.mode).toBe('undirected');
   });
 
   it('handles graphics properties', () => {
@@ -100,7 +100,7 @@ describe('GML', () => {
     const graph = fromGML('graph [ directed 1 ]');
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
-    expect(graph.type).toBe('directed');
+    expect(graph.mode).toBe('directed');
   });
 
   it('handles comments in GML', () => {

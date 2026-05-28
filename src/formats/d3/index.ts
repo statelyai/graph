@@ -16,7 +16,7 @@ export interface D3Link {
 
 export interface D3Graph {
   id?: string;
-  type?: Graph['type'];
+  mode?: Graph['mode'];
   initialNodeId?: string | null;
   data?: any;
   direction?: Graph['direction'];
@@ -48,7 +48,7 @@ export interface D3Graph {
 export function toD3Graph(graph: Graph): D3Graph {
   return {
     ...(graph.id && { id: graph.id }),
-    type: graph.type,
+    mode: graph.mode,
     initialNodeId: graph.initialNodeId,
     ...(graph.data !== undefined && { data: graph.data }),
     ...(graph.direction && { direction: graph.direction }),
@@ -116,7 +116,7 @@ export function fromD3Graph(d3: D3Graph): Graph {
   }
   return {
     id: d3.id ?? '',
-    type: d3.type === 'undirected' ? 'undirected' : 'directed',
+    mode: d3.mode ?? 'directed',
     initialNodeId: d3.initialNodeId ?? null,
     data: d3.data,
     ...(d3.direction && { direction: d3.direction }),

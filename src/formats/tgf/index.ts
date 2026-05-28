@@ -95,7 +95,7 @@ export function fromTGF(tgf: string): Graph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes,
     edges,

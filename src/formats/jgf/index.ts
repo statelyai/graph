@@ -56,7 +56,7 @@ export function toJGF(graph: Graph): JGFGraph {
   return {
     graph: {
       id: graph.id || undefined,
-      directed: graph.type === 'directed',
+      directed: graph.mode !== 'undirected',
       ...(Object.keys(metadata).length > 0 && { metadata }),
       nodes: graph.nodes.map((n) => {
         const meta: Record<string, any> = {};
@@ -133,7 +133,7 @@ export function fromJGF(jgf: JGFGraph): Graph {
   }
   return {
     id: g.id ?? '',
-    type: g.directed === false ? 'undirected' : 'directed',
+    mode: g.directed === false ? 'undirected' : 'directed',
     initialNodeId: g.metadata?.initialNodeId ?? null,
     data: g.metadata?.data,
     ...(g.metadata?.direction && { direction: g.metadata.direction }),

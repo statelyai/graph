@@ -71,7 +71,7 @@ const imported = fromJGF({
 
 <!-- JGF fidelity notes derived from src/formats/jgf/index.ts -->
 
-Graph-level properties (`initialNodeId`, `data`, `direction`, `style`) are stored in `graph.metadata`. Node properties (`parentId`, `data`, visual props, `style`, `ports`) are stored in `node.metadata`. Edge properties (`data`, `weight`, visual props, `style`, `sourcePort`, `targetPort`) are stored in `edge.metadata`.
+Graph-level properties (`mode`, `initialNodeId`, `data`, `direction`, `style`) are stored in `graph.metadata`. Node properties (`parentId`, `data`, visual props, `style`, `ports`) are stored in `node.metadata`. Edge properties (`mode`, `data`, `weight`, visual props, `style`, `sourcePort`, `targetPort`) are stored in `edge.metadata`.
 
 ### `fromJGF(jgf): Graph`
 

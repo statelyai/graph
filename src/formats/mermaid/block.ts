@@ -176,7 +176,7 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,

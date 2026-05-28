@@ -491,7 +491,7 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,

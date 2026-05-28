@@ -69,7 +69,7 @@ describe('edge weight property', () => {
 
   it('MST respects edge.weight without explicit getWeight', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
@@ -212,7 +212,7 @@ describe('getAStarPath', () => {
 
   it('works with undirected graph', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
@@ -361,13 +361,13 @@ describe('getSubgraph', () => {
 
   it('preserves graph type and data', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }],
       edges: [],
       data: { custom: true },
     });
     const sub = getSubgraph(g, ['a']);
-    expect(sub.type).toBe('undirected');
+    expect(sub.mode).toBe('undirected');
     expect(sub.data).toEqual({ custom: true });
   });
 
@@ -478,13 +478,13 @@ describe('reverseGraph', () => {
 
   it('preserves graph type and data', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }],
       edges: [],
       data: { meta: 'info' },
     });
     const rev = reverseGraph(g);
-    expect(rev.type).toBe('undirected');
+    expect(rev.mode).toBe('undirected');
     expect(rev.data).toEqual({ meta: 'info' });
   });
 
@@ -504,7 +504,7 @@ describe('reverseGraph', () => {
 describe('getMinimumSpanningTree (additional)', () => {
   it('disconnected graph: MST covers only reachable component (prim)', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
@@ -518,7 +518,7 @@ describe('getMinimumSpanningTree (additional)', () => {
 
   it('kruskal handles disconnected graph', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
@@ -532,7 +532,7 @@ describe('getMinimumSpanningTree (additional)', () => {
 
   it('MST with edge.weight (no explicit getWeight)', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b', weight: 4 },
@@ -550,7 +550,7 @@ describe('getMinimumSpanningTree (additional)', () => {
 
   it('parallel edges: picks the lighter one', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b', weight: 5 },
@@ -564,7 +564,7 @@ describe('getMinimumSpanningTree (additional)', () => {
 
   it('negative weights handled by kruskal', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b', weight: -3 },

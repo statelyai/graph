@@ -505,7 +505,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,

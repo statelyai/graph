@@ -334,7 +334,7 @@ describe('getCycles', () => {
 
   it('undirected triangle: exactly one cycle, deduplicated', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -349,7 +349,7 @@ describe('getCycles', () => {
 
   it('undirected square: one 4-cycle', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -365,7 +365,7 @@ describe('getCycles', () => {
 
   it('undirected tree has no cycles', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -634,7 +634,7 @@ describe('genPostorders', () => {
 describe('getMinimumSpanningTree', () => {
   const makeWeightedTriangle = () =>
     createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b', data: 1 },
@@ -666,7 +666,7 @@ describe('getMinimumSpanningTree', () => {
 
   it('prim and kruskal agree on total weight', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b', data: 4 },
@@ -701,7 +701,7 @@ describe('getMinimumSpanningTree', () => {
 
   it('default weight is 1: picks any spanning tree', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -721,7 +721,7 @@ describe('getMinimumSpanningTree', () => {
 
   it('single node', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'x' }],
     });
     const mst = getMinimumSpanningTree(g);
@@ -731,7 +731,7 @@ describe('getMinimumSpanningTree', () => {
 
   it('already a tree: MST = original', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b', data: 5 },
@@ -747,7 +747,7 @@ describe('getMinimumSpanningTree', () => {
     const mst = getMinimumSpanningTree(makeWeightedTriangle(), {
       getWeight: (e) => e.data,
     });
-    expect(mst.type).toBe('undirected');
+    expect(mst.mode).toBe('undirected');
     expect(mst.id).toBe('');
     for (const n of mst.nodes) {
       expect(n.type).toBe('node');
@@ -760,7 +760,7 @@ describe('getMinimumSpanningTree', () => {
   it('kruskal: skips edges that would create a cycle', () => {
     // Force kruskal to encounter a cycle-forming edge
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b', data: 1 },
@@ -868,7 +868,7 @@ describe('getAllPairsShortestPaths', () => {
 
   it('undirected: paths in both directions', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
     });

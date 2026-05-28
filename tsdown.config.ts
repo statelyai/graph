@@ -11,6 +11,7 @@ export default defineConfig({
     'src/formats/adjacency-list/index.ts',
     'src/formats/converter/index.ts',
     'src/formats/cytoscape/index.ts',
+    'src/formats/d2/index.ts',
     'src/formats/d3/index.ts',
     'src/formats/dot/index.ts',
     'src/formats/edge-list/index.ts',

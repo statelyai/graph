@@ -10,6 +10,7 @@ import type {
   SinglePathOptions,
 } from '../types';
 import { getIndex } from '../indexing';
+import { getEdgeMode } from '../mode';
 import {
   getNeighborEdges,
   getNeighborEdgesAll,
@@ -103,7 +104,6 @@ function bellmanFord<N, E>(
   const dist = new Map<string, number>();
   const prev = new Map<string, Array<{ from: string; edge: GraphEdge<E> }>>();
   const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-  const isUndirected = graph.type === 'undirected';
 
   for (const node of graph.nodes) {
     dist.set(node.id, Infinity);
@@ -122,7 +122,7 @@ function bellmanFord<N, E>(
       toId: edge.targetId,
       edge: edge as GraphEdge<E>,
     });
-    if (isUndirected) {
+    if (getEdgeMode(graph, edge) !== 'directed') {
       directedEdges.push({
         fromId: edge.targetId,
         toId: edge.sourceId,
@@ -373,7 +373,7 @@ export function getCycles<N, E>(graph: Graph<N, E>): GraphPath<N, E>[] {
 export function* genCycles<N, E>(
   graph: Graph<N, E>,
 ): Generator<GraphPath<N, E>> {
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     yield* genCyclesUndirected(graph);
   } else {
     yield* genCyclesDirected(graph);
@@ -557,7 +557,7 @@ function floydWarshallAllPaths<N, E>(
       prev[source][target].push({ from: source, edge: edge as GraphEdge<E> });
     }
 
-    if (graph.type === 'undirected') {
+    if (getEdgeMode(graph, edge) !== 'directed') {
       if (edgeWeight < dist[target][source]) {
         dist[target][source] = edgeWeight;
         prev[target][source] = [{ from: target, edge: edge as GraphEdge<E> }];

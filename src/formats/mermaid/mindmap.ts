@@ -142,7 +142,7 @@ export function fromMermaidMindmap(input: string): MermaidMindmapGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,

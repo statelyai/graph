@@ -12,7 +12,7 @@ stateDiagram-v2
     Idle --> Active
     Active --> Idle
       `);
-      expect(graph.type).toBe('directed');
+      expect(graph.mode).toBe('directed');
       expect(graph.data.diagramType).toBe('stateDiagram');
       expect(graph.nodes).toHaveLength(2);
       expect(graph.nodes[0].label).toBe('Idle');
@@ -355,7 +355,7 @@ stateDiagram-v2
     it('serializes basic state diagram', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Idle', parentId: null, initialNodeId: null, label: 'Idle', data: {} },
@@ -373,7 +373,7 @@ stateDiagram-v2
     it('serializes [*] start/end', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'start_0', parentId: null, initialNodeId: null, label: '[*]', data: { isStart: true } },
@@ -393,7 +393,7 @@ stateDiagram-v2
     it('serializes composite states', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Parent', parentId: null, initialNodeId: null, label: 'Parent', data: {} },
@@ -409,7 +409,7 @@ stateDiagram-v2
     it('serializes descriptions', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 's1', parentId: null, initialNodeId: null, label: 's1', data: { description: 'Loading data' } },
@@ -423,7 +423,7 @@ stateDiagram-v2
     it('serializes composite states with descriptions as one declaration', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {
@@ -453,7 +453,7 @@ stateDiagram-v2
     it('serializes block notes', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {
@@ -485,7 +485,7 @@ stateDiagram-v2
     it('serializes parallel states with -- separator', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Active', parentId: null, initialNodeId: null, label: 'Active', data: { stateType: 'parallel' as const } },
@@ -507,7 +507,7 @@ stateDiagram-v2
     it('serializes direction', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         direction: 'right',
         nodes: [
@@ -522,7 +522,7 @@ stateDiagram-v2
     it('serializes classDefs and class assignments', () => {
       const output = toMermaidState({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Idle', parentId: null, initialNodeId: null, label: 'Idle', data: { classes: ['red'] } },

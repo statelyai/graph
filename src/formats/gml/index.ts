@@ -28,7 +28,7 @@ import { createFormatConverter } from '../converter';
 export function toGML(graph: Graph): string {
   const lines: string[] = [];
   lines.push('graph [');
-  lines.push(`  directed ${graph.type === 'directed' ? 1 : 0}`);
+  lines.push(`  directed ${graph.mode === 'undirected' ? 0 : 1}`);
   if (graph.id) lines.push(`  id ${gmlString(graph.id)}`);
   if (graph.initialNodeId) {
     lines.push(`  initialNodeId ${gmlString(graph.initialNodeId)}`);
@@ -237,7 +237,7 @@ export function fromGML(gml: string): Graph {
 
   return {
     id: graphId,
-    type: directed ? 'directed' : 'undirected',
+    mode: directed ? 'directed' : 'undirected',
     initialNodeId: graphBlock['initialNodeId'] ?? null,
     nodes,
     edges,

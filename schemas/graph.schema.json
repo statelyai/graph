@@ -5,11 +5,12 @@
     "id": {
       "type": "string"
     },
-    "type": {
+    "mode": {
       "type": "string",
       "enum": [
         "directed",
-        "undirected"
+        "undirected",
+        "bidirectional"
       ]
     },
     "initialNodeId": {
@@ -95,6 +96,9 @@
                 },
                 {
                   "type": "number"
+                },
+                {
+                  "type": "boolean"
                 }
               ]
             }
@@ -143,6 +147,9 @@
                       },
                       {
                         "type": "number"
+                      },
+                      {
+                        "type": "boolean"
                       }
                     ]
                   }
@@ -202,6 +209,14 @@
           "targetPort": {
             "type": "string"
           },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "directed",
+              "undirected",
+              "bidirectional"
+            ]
+          },
           "data": {},
           "x": {
             "type": "number"
@@ -230,6 +245,9 @@
                 },
                 {
                   "type": "number"
+                },
+                {
+                  "type": "boolean"
                 }
               ]
             }
@@ -267,6 +285,9 @@
           },
           {
             "type": "number"
+          },
+          {
+            "type": "boolean"
           }
         ]
       }
@@ -274,7 +295,7 @@
   },
   "required": [
     "id",
-    "type",
+    "mode",
     "nodes",
     "edges",
     "data"

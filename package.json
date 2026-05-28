@@ -29,6 +29,7 @@
     "./adjacency-list": "./dist/formats/adjacency-list/index.mjs",
     "./converter": "./dist/formats/converter/index.mjs",
     "./cytoscape": "./dist/formats/cytoscape/index.mjs",
+    "./d2": "./dist/formats/d2/index.mjs",
     "./d3": "./dist/formats/d3/index.mjs",
     "./dot": "./dist/formats/dot/index.mjs",
     "./edge-list": "./dist/formats/edge-list/index.mjs",

@@ -42,7 +42,7 @@ export interface CytoscapeJSON {
 export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
   const graphData: Record<string, any> = {};
   if (graph.id) graphData.id = graph.id;
-  graphData.type = graph.type;
+  graphData.mode = graph.mode;
   if (graph.initialNodeId)
     graphData.initialNodeId = graph.initialNodeId;
   if (graph.data !== undefined) graphData.graphData = graph.data;
@@ -124,7 +124,7 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
   }
   return {
     id: cyto.data?.id ?? '',
-    type: cyto.data?.type === 'undirected' ? 'undirected' : 'directed',
+    mode: cyto.data?.mode ?? 'directed',
     initialNodeId: cyto.data?.initialNodeId ?? null,
     data: cyto.data?.graphData,
     ...(cyto.data?.direction && { direction: cyto.data.direction }),

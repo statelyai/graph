@@ -57,7 +57,7 @@ const SHAPE_TO_DOT: Record<string, string> = {
  * ```
  */
 export function toDOT(graph: Graph): string {
-  const isDirected = graph.type === 'directed';
+  const isDirected = graph.mode !== 'undirected';
   const keyword = isDirected ? 'digraph' : 'graph';
   const edgeOp = isDirected ? '->' : '--';
 
@@ -378,7 +378,7 @@ export function fromDOT(dot: string): Graph {
 
   return {
     id: root.id ?? '',
-    type: isDirected ? 'directed' : 'undirected',
+    mode: isDirected ? 'directed' : 'undirected',
     initialNodeId: null,
     nodes: [...nodeMap.values()],
     edges,

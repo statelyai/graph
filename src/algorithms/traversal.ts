@@ -56,7 +56,7 @@ export function* dfs<N>(
 }
 
 export function isAcyclic(graph: Graph): boolean {
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     return isAcyclicUndirected(graph);
   }
   const WHITE = 0;

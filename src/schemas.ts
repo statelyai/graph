@@ -1,7 +1,12 @@
 import * as z from 'zod';
 import type { Graph, GraphEdge, GraphNode, GraphPort } from './types';
 
-const StyleSchema = z.record(z.string(), z.union([z.string(), z.number()]));
+const StyleSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean()]),
+);
+
+const ModeSchema = z.enum(['directed', 'undirected', 'bidirectional']);
 const PortDirectionSchema = z.enum(['in', 'out', 'inout']);
 
 export const PortSchema = z.object({
@@ -42,6 +47,7 @@ export const EdgeSchema = z.object({
   weight: z.number().optional(),
   sourcePort: z.string().optional(),
   targetPort: z.string().optional(),
+  mode: ModeSchema.optional(),
   data: z.any(),
   x: z.number().optional(),
   y: z.number().optional(),
@@ -53,7 +59,7 @@ export const EdgeSchema = z.object({
 
 export const GraphSchema = z.object({
   id: z.string(),
-  type: z.enum(['directed', 'undirected']),
+  mode: ModeSchema,
   initialNodeId: z.string().nullable().optional(),
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),

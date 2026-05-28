@@ -153,7 +153,7 @@ describe('flatten', () => {
   it('preserves graph metadata', () => {
     const g = createGraph({
       id: 'my-graph',
-      type: 'directed',
+      mode: 'directed',
       data: { name: 'test' },
       nodes: [{ id: 'a' }],
       edges: [],
@@ -161,7 +161,7 @@ describe('flatten', () => {
 
     const flat = flatten(g);
     expect(flat.id).toBe('my-graph');
-    expect(flat.type).toBe('directed');
+    expect(flat.mode).toBe('directed');
     expect(flat.data).toEqual({ name: 'test' });
   });
 

@@ -6,7 +6,7 @@ describe('toDOT', () => {
   it('exports directed graph', () => {
     const g: Graph = {
       id: 'test',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'Node A', data: undefined },
@@ -26,7 +26,7 @@ describe('toDOT', () => {
   it('exports undirected graph', () => {
     const g: Graph = {
       id: 'ug',
-      type: 'undirected',
+      mode: 'undirected',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: '', data: undefined },
@@ -45,7 +45,7 @@ describe('toDOT', () => {
   it('exports edge port references', () => {
     const g: Graph = {
       id: 'ports',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: '', data: undefined },
@@ -72,7 +72,7 @@ describe('toDOT', () => {
   it('escapes special characters in ids', () => {
     const g: Graph = {
       id: 'my graph',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'node 1', parentId: null, initialNodeId: null, label: 'has "quotes"', data: undefined },
@@ -91,14 +91,14 @@ describe('fromDOT', () => {
   it('parses empty digraph', () => {
     const g = fromDOT('digraph G {}');
     expect(g.id).toBe('G');
-    expect(g.type).toBe('directed');
+    expect(g.mode).toBe('directed');
     expect(g.nodes).toHaveLength(0);
     expect(g.edges).toHaveLength(0);
   });
 
   it('parses empty undirected graph', () => {
     const g = fromDOT('graph G {}');
-    expect(g.type).toBe('undirected');
+    expect(g.mode).toBe('undirected');
   });
 
   it('parses nodes with labels', () => {
@@ -300,7 +300,7 @@ describe('dotConverter', () => {
   it('round-trips a simple graph', () => {
     const g: Graph = {
       id: 'test',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: undefined },
@@ -316,7 +316,7 @@ describe('dotConverter', () => {
     const restored = dotConverter.from(dot);
 
     expect(restored.id).toBe('test');
-    expect(restored.type).toBe('directed');
+    expect(restored.mode).toBe('directed');
     expect(restored.nodes).toHaveLength(2);
     expect(restored.nodes[0].id).toBe('a');
     expect(restored.nodes[0].label).toBe('A');
@@ -331,7 +331,7 @@ describe('dotConverter', () => {
   it('round-trips edge port references', () => {
     const g: Graph = {
       id: 'ports',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: undefined },

@@ -133,7 +133,7 @@ export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
 
   return createGraph({
     id: graph.id,
-    type: graph.type,
+    mode: graph.mode,
     nodes: leafNodes,
     edges: flatEdges,
     data: graph.data,
@@ -215,7 +215,7 @@ export function getSubgraph<N, E, G>(
 
   return createGraph({
     id: graph.id,
-    type: graph.type,
+    mode: graph.mode,
     initialNodeId:
       graph.initialNodeId && nodeIdSet.has(graph.initialNodeId)
         ? graph.initialNodeId
@@ -263,7 +263,7 @@ export function reverseGraph<N, E, G>(
 
   return createGraph({
     id: graph.id,
-    type: graph.type,
+    mode: graph.mode,
     initialNodeId: graph.initialNodeId ?? undefined,
     nodes: graph.nodes.map((n) => nodeToConfig(n)),
     edges: edges.map((e) => {

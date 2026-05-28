@@ -67,7 +67,7 @@ const imported = fromGML(`graph [
 
 <!-- GML fidelity notes derived from src/formats/gml/index.ts -->
 
-Preserves graph `initialNodeId`, `data`, `direction`, `style`, plus node and edge `label`, `data`, `ports`, `sourcePort`, `targetPort`, `weight`, `shape`, `color`, `style`, and visual properties in `graphics [x, y, w, h]` blocks. Compound graphs use nested `node [ ... node [ ] ]` blocks.
+Preserves graph `mode`, `initialNodeId`, `data`, `direction`, `style`, plus node and edge `label`, `data`, `ports`, `sourcePort`, `targetPort`, `weight`, `shape`, `color`, `style`, and visual properties in `graphics [x, y, w, h]` blocks. Compound graphs use nested `node [ ... node [ ] ]` blocks.
 
 ### `fromGML(gml): string`
 

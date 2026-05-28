@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: VisualGraph = {
   id: '',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   direction: 'down',
   nodes: [

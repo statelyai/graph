@@ -108,7 +108,7 @@ erDiagram
     it('serializes ER diagram', () => {
       const output = toMermaidER({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {

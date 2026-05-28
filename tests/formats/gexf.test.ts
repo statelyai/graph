@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'Node A', data: { color: 'red' } },
@@ -34,7 +34,7 @@ describe('GEXF', () => {
     const xml = toGEXF(sampleGraph);
     const parsed = fromGEXF(xml);
 
-    expect(parsed.type).toBe('directed');
+    expect(parsed.mode).toBe('directed');
     expect(parsed.nodes).toHaveLength(3);
     expect(parsed.edges).toHaveLength(2);
 
@@ -51,10 +51,10 @@ describe('GEXF', () => {
   });
 
   it('handles undirected graphs', () => {
-    const xml = toGEXF({ ...sampleGraph, type: 'undirected' });
+    const xml = toGEXF({ ...sampleGraph, mode: 'undirected' });
     expect(xml).toContain('defaultedgetype="undirected"');
     const parsed = fromGEXF(xml);
-    expect(parsed.type).toBe('undirected');
+    expect(parsed.mode).toBe('undirected');
   });
 
   it('preserves visual properties', () => {
@@ -97,7 +97,7 @@ describe('GEXF', () => {
     const graph = fromGEXF(xml);
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
-    expect(graph.type).toBe('directed');
+    expect(graph.mode).toBe('directed');
   });
 
   it('round-trips ports and edge port references', () => {

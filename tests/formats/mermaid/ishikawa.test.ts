@@ -46,7 +46,7 @@ Blurry Photo
     it('serializes an Ishikawa graph', () => {
       const output = toMermaidIshikawa({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {

@@ -11,7 +11,7 @@ function getDegreeSignature(graph: Graph, nodeId: string): string {
   const outDegree = idx.outEdges.get(nodeId)?.length ?? 0;
   const inDegree = idx.inEdges.get(nodeId)?.length ?? 0;
 
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     return `u:${new Set([
       ...(idx.outEdges.get(nodeId) ?? []),
       ...(idx.inEdges.get(nodeId) ?? []),
@@ -26,7 +26,7 @@ function getEdgesBetween<N, E>(
   sourceId: string,
   targetId: string,
 ): GraphEdge<E>[] {
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     return graph.edges.filter(
       (edge) =>
         (edge.sourceId === sourceId && edge.targetId === targetId) ||
@@ -75,7 +75,7 @@ export function isIsomorphic<N, E>(
   graphB: Graph<N, E>,
   options?: IsomorphismOptions<N, E>,
 ): boolean {
-  if (graphA.type !== graphB.type) return false;
+  if (graphA.mode !== graphB.mode) return false;
   if (graphA.nodes.length !== graphB.nodes.length) return false;
   if (graphA.edges.length !== graphB.edges.length) return false;
 

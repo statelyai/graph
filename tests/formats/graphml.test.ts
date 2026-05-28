@@ -6,7 +6,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'Node A', data: { color: 'red' } },
@@ -35,7 +35,7 @@ describe('GraphML', () => {
     const parsed = fromGraphML(xml);
 
     expect(parsed.id).toBe('test');
-    expect(parsed.type).toBe('directed');
+    expect(parsed.mode).toBe('directed');
     expect(parsed.nodes).toHaveLength(3);
     expect(parsed.edges).toHaveLength(2);
 
@@ -92,12 +92,12 @@ describe('GraphML', () => {
   it('handles undirected graphs', () => {
     const g: Graph = {
       ...sampleGraph,
-      type: 'undirected',
+      mode: 'undirected',
     };
     const xml = toGraphML(g);
     expect(xml).toContain('edgedefault="undirected"');
     const parsed = fromGraphML(xml);
-    expect(parsed.type).toBe('undirected');
+    expect(parsed.mode).toBe('undirected');
   });
 
   it('throws on non-string input', () => {

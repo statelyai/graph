@@ -333,7 +333,7 @@ export function fromMermaidClass(input: string): MermaidClassGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,

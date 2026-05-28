@@ -252,7 +252,7 @@ const imported = fromGEXF(gexfXmlString); // GEXF (Gephi)
 
 <!-- supported format adapters derived from src/formats/* subdirectories -->
 
-**Supported formats:** Cytoscape.js JSON, D3.js JSON, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block, Ishikawa), ELK, xyflow, adjacency list, and edge list.
+**Supported formats:** Cytoscape.js JSON, D3.js JSON, D2, JSON Graph Format, GEXF, GraphML, GML, TGF, DOT, Mermaid (flowchart, state, sequence, class, ER, mindmap, block, Ishikawa), ELK, xyflow, adjacency list, and edge list.
 
 Each bidirectional format also has a converter object:
 
@@ -277,6 +277,7 @@ source information instead of preserving it as metadata.
 | `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                  |
 | `cytoscape`         | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through element data.            |
 | `d3`                | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through the loose JSON shape.    |
+| `d2`                | full      | full    | full    | full       | D2 syntax, hierarchy, ports, styles, and connector modes round-trip.       |
 | `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete. |
 | `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                            |
 | `elk`               | full      | full    | full    | full       | Metadata round-trips through reserved layout options.                      |
@@ -304,6 +305,7 @@ Format-specific docs live alongside the source:
 - [Adjacency list](./src/formats/adjacency-list/README.md)
 - [Cytoscape](./src/formats/cytoscape/README.md)
 - [D3](./src/formats/d3/README.md)
+- [D2](./src/formats/d2/README.md)
 - [DOT](./src/formats/dot/README.md)
 - [Edge list](./src/formats/edge-list/README.md)
 - [ELK](./src/formats/elk/README.md)

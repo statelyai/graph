@@ -1,6 +1,7 @@
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
+import { getEdgeMode } from '../../mode';
 
 // --- GEXF (Graph Exchange XML Format, https://gexf.net/) ---
 
@@ -95,12 +96,20 @@ export function toGEXF(graph: Graph): string {
     return node;
   });
 
+  const graphDirected = graph.mode !== 'undirected';
   const edges = graph.edges.map((e) => {
     const edge: any = {
       '@_id': e.id,
       '@_source': e.sourceId,
       '@_target': e.targetId,
     };
+    // Per-edge directedness override. GEXF edges carry an optional `type`
+    // attribute; emit it only when the edge differs from the graph default.
+    // Bidirectional has no GEXF representation and maps to directed.
+    const edgeDirected = getEdgeMode(graph, e) !== 'undirected';
+    if (edgeDirected !== graphDirected) {
+      edge['@_type'] = edgeDirected ? 'directed' : 'undirected';
+    }
     if (e.label) edge['@_label'] = e.label;
     if (e.data !== undefined) {
       edge.attvalues = {
@@ -164,7 +173,7 @@ export function toGEXF(graph: Graph): string {
       '@_xmlns:viz': 'http://gexf.net/1.3/viz',
       '@_version': '1.3',
       graph: {
-        '@_defaultedgetype': graph.type === 'directed' ? 'directed' : 'undirected',
+        '@_defaultedgetype': graph.mode === 'undirected' ? 'undirected' : 'directed',
         ...(graph.id && { '@_id': graph.id }),
         ...(graph.initialNodeId && { '@_initialNodeId': graph.initialNodeId }),
         ...(graph.direction && { '@_direction': graph.direction }),
@@ -340,12 +349,17 @@ export function fromGEXF(xml: string): Graph {
       const b = Number(color['@_b'] ?? 0);
       edge.color = `#${hex(r)}${hex(g)}${hex(b)}`;
     }
+    // Per-edge directedness override from the GEXF `type` attribute.
+    const typeAttr = e['@_type'];
+    if (typeAttr !== undefined) {
+      edge.mode = String(typeAttr) === 'undirected' ? 'undirected' : 'directed';
+    }
     return edge;
   });
 
   return {
     id: String(graphEl['@_id'] ?? ''),
-    type: graphType,
+    mode: graphType,
     initialNodeId: graphEl['@_initialNodeId'] ?? null,
     nodes,
     edges,

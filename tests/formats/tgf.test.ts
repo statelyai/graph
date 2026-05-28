@@ -6,7 +6,7 @@ describe('TGF', () => {
   it('toTGF() produces valid TGF', () => {
     const g: Graph = {
       id: '',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'Node A', data: undefined },

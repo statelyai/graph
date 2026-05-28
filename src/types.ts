@@ -1,5 +1,17 @@
 // --- Base interfaces (DRY) ---
 
+/**
+ * Directedness of a graph or an individual edge.
+ *
+ * - `'directed'` — edge points from source to target.
+ * - `'undirected'` — edge has no direction; traversable both ways.
+ * - `'bidirectional'` — edge points both ways (arrows on both ends).
+ *
+ * Set at the graph level as the default ({@link Graph.mode}); individual edges
+ * may override it ({@link GraphEdge.mode}).
+ */
+export type GraphMode = 'directed' | 'undirected' | 'bidirectional';
+
 export interface EntityRect {
   x: number;
   y: number;
@@ -13,7 +25,7 @@ export interface GraphEntity {
   y?: number;
   width?: number;
   height?: number;
-  style?: Record<string, string | number>;
+  style?: Record<string, string | number | boolean>;
 }
 
 /** Visual entity base — required position/size. */
@@ -22,7 +34,7 @@ export interface VisualGraphEntity {
   y: number;
   width: number;
   height: number;
-  style?: Record<string, string | number>;
+  style?: Record<string, string | number | boolean>;
 }
 
 // --- Port types ---
@@ -59,13 +71,14 @@ export interface GraphConfig<
   TPortData = any,
 > {
   id?: string;
-  type?: 'directed' | 'undirected';
+  /** Default directedness for all edges. Defaults to `'directed'`. */
+  mode?: GraphMode;
   initialNodeId?: string;
   nodes?: NodeConfig<TNodeData, TPortData>[];
   edges?: EdgeConfig<TEdgeData>[];
   data?: TGraphData;
   direction?: 'up' | 'down' | 'left' | 'right';
-  style?: Record<string, string | number>;
+  style?: Record<string, string | number | boolean>;
 }
 
 export interface NodeConfig<TNodeData = any, TPortData = any>
@@ -107,6 +120,11 @@ export interface EdgeConfig<TEdgeData = any> extends GraphEntity {
   sourcePort?: string;
   /** Port name on the target node this edge connects to. */
   targetPort?: string;
+  /**
+   * Per-edge directedness override. When absent, the edge inherits the graph's
+   * {@link GraphConfig.mode}.
+   */
+  mode?: GraphMode;
   data?: TEdgeData;
   color?: string;
 }
@@ -120,13 +138,14 @@ export interface Graph<
   TPortData = any,
 > {
   id: string;
-  type: 'directed' | 'undirected';
+  /** Default directedness for all edges. */
+  mode: GraphMode;
   initialNodeId?: string | null;
   nodes: GraphNode<TNodeData, TPortData>[];
   edges: GraphEdge<TEdgeData>[];
   data: TGraphData;
   direction?: 'up' | 'down' | 'left' | 'right';
-  style?: Record<string, string | number>;
+  style?: Record<string, string | number | boolean>;
 }
 
 export interface GraphNode<TNodeData = any, TPortData = any>
@@ -158,6 +177,11 @@ export interface GraphEdge<TEdgeData = any> extends GraphEntity {
   sourcePort?: string;
   /** Port name on the target node this edge connects to. */
   targetPort?: string;
+  /**
+   * Per-edge directedness override. When absent, the edge inherits the graph's
+   * {@link Graph.mode}.
+   */
+  mode?: GraphMode;
   data: TEdgeData;
   color?: string;
 }

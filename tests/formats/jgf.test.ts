@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: 'a',
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'Node A', data: { color: 'red' } },
@@ -35,7 +35,7 @@ describe('JGF', () => {
     const parsed = fromJGF(jgf);
 
     expect(parsed.id).toBe('test');
-    expect(parsed.type).toBe('directed');
+    expect(parsed.mode).toBe('directed');
     expect(parsed.initialNodeId).toBe('a');
     expect(parsed.data).toEqual({ version: 1 });
     expect(parsed.nodes).toHaveLength(3);
@@ -54,10 +54,10 @@ describe('JGF', () => {
   });
 
   it('handles undirected graphs', () => {
-    const jgf = toJGF({ ...sampleGraph, type: 'undirected' });
+    const jgf = toJGF({ ...sampleGraph, mode: 'undirected' });
     expect(jgf.graph.directed).toBe(false);
     const parsed = fromJGF(jgf);
-    expect(parsed.type).toBe('undirected');
+    expect(parsed.mode).toBe('undirected');
   });
 
   it('throws on null/undefined input', () => {
@@ -79,7 +79,7 @@ describe('JGF', () => {
     const graph = fromJGF({ graph: { nodes: [], edges: [] } });
     expect(graph.nodes).toHaveLength(0);
     expect(graph.edges).toHaveLength(0);
-    expect(graph.type).toBe('directed');
+    expect(graph.mode).toBe('directed');
   });
 
   it('round-trips ports and edge port references', () => {

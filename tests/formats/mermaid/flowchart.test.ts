@@ -11,7 +11,7 @@ describe('Mermaid Flowchart Converter', () => {
 graph TD
     A[Start] --> B[End]
       `);
-      expect(graph.type).toBe('directed');
+      expect(graph.mode).toBe('directed');
       expect(graph.direction).toBe('down');
       expect(graph.data.diagramType).toBe('flowchart');
       expect(graph.nodes).toHaveLength(2);
@@ -297,7 +297,7 @@ flowchart TD
     it('serializes basic flowchart', () => {
       const output = toMermaidFlowchart({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         direction: 'right',
         nodes: [
@@ -330,7 +330,7 @@ flowchart TD
       for (const [shape, expected] of Object.entries(shapes)) {
         const output = toMermaidFlowchart({
           id: '',
-          type: 'directed',
+          mode: 'directed',
           initialNodeId: null,
           nodes: [
             { type: 'node', id: 'X', parentId: null, initialNodeId: null, label: 'label', data: {}, shape } as any,
@@ -345,7 +345,7 @@ flowchart TD
     it('serializes edge labels', () => {
       const output = toMermaidFlowchart({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: '', data: {} },
@@ -362,7 +362,7 @@ flowchart TD
     it('serializes subgraphs', () => {
       const output = toMermaidFlowchart({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'sub1', parentId: null, initialNodeId: null, label: 'My Sub', data: {} },
@@ -379,7 +379,7 @@ flowchart TD
     it('serializes subgraph direction', () => {
       const output = toMermaidFlowchart({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'sub1', parentId: null, initialNodeId: null, label: 'Sub', data: { direction: 'right' as const } },
@@ -394,7 +394,7 @@ flowchart TD
     it('serializes invisible links', () => {
       const output = toMermaidFlowchart({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: '', data: {} },
@@ -411,7 +411,7 @@ flowchart TD
     it('serializes startMarker', () => {
       const output = toMermaidFlowchart({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: '', data: {} },
@@ -438,7 +438,7 @@ flowchart TD
       for (const { data, expected } of tests) {
         const output = toMermaidFlowchart({
           id: '',
-          type: 'directed',
+          mode: 'directed',
           initialNodeId: null,
           nodes: [
             { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: '', data: {} },

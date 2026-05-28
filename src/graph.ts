@@ -127,6 +127,7 @@ export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
   };
   if (config.sourcePort !== undefined) edge.sourcePort = config.sourcePort;
   if (config.targetPort !== undefined) edge.targetPort = config.targetPort;
+  if (config.mode !== undefined) edge.mode = config.mode;
   if (config.weight !== undefined) edge.weight = config.weight;
   if (config.x !== undefined) edge.x = config.x;
   if (config.y !== undefined) edge.y = config.y;
@@ -155,7 +156,7 @@ export function createGraph<N = any, E = any, G = any, P = any>(
 ): Graph<N, E, G, P> {
   const graph: Graph<N, E, G, P> = {
     id: config?.id ?? '',
-    type: config?.type ?? 'directed',
+    mode: config?.mode ?? 'directed',
     initialNodeId: config?.initialNodeId ?? null,
     nodes: (config?.nodes ?? []).map(createGraphNode),
     edges: (config?.edges ?? []).map(createGraphEdge),
@@ -314,7 +315,7 @@ export function createGraphFromTransition<TState, TEvent>(
 
   return createGraph({
     id: options.id ?? '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: initialStateId,
     nodes,
     edges,
@@ -814,8 +815,9 @@ export class GraphInstance<N = any, E = any, G = any, P = any> {
   get id() {
     return this.graph.id;
   }
-  get type() {
-    return this.graph.type;
+  /** Default directedness for all edges. */
+  get mode() {
+    return this.graph.mode;
   }
   get nodes() {
     return this.graph.nodes;

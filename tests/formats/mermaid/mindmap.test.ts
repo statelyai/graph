@@ -88,7 +88,7 @@ mindmap
     it('serializes mindmap with hierarchy', () => {
       const output = toMermaidMindmap({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'r', parentId: null, initialNodeId: null, label: 'Root', data: {} },
@@ -118,7 +118,7 @@ mindmap
     it('serializes node shapes', () => {
       const output = toMermaidMindmap({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'r', parentId: null, initialNodeId: null, label: 'Root', data: {} },

@@ -18,7 +18,7 @@ function toIdGroups(
 
 function makeDisconnectedTriangles() {
   return createGraph({
-    type: 'undirected',
+    mode: 'undirected',
     nodes: [
       { id: 'a' },
       { id: 'b' },
@@ -40,7 +40,7 @@ function makeDisconnectedTriangles() {
 
 function makeTrianglesWithBridge() {
   return createGraph({
-    type: 'undirected',
+    mode: 'undirected',
     nodes: [
       { id: 'a' },
       { id: 'b' },

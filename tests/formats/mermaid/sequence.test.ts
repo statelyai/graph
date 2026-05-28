@@ -11,7 +11,7 @@ describe('Mermaid Sequence Converter', () => {
 sequenceDiagram
     Alice->>Bob: Hello Bob
       `);
-      expect(graph.type).toBe('directed');
+      expect(graph.mode).toBe('directed');
       expect(graph.data.diagramType).toBe('sequence');
       expect(graph.nodes).toHaveLength(2);
       expect(graph.nodes[0].id).toBe('Alice');
@@ -337,7 +337,7 @@ sequenceDiagram
     it('serializes basic sequence', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {
@@ -380,7 +380,7 @@ sequenceDiagram
     it('serializes actor type', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {
@@ -404,7 +404,7 @@ sequenceDiagram
     it('serializes aliases', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {
@@ -443,7 +443,7 @@ sequenceDiagram
       for (const { stroke, arrowType, expected } of arrows) {
         const output = toMermaidSequence({
           id: '',
-          type: 'directed',
+          mode: 'directed',
           initialNodeId: null,
           nodes: [
             { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: 'A', data: { actorType: 'participant' } },
@@ -468,7 +468,7 @@ sequenceDiagram
     it('serializes activation/deactivation self-edges', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Alice', parentId: null, initialNodeId: null, label: 'Alice', data: { actorType: 'participant' } },
@@ -504,7 +504,7 @@ sequenceDiagram
     it('serializes autonumber', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [],
         edges: [],
@@ -519,7 +519,7 @@ sequenceDiagram
     it('serializes database participant type', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'DB', parentId: null, initialNodeId: null, label: 'DB', data: { actorType: 'database' } },
@@ -533,7 +533,7 @@ sequenceDiagram
     it('serializes notes', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Alice', parentId: null, initialNodeId: null, label: 'Alice', data: { actorType: 'participant', notes: [{ position: 'right' as const, text: 'Thinking' }] } },
@@ -547,7 +547,7 @@ sequenceDiagram
     it('serializes box grouping', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'Alice', parentId: null, initialNodeId: null, label: 'Alice', data: { actorType: 'participant', box: { color: 'rgb(200,200,200)', title: 'My Group' } } },
@@ -565,7 +565,7 @@ sequenceDiagram
     it('serializes create participant', () => {
       const output = toMermaidSequence({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {

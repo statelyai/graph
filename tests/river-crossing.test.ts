@@ -28,7 +28,7 @@ function isSafe(bank: string[]): boolean {
 
 /** Build the full state-space graph and return it along with start/goal ids. */
 function buildStateGraph() {
-  const g = createGraph({ id: 'river-crossing', type: 'directed' });
+  const g = createGraph({ id: 'river-crossing', mode: 'directed' });
 
   // --- Nodes: every valid configuration ---
   const states = new Map<string, { left: string[]; right: string[] }>();

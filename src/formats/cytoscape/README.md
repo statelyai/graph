@@ -64,7 +64,7 @@ const imported = fromCytoscapeJSON({
 
 <!-- Cytoscape fidelity notes derived from src/formats/cytoscape/index.ts -->
 
-Preserves graph `initialNodeId`, `data`, `direction`, `style`; node `parentId` (as `parent`), position (`x`/`y`), `shape`, `color`, `width`, `height`, `style`, `label`, `ports`; and edge `weight`, visual/style fields, `sourcePort`, `targetPort`, and `data`.
+Preserves graph `mode`, `initialNodeId`, `data`, `direction`, `style`; node `parentId` (as `parent`), position (`x`/`y`), `shape`, `color`, `width`, `height`, `style`, `label`, `ports`; and edge `weight`, visual/style fields, `sourcePort`, `targetPort`, and `data`.
 
 ### `cytoscapeConverter`
 

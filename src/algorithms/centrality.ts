@@ -27,7 +27,7 @@ function getNeighborIds(graph: Graph, nodeId: string): string[] {
     }
   }
 
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     for (const edgeId of idx.inEdges.get(nodeId) ?? []) {
       const edgeIndex = idx.edgeById.get(edgeId);
       if (edgeIndex !== undefined) {
@@ -50,7 +50,7 @@ function getIncomingIds(graph: Graph, nodeId: string): string[] {
     }
   }
 
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     for (const edgeId of idx.outEdges.get(nodeId) ?? []) {
       const edgeIndex = idx.edgeById.get(edgeId);
       if (edgeIndex !== undefined) {
@@ -131,7 +131,7 @@ export function getDegreeCentrality(graph: Graph): Record<string, number> {
     const outDegree = idx.outEdges.get(node.id)?.length ?? 0;
     const inDegree = idx.inEdges.get(node.id)?.length ?? 0;
     const degree =
-      graph.type === 'undirected'
+      graph.mode !== 'directed'
         ? new Set([...(idx.outEdges.get(node.id) ?? []), ...(idx.inEdges.get(node.id) ?? [])])
             .size
         : outDegree + inDegree;
@@ -272,12 +272,12 @@ export function getBetweennessCentrality(graph: Graph): Record<string, number> {
   }
 
   const scale =
-    graph.type === 'undirected'
+    graph.mode !== 'directed'
       ? 1 / (((order - 1) * (order - 2)) / 2)
       : 1 / ((order - 1) * (order - 2));
 
   for (const nodeId of Object.keys(scores)) {
-    if (graph.type === 'undirected') {
+    if (graph.mode !== 'directed') {
       scores[nodeId] /= 2;
     }
     scores[nodeId] *= scale;

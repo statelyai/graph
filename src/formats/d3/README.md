@@ -58,7 +58,7 @@ Handles D3's mutated link objects where `source`/`target` may be node objects (a
 
 <!-- D3 fidelity notes derived from src/formats/d3/index.ts -->
 
-Also preserves graph `id`, `type`, `initialNodeId`, `data`, `direction`, `style`, node hierarchy/layout/style fields, and edge layout/style/weight fields through the loose `{ nodes, links }` object shape. Ports and edge port references round-trip as `ports`, `sourcePort`, and `targetPort`.
+Also preserves graph `id`, `mode`, `initialNodeId`, `data`, `direction`, `style`, node hierarchy/layout/style fields, and edge layout/style/weight fields through the loose `{ nodes, links }` object shape. Ports and edge port references round-trip as `ports`, `sourcePort`, and `targetPort`.
 
 ### `d3Converter`
 

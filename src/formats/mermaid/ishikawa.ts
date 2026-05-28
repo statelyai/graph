@@ -93,7 +93,7 @@ export function fromMermaidIshikawa(input: string): MermaidIshikawaGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes,
     edges,

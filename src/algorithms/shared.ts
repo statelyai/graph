@@ -1,5 +1,6 @@
 import type { Graph, GraphEdge } from '../types';
 import { getIndex } from '../indexing';
+import { getEdgeMode } from '../mode';
 
 export class MinPriorityQueue<T> {
   private items: T[] = [];
@@ -80,10 +81,12 @@ export function getNeighborIds(graph: Graph, nodeId: string): string[] {
     const ai = idx.edgeById.get(eid);
     if (ai !== undefined) ids.push(graph.edges[ai].targetId);
   }
-  if (graph.type === 'undirected') {
-    for (const eid of idx.inEdges.get(nodeId) ?? []) {
-      const ai = idx.edgeById.get(eid);
-      if (ai !== undefined) ids.push(graph.edges[ai].sourceId);
+  for (const eid of idx.inEdges.get(nodeId) ?? []) {
+    const ai = idx.edgeById.get(eid);
+    if (ai === undefined) continue;
+    const edge = graph.edges[ai];
+    if (getEdgeMode(graph, edge) !== 'directed') {
+      ids.push(edge.sourceId);
     }
   }
   return ids;
@@ -131,11 +134,11 @@ export function getNeighborEdges(
       result.push({ neighborId: edge.targetId, edge });
     }
   }
-  if (graph.type === 'undirected') {
-    for (const eid of idx.inEdges.get(nodeId) ?? []) {
-      const ai = idx.edgeById.get(eid);
-      if (ai !== undefined) {
-        const edge = graph.edges[ai];
+  for (const eid of idx.inEdges.get(nodeId) ?? []) {
+    const ai = idx.edgeById.get(eid);
+    if (ai !== undefined) {
+      const edge = graph.edges[ai];
+      if (getEdgeMode(graph, edge) !== 'directed') {
         result.push({ neighborId: edge.sourceId, edge });
       }
     }

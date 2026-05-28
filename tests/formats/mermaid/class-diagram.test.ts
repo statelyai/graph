@@ -155,7 +155,7 @@ classDiagram
     it('serializes class with members', () => {
       const output = toMermaidClass({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           {
@@ -183,7 +183,7 @@ classDiagram
     it('serializes relationships', () => {
       const output = toMermaidClass({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: 'A', data: {} },

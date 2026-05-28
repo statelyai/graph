@@ -215,7 +215,7 @@ export function toELK(graph: VisualGraph): ElkNode {
   addMetadata(root, {
     graph: {
       id: graph.id,
-      type: graph.type,
+      mode: graph.mode,
       initialNodeId: graph.initialNodeId,
       data: graph.data,
       direction: graph.direction,
@@ -407,7 +407,7 @@ export function fromELK(elkRoot: ElkNode): VisualGraph {
 
   return {
     id: graphMetadata?.id ?? elkRoot.id,
-    type: graphMetadata?.type === 'undirected' ? 'undirected' : 'directed',
+    mode: graphMetadata?.mode ?? 'directed',
     initialNodeId:
       graphMetadata && 'initialNodeId' in graphMetadata
         ? (graphMetadata.initialNodeId as string | null)

@@ -84,6 +84,15 @@ describe('format support matrix', () => {
     );
   });
 
+  it('marks d2 as a full-fidelity syntax format with ports and no weight', () => {
+    const d2 = getFormatSupportEntry('d2');
+    expect(d2).toBeDefined();
+    expect(d2?.features.ports).toBe('full');
+    expect(d2?.features.hierarchy).toBe('full');
+    expect(d2?.features.roundTrip).toBe('full');
+    expect(d2?.features.weight).toBe('none');
+  });
+
   it('captures known DOT round-trip limitations', () => {
     const dot = getFormatSupportEntry('dot');
 
@@ -119,10 +128,16 @@ describe('format support matrix', () => {
     }
   });
 
+  // Diagram-syntax formats (mermaid, d2) round-trip their own syntax fully but
+  // are not generic data containers — they don't preserve arbitrary foreign
+  // graph data (e.g. edge weights, untyped node data), so they're excluded from
+  // the generic fully-featured fixture conformance check.
+  const SYNTAX_FORMAT = (id: string) =>
+    id.startsWith('mermaid/') || id === 'd2';
+
   it('has fixture conformance checks for generic full round-trip adapters', () => {
     const genericFullRoundTripIds = FORMAT_SUPPORT_MATRIX.filter(
-      (entry) =>
-        entry.features.roundTrip === 'full' && !entry.id.startsWith('mermaid/'),
+      (entry) => entry.features.roundTrip === 'full' && !SYNTAX_FORMAT(entry.id),
     ).map((entry) => entry.id);
 
     expect(Object.keys(FULL_ROUND_TRIP_CHECKS).sort()).toEqual(

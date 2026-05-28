@@ -1,5 +1,6 @@
 import type { Graph, GraphNode, GraphEdge, GraphPort } from './types';
 import { getIndex } from './indexing';
+import { getEdgeMode } from './mode';
 
 // --- Edge queries ---
 
@@ -83,7 +84,7 @@ export function getOutEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge
 
 /**
  * Returns all edges from `sourceId` to `targetId`.
- * For undirected graphs, checks both directions.
+ * Edges whose effective mode is not `'directed'` are matched both ways.
  *
  * @example
  * ```ts
@@ -94,7 +95,7 @@ export function getOutEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge
  * getEdgesBetween(graph, 'a', 'b');
  * // => [edge e1]
  * getEdgesBetween(graph, 'b', 'a');
- * // => [] (directed graph)
+ * // => [] (directed edge)
  * ```
  */
 export function getEdgesBetween<N, E>(
@@ -114,15 +115,13 @@ export function getEdgesBetween<N, E>(
       result.push(e);
     }
   }
-  if (graph.type === 'undirected') {
-    const outIds2 = idx.outEdges.get(targetId) ?? [];
-    for (const eid of outIds2) {
-      if (seen.has(eid)) continue;
-      const ai = idx.edgeById.get(eid)!;
-      const e = graph.edges[ai];
-      if (e.targetId === sourceId) {
-        result.push(e);
-      }
+  const outIds2 = idx.outEdges.get(targetId) ?? [];
+  for (const eid of outIds2) {
+    if (seen.has(eid)) continue;
+    const ai = idx.edgeById.get(eid)!;
+    const e = graph.edges[ai];
+    if (e.targetId === sourceId && getEdgeMode(graph, e) !== 'directed') {
+      result.push(e);
     }
   }
   return result;
@@ -226,7 +225,8 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
 
 /**
  * Returns the total degree of a node (inDegree + outDegree).
- * For undirected graphs, each edge is counted once.
+ * For graphs whose default mode is not `'directed'`, each incident edge is
+ * counted once.
  *
  * @example
  * ```ts
@@ -243,7 +243,7 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
  */
 export function getDegree(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
-  if (graph.type === 'undirected') {
+  if (graph.mode !== 'directed') {
     // Count unique edges (an edge where sourceId === targetId === nodeId should count once)
     const out = idx.outEdges.get(nodeId) ?? [];
     const inE = idx.inEdges.get(nodeId) ?? [];
@@ -681,15 +681,15 @@ export function getRelativeDistanceMap(
         queue.push(neighborId);
       }
     }
-    if (graph.type === 'undirected') {
-      for (const eid of idx.inEdges.get(id) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const neighborId = graph.edges[ai].sourceId;
-        if (siblingSet.has(neighborId) && !dist.has(neighborId)) {
-          dist.set(neighborId, d + 1);
-          queue.push(neighborId);
-        }
+    for (const eid of idx.inEdges.get(id) ?? []) {
+      const ai = idx.edgeById.get(eid);
+      if (ai === undefined) continue;
+      const edge = graph.edges[ai];
+      if (getEdgeMode(graph, edge) === 'directed') continue;
+      const neighborId = edge.sourceId;
+      if (siblingSet.has(neighborId) && !dist.has(neighborId)) {
+        dist.set(neighborId, d + 1);
+        queue.push(neighborId);
       }
     }
   }

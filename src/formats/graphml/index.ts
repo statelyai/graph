@@ -6,6 +6,7 @@ import type {
   GraphNode,
 } from '../../types';
 import { createFormatConverter } from '../converter';
+import { getEdgeMode } from '../../mode';
 
 const GRAPHML_NS = 'http://graphml.graphdrawing.org/xmlns';
 
@@ -161,7 +162,12 @@ export function toGraphML(graph: Graph): string {
     };
   });
 
+  const graphDirected = graph.mode !== 'undirected';
   const edges = graph.edges.map((edge) => {
+    // Per-edge directedness override. GraphML edges carry an optional boolean
+    // `directed` attribute; emit it only when the edge differs from the graph
+    // default. Bidirectional has no GraphML representation and maps to directed.
+    const edgeDirected = getEdgeMode(graph, edge) !== 'undirected';
     const data: Array<{ '@_key': string; '#text': string | number }> = [];
     if (edge.label) data.push({ '@_key': 'label', '#text': edge.label });
     if (edge.data !== undefined) {
@@ -193,6 +199,9 @@ export function toGraphML(graph: Graph): string {
       '@_id': edge.id,
       '@_source': edge.sourceId,
       '@_target': edge.targetId,
+      ...(edgeDirected !== graphDirected && {
+        '@_directed': edgeDirected ? 'true' : 'false',
+      }),
       ...(data.length > 0 && { data }),
     };
   });
@@ -225,7 +234,7 @@ export function toGraphML(graph: Graph): string {
       graph: {
         '@_id': graph.id,
         '@_edgedefault':
-          graph.type === 'directed' ? 'directed' : 'undirected',
+          graph.mode === 'undirected' ? 'undirected' : 'directed',
         ...(graphData.length > 0 && { data: graphData }),
         node: nodes,
         edge: edges,
@@ -237,6 +246,8 @@ export function toGraphML(graph: Graph): string {
     ignoreAttributes: false,
     format: true,
     suppressEmptyNode: true,
+    // Keep `directed="true"` intact instead of collapsing to a bare attribute.
+    suppressBooleanAttributes: false,
   });
 
   return builder.build(obj);
@@ -323,12 +334,18 @@ export function fromGraphML(xml: string): Graph {
     if (dataMap.sourcePort !== undefined) edge.sourcePort = dataMap.sourcePort;
     if (dataMap.targetPort !== undefined) edge.targetPort = dataMap.targetPort;
 
+    // Per-edge directedness override from the GraphML `directed` attribute.
+    const directedAttr = edgeEl['@_directed'];
+    if (directedAttr !== undefined) {
+      edge.mode = String(directedAttr) === 'false' ? 'undirected' : 'directed';
+    }
+
     return edge;
   });
 
   const graph: Graph = {
     id: String(graphEl['@_id'] ?? ''),
-    type: graphType,
+    mode: graphType,
     initialNodeId: graphDataMap.graphInitialNodeId ?? null,
     nodes,
     edges,

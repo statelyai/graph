@@ -40,7 +40,7 @@ function makeDirectedGraph() {
 function makeUndirectedGraph() {
   return createGraph({
     id: 'ug',
-    type: 'undirected',
+    mode: 'undirected',
     nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
     edges: [
       { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -85,6 +85,28 @@ describe('Edge queries', () => {
     const g = makeUndirectedGraph();
     expect(getEdgesBetween(g, 'a', 'b').map((e) => e.id)).toEqual(['e1']);
     expect(getEdgesBetween(g, 'b', 'a').map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('getEdgesBetween() follows undirected edge overrides in directed graphs', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', mode: 'undirected' },
+      ],
+    });
+
+    expect(getEdgesBetween(g, 'b', 'a').map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('getEdgesBetween() follows directed edge overrides in undirected graphs', () => {
+    const g = createGraph({
+      mode: 'undirected',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', mode: 'directed' }],
+    });
+
+    expect(getEdgesBetween(g, 'a', 'b').map((e) => e.id)).toEqual(['e1']);
+    expect(getEdgesBetween(g, 'b', 'a')).toEqual([]);
   });
 });
 
@@ -396,6 +418,30 @@ describe('getRelativeDistanceMap', () => {
     });
     const map = getRelativeDistanceMap(g, null);
     expect(map).toEqual({ a: 0, b: 1, c: 1, d: 2 });
+  });
+
+  it('uses undirected edge overrides in directed graphs', () => {
+    const g = createGraph({
+      initialNodeId: 'b',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', mode: 'undirected' },
+        { id: 'e2', sourceId: 'a', targetId: 'c' },
+      ],
+    });
+
+    expect(getRelativeDistanceMap(g, null)).toEqual({ b: 0, a: 1, c: 2 });
+  });
+
+  it('uses directed edge overrides in undirected graphs', () => {
+    const g = createGraph({
+      mode: 'undirected',
+      initialNodeId: 'b',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', mode: 'directed' }],
+    });
+
+    expect(getRelativeDistanceMap(g, null)).toEqual({ b: 0 });
   });
 
   it('only includes sibling nodes, not cross-level edges', () => {

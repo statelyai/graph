@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: 42 },
@@ -32,7 +32,7 @@ describe('D3.js JSON', () => {
     const parsed = fromD3Graph(d3);
 
     expect(parsed.id).toBe('test');
-    expect(parsed.type).toBe('directed');
+    expect(parsed.mode).toBe('directed');
     expect(parsed.nodes).toHaveLength(2);
     expect(parsed.edges).toHaveLength(1);
     expect(parsed.edges[0].sourceId).toBe('a');

@@ -66,11 +66,11 @@ const imported = fromGEXF(`<?xml version="1.0" encoding="UTF-8"?>
 Produces GEXF 1.3 XML with:
 - Node/edge attributes via `<attvalues>`
 - Hierarchy via `pid` attribute
-- Graph `initialNodeId`, `direction`, and `data` stored as custom `<graph>` attributes
+- Graph `mode`, `initialNodeId`, `direction`, and `data` stored as XML or custom `<graph>` attributes
 - Graph `style` stored as a custom `<graph>` attribute
 - Visual properties via `viz:color`, `viz:position`, `viz:size`
 - Custom node attributes for `width`, `height`, `style`, and `ports`
-- Custom edge attributes for `weight`, `x`, `y`, `width`, `height`, `style`, `sourcePort`, and `targetPort`
+- Custom edge attributes for `mode`, `weight`, `x`, `y`, `width`, `height`, `style`, `sourcePort`, and `targetPort`
 - JSON-serialized graph/node/edge style and data fields where needed
 
 ### `fromGEXF(xml): Graph`
@@ -78,7 +78,7 @@ Produces GEXF 1.3 XML with:
 Parses:
 - `<attributes>` declarations and `<attvalues>` on nodes/edges
 - `@pid` and nested `<nodes>` for hierarchy
-- Custom graph attributes for `initialNodeId`, `direction`, `data`, and `style`
+- Custom graph attributes for `mode`, `initialNodeId`, `direction`, `data`, and `style`
 - `viz:color`, `viz:position`, `viz:size`
 - JSON-encoded `data`, `style`, and `ports` fields
 

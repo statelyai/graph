@@ -8,7 +8,7 @@ import {
 
 function makeBridgeGraph() {
   return createGraph({
-    type: 'undirected',
+    mode: 'undirected',
     nodes: [
       { id: 'a' },
       { id: 'b' },
@@ -63,7 +63,7 @@ describe('connectivity algorithms', () => {
   });
 
   it('returns empty results for an empty graph', () => {
-    const graph = createGraph({ type: 'undirected' });
+    const graph = createGraph({ mode: 'undirected' });
 
     expect(getBridges(graph)).toEqual([]);
     expect(getArticulationPoints(graph)).toEqual([]);

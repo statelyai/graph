@@ -17,7 +17,7 @@ export function getMinimumSpanningTree<N, E>(
 
   return createGraph({
     id: graph.id,
-    type: graph.type,
+    mode: graph.mode,
     initialNodeId: graph.initialNodeId ?? undefined,
     nodes: graph.nodes.map((node) => ({
       id: node.id,
@@ -60,7 +60,7 @@ function primMST<N, E>(
       }
     }
 
-    if (graph.type === 'undirected') {
+    if (graph.mode !== 'directed') {
       for (const eid of idx.inEdges.get(nodeId) ?? []) {
         const ai = idx.edgeById.get(eid);
         if (ai === undefined) continue;
@@ -80,7 +80,7 @@ function primMST<N, E>(
     const { edge } = candidates.pop()!;
 
     const targetId =
-      graph.type === 'undirected' && inMST.has(edge.targetId)
+      graph.mode !== 'directed' && inMST.has(edge.targetId)
         ? edge.sourceId
         : edge.targetId;
 

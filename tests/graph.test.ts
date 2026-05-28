@@ -22,7 +22,7 @@ describe('createGraph', () => {
   it('creates an empty directed graph by default', () => {
     const g = createGraph();
     expect(g.id).toBe('');
-    expect(g.type).toBe('directed');
+    expect(g.mode).toBe('directed');
     expect(g.nodes).toEqual([]);
     expect(g.edges).toEqual([]);
   });
@@ -30,13 +30,13 @@ describe('createGraph', () => {
   it('creates a graph from config', () => {
     const g = createGraph({
       id: 'g1',
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a', label: 'A' }],
       edges: [],
       data: { name: 'test' },
     });
     expect(g.id).toBe('g1');
-    expect(g.type).toBe('undirected');
+    expect(g.mode).toBe('undirected');
     expect(g.nodes).toHaveLength(1);
     expect(g.nodes[0]).toEqual({
       type: 'node',
@@ -93,7 +93,7 @@ describe('createGraph', () => {
   it('supports plain object literal via satisfies', () => {
     const g = {
       id: 'manual',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         {
@@ -116,7 +116,7 @@ describe('createGraph', () => {
   it('supports type annotation', () => {
     const g: Graph = {
       id: 'typed',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [],
       edges: [],
@@ -353,7 +353,7 @@ describe('JSON serialization', () => {
   it('round-trips through JSON', () => {
     const g1 = createGraph({
       id: 'test',
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a', label: 'A' }, { id: 'b' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', label: 'connects' }],
       data: { meta: true },

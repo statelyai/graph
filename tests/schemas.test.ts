@@ -60,7 +60,7 @@ describe('Zod schemas', () => {
   it('GraphSchema validates a valid graph', () => {
     const result = GraphSchema.safeParse({
       id: 'g1',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: null },
@@ -80,10 +80,10 @@ describe('Zod schemas', () => {
     expect(GraphSchema.safeParse(graph).success).toBe(true);
   });
 
-  it('GraphSchema rejects invalid type', () => {
+  it('GraphSchema rejects invalid mode', () => {
     const result = GraphSchema.safeParse({
       id: 'g1',
-      type: 'mixed',
+      mode: 'mixed',
       nodes: [],
       edges: [],
     });
@@ -156,7 +156,7 @@ describe('Zod schemas', () => {
   it('validateGraph() combines shape and graph invariant validation', () => {
     const graph = {
       id: 'g1',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: 'missing-initial',
       nodes: [
         {
@@ -210,7 +210,7 @@ describe('Zod schemas', () => {
   it('validateGraph() reports parent cycles', () => {
     const graph = {
       id: 'g1',
-      type: 'directed',
+      mode: 'directed',
       initialNodeId: null,
       nodes: [
         {
@@ -242,9 +242,6 @@ describe('Zod schemas', () => {
   it('reports simplified validation issues', () => {
     expect(getGraphIssues({ id: 'g' })).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          path: ['type'],
-        }),
         expect.objectContaining({
           path: ['nodes'],
         }),

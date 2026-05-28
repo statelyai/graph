@@ -3,7 +3,7 @@ import type { Graph } from '../src/types';
 export function getFullyFeaturedGraphFixture(): Graph {
   return {
     id: 'full-graph',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: 'root',
     direction: 'right',
     style: {

@@ -25,7 +25,7 @@ export function toAdjacencyList(graph: Graph): Record<string, string[]> {
 
   for (const edge of graph.edges) {
     adj[edge.sourceId]?.push(edge.targetId);
-    if (graph.type === 'undirected') {
+    if (graph.mode !== 'directed') {
       adj[edge.targetId]?.push(edge.sourceId);
     }
   }
@@ -91,7 +91,7 @@ export function fromAdjacencyList(
 
   return {
     id: options?.id ?? '',
-    type: directed ? 'directed' : 'undirected',
+    mode: directed ? 'directed' : 'undirected',
     initialNodeId: null,
     nodes,
     edges,

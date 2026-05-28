@@ -9,7 +9,7 @@ interface FixtureRoundTripOptions {
   edgeKeys?: Array<keyof GraphEdge>;
 }
 
-const DEFAULT_GRAPH_KEYS: Array<keyof Graph> = ['id', 'type'];
+const DEFAULT_GRAPH_KEYS: Array<keyof Graph> = ['id', 'mode'];
 const DEFAULT_NODE_KEYS: Array<keyof GraphNode> = ['type', 'id'];
 const DEFAULT_EDGE_KEYS: Array<keyof GraphEdge> = [
   'type',

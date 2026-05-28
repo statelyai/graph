@@ -90,7 +90,7 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
       [STATELYAI_METADATA_KEY]: {
         graph: {
           id: graph.id,
-          type: graph.type,
+          mode: graph.mode,
           initialNodeId: graph.initialNodeId,
           data: graph.data,
           direction: graph.direction,
@@ -173,7 +173,7 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
   const graphMetadata = readMetadata(flow.data)?.graph;
   return {
     id: graphMetadata?.id?.toString() ?? '',
-    type: graphMetadata?.type === 'undirected' ? 'undirected' : 'directed',
+    mode: graphMetadata?.mode ?? 'directed',
     initialNodeId:
       graphMetadata && 'initialNodeId' in graphMetadata
         ? (graphMetadata.initialNodeId as string | null)

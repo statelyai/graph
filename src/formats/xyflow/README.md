@@ -58,4 +58,4 @@ const roundTripped = xyflowConverter.from(flow);
 | `XYFlowNode` | Re-exported `NodeBase` from `@xyflow/system` |
 | `XYFlowEdge` | Re-exported `EdgeBase` from `@xyflow/system` |
 
-> **Note:** `fromXYFlow` always produces a `directed` graph with `direction: 'down'`.
+> **Note:** `fromXYFlow` restores `mode` and `direction` from graph metadata when present; otherwise it defaults to a `directed` graph with `direction: 'down'`.

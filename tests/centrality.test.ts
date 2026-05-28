@@ -14,7 +14,7 @@ import {
 describe('centrality and link analysis', () => {
   it('getDegreeCentrality normalizes undirected degree by n - 1', () => {
     const graph = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b' },
@@ -54,7 +54,7 @@ describe('centrality and link analysis', () => {
 
   it('getClosenessCentrality favors central nodes on an undirected path', () => {
     const graph = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b' },
@@ -71,7 +71,7 @@ describe('centrality and link analysis', () => {
 
   it('getBetweennessCentrality assigns all path betweenness to the middle node', () => {
     const graph = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b' },
@@ -125,7 +125,7 @@ describe('centrality and link analysis', () => {
 
   it('getEigenvectorCentrality ranks the center of an undirected star highest', () => {
     const graph = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b' },

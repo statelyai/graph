@@ -78,6 +78,27 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     ],
   },
   {
+    id: 'd2',
+    importPath: '@statelyai/graph/d2',
+    features: {
+      directed: 'full',
+      undirected: 'full',
+      hierarchy: 'full',
+      ports: 'full',
+      visual: 'full',
+      style: 'full',
+      weight: 'none',
+      roundTrip: 'full',
+    },
+    notes: [
+      'Containers map to hierarchy; dot vs block declaration form is preserved per node.',
+      'sql_table/class fields map to ports; node.field connections round-trip as sourcePort/targetPort.',
+      'Per-edge connectors (->, <-, --, <->) map to edge.mode; the authored glyph is preserved in _d2.arrow.',
+      'vars/classes/imports are preserved on graph data; comments attach to the following entity (best-effort).',
+      'd2 has no native edge weight.',
+    ],
+  },
+  {
     id: 'dot',
     importPath: '@statelyai/graph/dot',
     features: {
@@ -143,6 +164,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     notes: [
       'Custom attributes preserve graph, node, and edge metadata beyond the standard viz module.',
       'Ports round-trip via custom node/edge attributes.',
+      'Per-edge directedness round-trips via the `type` edge attribute; bidirectional maps to directed.',
     ],
   },
   {
@@ -179,6 +201,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     notes: [
       'GraphML attribute fidelity is good, but not every extension is represented.',
       'Ports round-trip through node and edge `<data>` fields.',
+      'Per-edge directedness round-trips via the `directed` edge attribute; bidirectional maps to directed.',
     ],
   },
   {

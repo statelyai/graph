@@ -1,6 +1,7 @@
 // Types
 export type {
   EntityRect,
+  GraphMode,
   GraphEntity,
   VisualGraphEntity,
   PortDirection,
@@ -77,6 +78,9 @@ export { addEntities, deleteEntities, updateEntities } from './graph';
 
 // Class wrapper
 export { GraphInstance } from './graph';
+
+// Mode helpers
+export { getEdgeMode, isEdgeDirected } from './mode';
 
 // Indexing
 export { invalidateIndex } from './indexing';

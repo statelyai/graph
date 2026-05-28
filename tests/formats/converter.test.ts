@@ -9,7 +9,7 @@ import type { Graph, GraphFormatConverter } from '../../src/types';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: undefined },
@@ -60,7 +60,7 @@ describe('adjacencyListConverter', () => {
     });
 
     const graph = adjacencyListConverter.from(adj);
-    expect(graph.type).toBe('directed');
+    expect(graph.mode).toBe('directed');
     expect(graph.nodes).toHaveLength(3);
     expect(graph.edges).toHaveLength(2);
   });
@@ -76,7 +76,7 @@ describe('edgeListConverter', () => {
     ]);
 
     const graph = edgeListConverter.from(edges);
-    expect(graph.type).toBe('directed');
+    expect(graph.mode).toBe('directed');
     expect(graph.nodes).toHaveLength(3);
     expect(graph.edges).toHaveLength(2);
   });
@@ -89,7 +89,7 @@ describe('graphmlConverter', () => {
 
     const graph = graphmlConverter.from(xml);
     expect(graph.id).toBe('test');
-    expect(graph.type).toBe('directed');
+    expect(graph.mode).toBe('directed');
     expect(graph.nodes).toHaveLength(3);
     expect(graph.edges).toHaveLength(2);
   });
@@ -128,7 +128,7 @@ describe('custom converter (third-party example)', () => {
 
         return {
           id: '',
-          type: 'directed',
+          mode: 'directed',
           initialNodeId: null,
           nodes: [...nodeIds].map((id) => ({
             type: 'node' as const,

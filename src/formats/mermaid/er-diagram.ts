@@ -212,7 +212,7 @@ export function fromMermaidER(input: string): MermaidERGraph {
 
   return {
     id: '',
-    type: 'directed',
+    mode: 'directed',
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,

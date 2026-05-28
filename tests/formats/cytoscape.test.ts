@@ -5,7 +5,7 @@ import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
 const sampleGraph: Graph = {
   id: 'test',
-  type: 'directed',
+  mode: 'directed',
   initialNodeId: null,
   nodes: [
     { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: { weight: 1 }, x: 10, y: 20 },
@@ -36,7 +36,7 @@ describe('Cytoscape.js JSON', () => {
     const parsed = fromCytoscapeJSON(cyto);
 
     expect(parsed.id).toBe('test');
-    expect(parsed.type).toBe('directed');
+    expect(parsed.mode).toBe('directed');
     expect(parsed.nodes).toHaveLength(3);
 
     const nodeC = parsed.nodes.find((n) => n.id === 'c');

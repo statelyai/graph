@@ -68,7 +68,7 @@ export function fromEdgeList(
 
   return {
     id: options?.id ?? '',
-    type: directed ? 'directed' : 'undirected',
+    mode: directed ? 'directed' : 'undirected',
     initialNodeId: null,
     nodes,
     edges: edgeObjects,

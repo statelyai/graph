@@ -66,6 +66,28 @@ describe('BFS / DFS', () => {
     expect(visited[0]).toBe('a');
     expect(visited).toHaveLength(4);
   });
+
+  it('bfs follows undirected edge overrides in directed graphs', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', mode: 'undirected' },
+        { id: 'e2', sourceId: 'a', targetId: 'c' },
+      ],
+    });
+
+    expect([...bfs(g, 'b')].map((n) => n.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('bfs follows directed edge overrides in undirected graphs', () => {
+    const g = createGraph({
+      mode: 'undirected',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', mode: 'directed' }],
+    });
+
+    expect([...bfs(g, 'b')].map((n) => n.id)).toEqual(['b']);
+  });
 });
 
 describe('isAcyclic', () => {
@@ -83,7 +105,7 @@ describe('isAcyclic', () => {
 
   it('works for undirected acyclic (tree)', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -95,7 +117,7 @@ describe('isAcyclic', () => {
 
   it('works for undirected cyclic', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -165,7 +187,7 @@ describe('isConnected', () => {
 describe('isTree', () => {
   it('returns true for tree', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -177,7 +199,7 @@ describe('isTree', () => {
 
   it('returns false for graph with cycle', () => {
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b' },
@@ -235,6 +257,30 @@ describe('getShortestPaths', () => {
     const paths = getShortestPaths(g, { from: 'a' });
     const targets = paths.map((p) => p.steps.at(-1)!.node.id);
     expect(targets).toEqual(['b']);
+  });
+
+  it('follows undirected edge overrides in directed graphs', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', mode: 'undirected' },
+        { id: 'e2', sourceId: 'a', targetId: 'c' },
+      ],
+    });
+
+    const paths = getShortestPaths(g, { from: 'b', to: 'c' });
+    expect(paths).toHaveLength(1);
+    expect(paths[0].steps.map((s) => s.node.id)).toEqual(['a', 'c']);
+  });
+
+  it('follows directed edge overrides in undirected graphs', () => {
+    const g = createGraph({
+      mode: 'undirected',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', mode: 'directed' }],
+    });
+
+    expect(getShortestPaths(g, { from: 'b', to: 'a' })).toEqual([]);
   });
 
   it('getWeight: Dijkstra picks lighter-weight path', () => {
@@ -455,7 +501,7 @@ describe('Bellman-Ford (algorithm: bellman-ford)', () => {
     // Undirected edge with negative weight creates an implicit negative cycle
     // (traverse back and forth indefinitely), so Bellman-Ford should throw
     const g = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'e1', sourceId: 'a', targetId: 'b', weight: 5 },

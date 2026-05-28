@@ -5,7 +5,7 @@ import { isIsomorphic } from '../src/algorithms';
 describe('isIsomorphic', () => {
   it('returns true for graphs with the same structure and different ids', () => {
     const graphA = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b' },
@@ -13,7 +13,7 @@ describe('isIsomorphic', () => {
       ],
     });
     const graphB = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'x' }, { id: 'y' }, { id: 'z' }],
       edges: [
         { id: 'xy', sourceId: 'x', targetId: 'y' },
@@ -26,7 +26,7 @@ describe('isIsomorphic', () => {
 
   it('returns false for graphs with different structures', () => {
     const path = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
         { id: 'ab', sourceId: 'a', targetId: 'b' },
@@ -34,7 +34,7 @@ describe('isIsomorphic', () => {
       ],
     });
     const triangle = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'x' }, { id: 'y' }, { id: 'z' }],
       edges: [
         { id: 'xy', sourceId: 'x', targetId: 'y' },
@@ -48,7 +48,7 @@ describe('isIsomorphic', () => {
 
   it('supports nodeMatch predicates', () => {
     const graphA = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [
         { id: 'a', data: { color: 'red' } },
         { id: 'b', data: { color: 'blue' } },
@@ -56,7 +56,7 @@ describe('isIsomorphic', () => {
       edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
     });
     const graphB = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [
         { id: 'x', data: { color: 'red' } },
         { id: 'y', data: { color: 'green' } },
@@ -73,12 +73,12 @@ describe('isIsomorphic', () => {
 
   it('supports edgeMatch predicates', () => {
     const graphA = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 }],
     });
     const graphB = createGraph({
-      type: 'undirected',
+      mode: 'undirected',
       nodes: [{ id: 'x' }, { id: 'y' }],
       edges: [{ id: 'xy', sourceId: 'x', targetId: 'y', weight: 2 }],
     });

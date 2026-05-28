@@ -73,7 +73,7 @@ block-beta
     it('serializes block diagram', () => {
       const output = toMermaidBlock({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'a', data: {} },
@@ -92,7 +92,7 @@ block-beta
     it('serializes nested blocks', () => {
       const output = toMermaidBlock({
         id: '',
-        type: 'directed',
+        mode: 'directed',
         initialNodeId: null,
         nodes: [
           { type: 'node', id: 'outer', parentId: null, initialNodeId: null, label: 'outer', data: {} },
