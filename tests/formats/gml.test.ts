@@ -119,6 +119,41 @@ graph [
     expect(graph.nodes[0].label).toBe('A');
   });
 
+  it('throws on non-numeric edge weight', () => {
+    const gml = `
+graph [
+  directed 1
+  node [ id "a" ]
+  node [ id "b" ]
+  edge [ id "e1" source "a" target "b" weight "heavy" ]
+]`;
+    expect(() => fromGML(gml)).toThrow(
+      'GML: weight value "heavy" on edge "e1" is not a number. Fix the value or remove the attribute.',
+    );
+  });
+
+  it('throws on non-numeric graphics values', () => {
+    const nodeGml = `
+graph [
+  directed 1
+  node [ id "a" graphics [ x "left" ] ]
+]`;
+    expect(() => fromGML(nodeGml)).toThrow(
+      'GML: graphics x value "left" on node "a" is not a number. Fix the value or remove the attribute.',
+    );
+
+    const edgeGml = `
+graph [
+  directed 1
+  node [ id "a" ]
+  node [ id "b" ]
+  edge [ id "e1" source "a" target "b" graphics [ w "wide" ] ]
+]`;
+    expect(() => fromGML(edgeGml)).toThrow(
+      'GML: graphics w value "wide" on edge "e1" is not a number. Fix the value or remove the attribute.',
+    );
+  });
+
   it('round-trips ports and edge port references', () => {
     expectFixtureRoundTrip((graph) => fromGML(toGML(graph)), {
       graphKeys: ['initialNodeId', 'data', 'direction', 'style'],

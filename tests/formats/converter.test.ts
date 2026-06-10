@@ -64,6 +64,14 @@ describe('adjacencyListConverter', () => {
     expect(graph.nodes).toHaveLength(3);
     expect(graph.edges).toHaveLength(2);
   });
+
+  it('materializes target nodes that do not appear as keys', () => {
+    const graph = adjacencyListConverter.from({ a: ['b'] });
+    expect(graph.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+    expect(graph.edges).toHaveLength(1);
+    expect(graph.edges[0].sourceId).toBe('a');
+    expect(graph.edges[0].targetId).toBe('b');
+  });
 });
 
 describe('edgeListConverter', () => {

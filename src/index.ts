@@ -21,6 +21,8 @@ export type {
   DeleteNodeOptions,
   EntitiesConfig,
   EntitiesUpdate,
+  NodeUpdate,
+  EdgeUpdate,
   GraphStep,
   GraphPath,
   PathOptions,

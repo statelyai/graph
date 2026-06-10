@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGraph } from '../src/graph';
+import { invalidateIndex } from '../src/indexing';
 import {
   getNeighbors,
   getSuccessors,
@@ -135,7 +136,9 @@ describe('Neighbor queries', () => {
     expect(n.map((x) => x.id).sort()).toEqual(['a', 'c']);
   });
 
-  it('observes same-count direct endpoint mutations', () => {
+  it('observes direct endpoint mutations after invalidateIndex()', () => {
+    // In-place *field* mutation is not auto-detected (O(1) staleness check);
+    // the documented contract is to call invalidateIndex() afterwards.
     const g = makeDirectedGraph();
 
     expect(getSuccessors(g, 'a').map((node) => node.id).sort()).toEqual([
@@ -145,6 +148,22 @@ describe('Neighbor queries', () => {
 
     g.edges[0].sourceId = 'd';
     g.edges[0].targetId = 'c';
+    invalidateIndex(g);
+
+    expect(getSuccessors(g, 'a').map((node) => node.id)).toEqual(['c']);
+    expect(getSuccessors(g, 'd').map((node) => node.id)).toEqual(['c']);
+  });
+
+  it('observes immutable-style array replacement without invalidateIndex()', () => {
+    const g = makeDirectedGraph();
+    expect(getSuccessors(g, 'a').map((node) => node.id).sort()).toEqual([
+      'b',
+      'c',
+    ]);
+
+    g.edges = g.edges.map((e, i) =>
+      i === 0 ? { ...e, sourceId: 'd', targetId: 'c' } : e,
+    );
 
     expect(getSuccessors(g, 'a').map((node) => node.id)).toEqual(['c']);
     expect(getSuccessors(g, 'd').map((node) => node.id)).toEqual(['c']);

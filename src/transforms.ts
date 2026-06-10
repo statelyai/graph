@@ -50,21 +50,26 @@ export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
   // Resolve a node to its deepest initial child (leaf).
   // If it's already a leaf, returns its id.
   // If it's compound, follows initialNodeId recursively.
-  function resolveInitial(nodeId: string): string | null {
+  function resolveInitial(
+    nodeId: string,
+    seen: Set<string> = new Set(),
+  ): string | null {
     if (leaves.has(nodeId)) return nodeId;
+    if (seen.has(nodeId)) return null; // malformed initialNodeId cycle
+    seen.add(nodeId);
 
     const ni = idx.nodeById.get(nodeId);
     if (ni === undefined) return null;
     const node = graph.nodes[ni];
 
     if (node.initialNodeId) {
-      return resolveInitial(node.initialNodeId);
+      return resolveInitial(node.initialNodeId, seen);
     }
 
     // No initialNodeId set — use first child
     const childIds = idx.childNodes.get(nodeId) ?? [];
     if (childIds.length > 0) {
-      return resolveInitial(childIds[0]);
+      return resolveInitial(childIds[0], seen);
     }
 
     return nodeId;
@@ -106,7 +111,11 @@ export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
     if (target === null) continue;
 
     for (const source of sources) {
-      if (source === target) continue; // skip self-loops from flattening
+      // Skip self-loops *introduced by flattening* (compound resolution made
+      // source === target); authored self-loops on leaf nodes are preserved.
+      const isAuthoredLeafSelfLoop =
+        edge.sourceId === edge.targetId && leaves.has(edge.sourceId);
+      if (source === target && !isAuthoredLeafSelfLoop) continue;
       const key = `${source}->${target}`;
       if (edgeSeen.has(key)) continue;
       edgeSeen.add(key);
@@ -118,22 +127,31 @@ export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
         targetId: target,
         label: edge.label,
         data: edge.data,
+        ...(edge.weight !== undefined && { weight: edge.weight }),
+        ...(edge.mode !== undefined && { mode: edge.mode }),
+        // Port refs only survive when the endpoint they belong to is unchanged
+        ...(source === edge.sourceId &&
+          edge.sourcePort !== undefined && { sourcePort: edge.sourcePort }),
+        ...(target === edge.targetId &&
+          edge.targetPort !== undefined && { targetPort: edge.targetPort }),
       });
     }
   }
 
-  // Collect leaf nodes in document order
+  // Collect leaf nodes in document order, dropping hierarchy-only fields
   const leafNodes: NodeConfig<N>[] = graph.nodes
     .filter((n) => leaves.has(n.id))
-    .map((n) => ({
-      id: n.id,
-      label: n.label,
-      data: n.data,
-    }));
+    .map((n) => {
+      const { type, parentId, initialNodeId, ...rest } = n;
+      return rest as NodeConfig<N>;
+    });
 
   return createGraph({
     id: graph.id,
     mode: graph.mode,
+    initialNodeId: graph.initialNodeId
+      ? (resolveInitial(graph.initialNodeId) ?? undefined)
+      : undefined,
     nodes: leafNodes,
     edges: flatEdges,
     data: graph.data,
@@ -155,8 +173,13 @@ function nodeToConfig<N>(
     config.parentId =
       nodeIdSet && !nodeIdSet.has(node.parentId) ? undefined : node.parentId;
   }
-  if (node.initialNodeId !== undefined)
-    config.initialNodeId = node.initialNodeId ?? undefined;
+  if (node.initialNodeId != null) {
+    config.initialNodeId =
+      nodeIdSet && !nodeIdSet.has(node.initialNodeId)
+        ? undefined
+        : node.initialNodeId;
+  }
+  if (node.ports !== undefined) config.ports = node.ports.map((p) => ({ ...p }));
   if (node.x !== undefined) config.x = node.x;
   if (node.y !== undefined) config.y = node.y;
   if (node.width !== undefined) config.width = node.width;
@@ -176,6 +199,9 @@ function edgeToConfig<E>(edge: GraphEdge<E>): EdgeConfig<E> {
     data: edge.data,
   };
   if (edge.weight !== undefined) config.weight = edge.weight;
+  if (edge.mode !== undefined) config.mode = edge.mode;
+  if (edge.sourcePort !== undefined) config.sourcePort = edge.sourcePort;
+  if (edge.targetPort !== undefined) config.targetPort = edge.targetPort;
   if (edge.x !== undefined) config.x = edge.x;
   if (edge.y !== undefined) config.y = edge.y;
   if (edge.width !== undefined) config.width = edge.width;
@@ -268,9 +294,13 @@ export function reverseGraph<N, E, G>(
     nodes: graph.nodes.map((n) => nodeToConfig(n)),
     edges: edges.map((e) => {
       const config = edgeToConfig(e);
-      // Flip source and target
+      // Flip source and target (and their port references)
       config.sourceId = e.targetId;
       config.targetId = e.sourceId;
+      delete config.sourcePort;
+      delete config.targetPort;
+      if (e.targetPort !== undefined) config.sourcePort = e.targetPort;
+      if (e.sourcePort !== undefined) config.targetPort = e.sourcePort;
       return config;
     }),
     data: graph.data,

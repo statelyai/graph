@@ -231,6 +231,59 @@ export interface DeleteNodeOptions {
   reparent?: boolean;
 }
 
+// --- Update types (input, lenient) ---
+
+/**
+ * Update payload for {@link updateNode}/`updateEntities`.
+ *
+ * Optional fields (`x`, `y`, `width`, `height`, `shape`, `color`, `style`,
+ * `ports`) accept `null` to **unset** the field. `undefined` (or omitting the
+ * key) leaves the field unchanged. `null` is used for unsetting so update
+ * payloads stay JSON-serializable.
+ */
+export interface NodeUpdate<TNodeData = any, TPortData = any> {
+  parentId?: string | null;
+  initialNodeId?: string | null;
+  label?: string | null;
+  data?: TNodeData;
+  /** New ports for the node, or `null` to remove all ports. */
+  ports?: PortConfig<TPortData>[] | null;
+  x?: number | null;
+  y?: number | null;
+  width?: number | null;
+  height?: number | null;
+  shape?: string | null;
+  color?: string | null;
+  style?: Record<string, string | number | boolean> | null;
+}
+
+/**
+ * Update payload for {@link updateEdge}/`updateEntities`.
+ *
+ * Optional fields (`weight`, `mode`, `sourcePort`, `targetPort`, `x`, `y`,
+ * `width`, `height`, `color`, `style`) accept `null` to **unset** the field.
+ * `undefined` (or omitting the key) leaves the field unchanged. `null` is
+ * used for unsetting so update payloads stay JSON-serializable.
+ */
+export interface EdgeUpdate<TEdgeData = any> {
+  sourceId?: string;
+  targetId?: string;
+  label?: string | null;
+  data?: TEdgeData;
+  weight?: number | null;
+  mode?: GraphMode | null;
+  /** Port name on the source node, or `null` to clear the port reference. */
+  sourcePort?: string | null;
+  /** Port name on the target node, or `null` to clear the port reference. */
+  targetPort?: string | null;
+  x?: number | null;
+  y?: number | null;
+  width?: number | null;
+  height?: number | null;
+  color?: string | null;
+  style?: Record<string, string | number | boolean> | null;
+}
+
 export interface EntitiesConfig<
   TNodeData = any,
   TEdgeData = any,
@@ -245,10 +298,8 @@ export interface EntitiesUpdate<
   TEdgeData = any,
   TPortData = any,
 > {
-  nodes?: (Partial<Omit<NodeConfig<TNodeData, TPortData>, 'id'>> & {
-    id: string;
-  })[];
-  edges?: (Partial<Omit<EdgeConfig<TEdgeData>, 'id'>> & { id: string })[];
+  nodes?: (NodeUpdate<TNodeData, TPortData> & { id: string })[];
+  edges?: (EdgeUpdate<TEdgeData> & { id: string })[];
 }
 
 // --- Path types ---
@@ -360,7 +411,7 @@ export type GraphPatch<TNodeData = any, TEdgeData = any> =
   | {
       op: 'updateNode';
       id: string;
-      data: Partial<Omit<NodeConfig<TNodeData>, 'id'>>;
+      data: NodeUpdate<TNodeData>;
       description?: string;
     }
   | { op: 'deleteNode'; id: string; description?: string }
@@ -368,7 +419,7 @@ export type GraphPatch<TNodeData = any, TEdgeData = any> =
   | {
       op: 'updateEdge';
       id: string;
-      data: Partial<Omit<EdgeConfig<TEdgeData>, 'id'>>;
+      data: EdgeUpdate<TEdgeData>;
       description?: string;
     }
   | { op: 'deleteEdge'; id: string; description?: string };

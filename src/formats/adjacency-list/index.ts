@@ -57,7 +57,16 @@ export function fromAdjacencyList(
   const directed = options?.directed ?? true;
   const seen = new Set<string>();
 
-  const nodes = Object.keys(adj).map((id) => ({
+  // Include targets that never appear as keys so edges always reference
+  // existing nodes.
+  const nodeIds = new Set<string>(Object.keys(adj));
+  for (const targets of Object.values(adj)) {
+    for (const targetId of targets) {
+      nodeIds.add(targetId);
+    }
+  }
+
+  const nodes = [...nodeIds].map((id) => ({
     type: 'node' as const,
     id,
     parentId: null,

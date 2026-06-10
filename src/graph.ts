@@ -16,6 +16,8 @@ import type {
   VisualEdge,
   VisualPort,
   TransitionOptions,
+  NodeUpdate,
+  EdgeUpdate,
 } from './types';
 import {
   getIndex,
@@ -544,21 +546,59 @@ export function deleteEdge(graph: Graph, id: string): void {
   invalidateIndex(graph);
 }
 
+/** Optional fields where `null` in an update unsets the field. */
+const NODE_OPTIONAL_KEYS = [
+  'x',
+  'y',
+  'width',
+  'height',
+  'shape',
+  'color',
+  'style',
+] as const;
+
+const EDGE_OPTIONAL_KEYS = [
+  'weight',
+  'mode',
+  'x',
+  'y',
+  'width',
+  'height',
+  'color',
+  'style',
+] as const;
+
+/** Apply optional-field updates: `null` unsets, a value sets, `undefined` is ignored. */
+function applyOptionalUpdates(
+  target: Record<string, any>,
+  update: Record<string, any>,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    const value = update[key];
+    if (value === undefined) continue;
+    if (value === null) delete target[key];
+    else target[key] = value;
+  }
+}
+
 /**
  * **Mutable.** Update a node in place.
+ * Optional fields (`x`, `y`, `width`, `height`, `shape`, `color`, `style`,
+ * `ports`) accept `null` to unset; `undefined` leaves them unchanged.
  * @returns The updated node.
  *
  * @example
  * ```ts
  * const graph = createGraph({ nodes: [{ id: 'a', label: 'old' }] });
- * const updated = updateNode(graph, 'a', { label: 'new' });
- * // updated.label === 'new'
+ * const updated = updateNode(graph, 'a', { label: 'new', x: 100 });
+ * // updated.label === 'new', updated.x === 100
  * ```
  */
 export function updateNode<N, P = any>(
   graph: Graph<N, any, any, P>,
   id: string,
-  update: Partial<Omit<NodeConfig<N, P>, 'id'>>,
+  update: NodeUpdate<N, P>,
 ): GraphNode<N, P> {
   const idx = getIndex(graph);
   const arrayIdx = idx.nodeById.get(id);
@@ -569,11 +609,52 @@ export function updateNode<N, P = any>(
     if (!idx.nodeById.has(update.parentId)) {
       throw new Error(`Parent node "${update.parentId}" does not exist`);
     }
+    // Reject hierarchy cycles: the new parent must not be the node itself or
+    // one of its descendants — queries like getAncestors would loop forever.
+    // The seen-set guards against pre-existing (authored) parent cycles not
+    // involving `id`, which would otherwise make this walk spin forever.
+    let ancestorId: string | null = update.parentId;
+    const seen = new Set<string>();
+    while (ancestorId !== null && !seen.has(ancestorId)) {
+      if (ancestorId === id) {
+        throw new Error(
+          `Cannot set parentId of node "${id}" to "${update.parentId}": ` +
+            `"${update.parentId}" is "${id}" or one of its descendants, which would create a hierarchy cycle. ` +
+            `Reparent "${update.parentId}" elsewhere first.`,
+        );
+      }
+      seen.add(ancestorId);
+      const ai = idx.nodeById.get(ancestorId);
+      ancestorId =
+        ai !== undefined ? (graph.nodes[ai].parentId ?? null) : null;
+    }
   }
-  if (update.ports !== undefined && update.ports.length > 0) {
+  if (update.ports != null && update.ports.length > 0) {
     validatePortNames(update.ports);
   }
   const node = graph.nodes[arrayIdx];
+  // Replacing/removing ports must not orphan edge port references
+  if (update.ports !== undefined) {
+    const newPortNames = new Set((update.ports ?? []).map((p) => p.name));
+    for (const eid of idx.outEdges.get(id) ?? []) {
+      const e = graph.edges[idx.edgeById.get(eid)!];
+      if (e.sourcePort !== undefined && !newPortNames.has(e.sourcePort)) {
+        throw new Error(
+          `Cannot update ports of node "${id}": edge "${e.id}" references port "${e.sourcePort}" via sourcePort. ` +
+            `Keep that port, or update/delete the edge first.`,
+        );
+      }
+    }
+    for (const eid of idx.inEdges.get(id) ?? []) {
+      const e = graph.edges[idx.edgeById.get(eid)!];
+      if (e.targetPort !== undefined && !newPortNames.has(e.targetPort)) {
+        throw new Error(
+          `Cannot update ports of node "${id}": edge "${e.id}" references port "${e.targetPort}" via targetPort. ` +
+            `Keep that port, or update/delete the edge first.`,
+        );
+      }
+    }
+  }
   const oldParentId = node.parentId;
   const updated: GraphNode<N, P> = {
     ...node,
@@ -583,10 +664,12 @@ export function updateNode<N, P = any>(
     }),
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
-    ...(update.ports !== undefined && {
-      ports: update.ports.map(createGraphPort),
-    }),
   };
+  if (update.ports !== undefined) {
+    if (update.ports === null) delete updated.ports;
+    else updated.ports = update.ports.map(createGraphPort);
+  }
+  applyOptionalUpdates(updated, update, NODE_OPTIONAL_KEYS);
   graph.nodes[arrayIdx] = updated;
 
   // Update hierarchy index if parentId changed
@@ -599,6 +682,9 @@ export function updateNode<N, P = any>(
 
 /**
  * **Mutable.** Update an edge in place.
+ * Optional fields (`weight`, `mode`, `sourcePort`, `targetPort`, `x`, `y`,
+ * `width`, `height`, `color`, `style`) accept `null` to unset; `undefined`
+ * leaves them unchanged.
  * @returns The updated edge.
  *
  * @example
@@ -607,14 +693,14 @@ export function updateNode<N, P = any>(
  *   nodes: [{ id: 'a' }, { id: 'b' }],
  *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', label: 'old' }],
  * });
- * const updated = updateEdge(graph, 'e1', { label: 'new' });
- * // updated.label === 'new'
+ * const updated = updateEdge(graph, 'e1', { label: 'new', weight: 2 });
+ * // updated.label === 'new', updated.weight === 2
  * ```
  */
 export function updateEdge<N, E>(
   graph: Graph<N, E>,
   id: string,
-  update: Partial<Omit<EdgeConfig<E>, 'id'>>,
+  update: EdgeUpdate<E>,
 ): GraphEdge<E> {
   const idx = getIndex(graph);
   const arrayIdx = idx.edgeById.get(id);
@@ -630,22 +716,37 @@ export function updateEdge<N, E>(
   const edge = graph.edges[arrayIdx];
   const oldSourceId = edge.sourceId;
   const oldTargetId = edge.targetId;
-  // Validate port references
+  // Validate port references against the *effective* endpoints, including
+  // port references kept from the existing edge when only an endpoint changes
   const effectiveSourceId = update.sourceId ?? edge.sourceId;
   const effectiveTargetId = update.targetId ?? edge.targetId;
-  if (update.sourcePort !== undefined) {
+  const effectiveSourcePort =
+    update.sourcePort !== undefined
+      ? (update.sourcePort ?? undefined)
+      : edge.sourcePort;
+  const effectiveTargetPort =
+    update.targetPort !== undefined
+      ? (update.targetPort ?? undefined)
+      : edge.targetPort;
+  if (effectiveSourcePort !== undefined) {
     const sourceNode = graph.nodes[idx.nodeById.get(effectiveSourceId)!];
-    if (!sourceNode.ports?.some((p) => p.name === update.sourcePort)) {
+    if (!sourceNode.ports?.some((p) => p.name === effectiveSourcePort)) {
       throw new Error(
-        `Port "${update.sourcePort}" does not exist on source node "${effectiveSourceId}"`,
+        update.sourcePort !== undefined
+          ? `Port "${effectiveSourcePort}" does not exist on source node "${effectiveSourceId}"`
+          : `Cannot update edge "${id}": its sourcePort "${effectiveSourcePort}" does not exist on the new source node "${effectiveSourceId}". ` +
+            `Include sourcePort in the update (a port on "${effectiveSourceId}", or null to clear it).`,
       );
     }
   }
-  if (update.targetPort !== undefined) {
+  if (effectiveTargetPort !== undefined) {
     const targetNode = graph.nodes[idx.nodeById.get(effectiveTargetId)!];
-    if (!targetNode.ports?.some((p) => p.name === update.targetPort)) {
+    if (!targetNode.ports?.some((p) => p.name === effectiveTargetPort)) {
       throw new Error(
-        `Port "${update.targetPort}" does not exist on target node "${effectiveTargetId}"`,
+        update.targetPort !== undefined
+          ? `Port "${effectiveTargetPort}" does not exist on target node "${effectiveTargetId}"`
+          : `Cannot update edge "${id}": its targetPort "${effectiveTargetPort}" does not exist on the new target node "${effectiveTargetId}". ` +
+            `Include targetPort in the update (a port on "${effectiveTargetId}", or null to clear it).`,
       );
     }
   }
@@ -655,13 +756,16 @@ export function updateEdge<N, E>(
     ...(update.targetId !== undefined && { targetId: update.targetId }),
     ...(update.label !== undefined && { label: update.label }),
     ...(update.data !== undefined && { data: update.data }),
-    ...(update.sourcePort !== undefined && {
-      sourcePort: update.sourcePort,
-    }),
-    ...(update.targetPort !== undefined && {
-      targetPort: update.targetPort,
-    }),
   };
+  if (update.sourcePort !== undefined) {
+    if (update.sourcePort === null) delete updated.sourcePort;
+    else updated.sourcePort = update.sourcePort;
+  }
+  if (update.targetPort !== undefined) {
+    if (update.targetPort === null) delete updated.targetPort;
+    else updated.targetPort = update.targetPort;
+  }
+  applyOptionalUpdates(updated, update, EDGE_OPTIONAL_KEYS);
   graph.edges[arrayIdx] = updated;
 
   // Update adjacency index if endpoints changed
@@ -854,10 +958,10 @@ export class GraphInstance<N = any, E = any, G = any, P = any> {
   deleteEdge(id: string) {
     return deleteEdge(this.graph, id);
   }
-  updateNode(id: string, update: Partial<Omit<NodeConfig<N, P>, 'id'>>) {
+  updateNode(id: string, update: NodeUpdate<N, P>) {
     return updateNode(this.graph, id, update);
   }
-  updateEdge(id: string, update: Partial<Omit<EdgeConfig<E>, 'id'>>) {
+  updateEdge(id: string, update: EdgeUpdate<E>) {
     return updateEdge(this.graph, id, update);
   }
 

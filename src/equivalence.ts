@@ -41,8 +41,14 @@ export function areEntitiesEqual<T extends GraphNode | GraphEdge>(
   b: T,
   keys?: readonly (keyof T)[],
 ): boolean {
+  // Union of both entities' keys so optional fields present on only one
+  // side are compared (keeps the comparison symmetric).
   const compareKeys =
-    keys && keys.length > 0 ? keys : (Object.keys(a) as (keyof T)[]);
+    keys && keys.length > 0
+      ? keys
+      : ([
+          ...new Set([...Object.keys(a), ...Object.keys(b)]),
+        ] as (keyof T)[]);
   for (const key of compareKeys) {
     if (differs(a[key], b[key])) return false;
   }
@@ -87,10 +93,10 @@ export function isNonLayoutEqual<T extends GraphNode | GraphEdge>(
   b: T,
 ): boolean {
   const skip = LAYOUT_KEY_SET[a.type];
-  const keys = Object.keys(a);
-  for (let i = 0; i < keys.length; i++) {
-    if (skip.has(keys[i])) continue;
-    if (differs((a as any)[keys[i]], (b as any)[keys[i]])) return false;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (skip.has(key)) continue;
+    if (differs((a as any)[key], (b as any)[key])) return false;
   }
   return true;
 }

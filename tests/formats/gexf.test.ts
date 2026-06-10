@@ -100,6 +100,81 @@ describe('GEXF', () => {
     expect(graph.mode).toBe('directed');
   });
 
+  it('throws on non-numeric node position/size values', () => {
+    const posXml = [
+      '<gexf xmlns="http://gexf.net/1.3" xmlns:viz="http://gexf.net/1.3/viz">',
+      '  <graph defaultedgetype="directed">',
+      '    <nodes>',
+      '      <node id="n1" label=""><viz:position x="abc" y="0"/></node>',
+      '    </nodes>',
+      '    <edges/>',
+      '  </graph>',
+      '</gexf>',
+    ].join('\n');
+    expect(() => fromGEXF(posXml)).toThrow(
+      'GEXF: <viz:position> x value "abc" on node "n1" is not a number. Fix the value or remove the attribute.',
+    );
+
+    const sizeXml = [
+      '<gexf xmlns="http://gexf.net/1.3" xmlns:viz="http://gexf.net/1.3/viz">',
+      '  <graph defaultedgetype="directed">',
+      '    <nodes>',
+      '      <node id="n1" label=""><viz:size value="big"/></node>',
+      '    </nodes>',
+      '    <edges/>',
+      '  </graph>',
+      '</gexf>',
+    ].join('\n');
+    expect(() => fromGEXF(sizeXml)).toThrow(
+      'GEXF: <viz:size> value "big" on node "n1" is not a number. Fix the value or remove the attribute.',
+    );
+  });
+
+  it('throws on non-numeric node width/height attvalues', () => {
+    const xml = [
+      '<gexf xmlns="http://gexf.net/1.3">',
+      '  <graph defaultedgetype="directed">',
+      '    <attributes class="node">',
+      '      <attribute id="a_width" title="width" type="double"/>',
+      '    </attributes>',
+      '    <nodes>',
+      '      <node id="n1" label="">',
+      '        <attvalues><attvalue for="a_width" value="wide"/></attvalues>',
+      '      </node>',
+      '    </nodes>',
+      '    <edges/>',
+      '  </graph>',
+      '</gexf>',
+    ].join('\n');
+    expect(() => fromGEXF(xml)).toThrow(
+      'GEXF: width attribute value "wide" on node "n1" is not a number. Fix the value or remove the attribute.',
+    );
+  });
+
+  it('throws on non-numeric edge weight/position attvalues', () => {
+    const xml = [
+      '<gexf xmlns="http://gexf.net/1.3">',
+      '  <graph defaultedgetype="directed">',
+      '    <attributes class="edge">',
+      '      <attribute id="a_edgeWeight" title="weight" type="double"/>',
+      '    </attributes>',
+      '    <nodes>',
+      '      <node id="a" label=""/>',
+      '      <node id="b" label=""/>',
+      '    </nodes>',
+      '    <edges>',
+      '      <edge id="e1" source="a" target="b">',
+      '        <attvalues><attvalue for="a_edgeWeight" value="heavy"/></attvalues>',
+      '      </edge>',
+      '    </edges>',
+      '  </graph>',
+      '</gexf>',
+    ].join('\n');
+    expect(() => fromGEXF(xml)).toThrow(
+      'GEXF: weight attribute value "heavy" on edge "e1" is not a number. Fix the value or remove the attribute.',
+    );
+  });
+
   it('round-trips ports and edge port references', () => {
     expectFixtureRoundTrip((graph) => fromGEXF(toGEXF(graph)), {
       graphKeys: ['initialNodeId', 'data', 'direction'],
@@ -131,5 +206,42 @@ describe('GEXF', () => {
         'targetPort',
       ],
     });
+  });
+});
+
+describe('GEXF label fidelity', () => {
+  it('preserves empty-string labels instead of substituting the node id', () => {
+    const g: Graph = {
+      id: 'g',
+      mode: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: '', data: undefined },
+      ],
+      edges: [],
+      data: undefined,
+    };
+    const out = fromGEXF(toGEXF(g));
+    expect(out.nodes[0].label).toBe('');
+  });
+
+  it('preserves label text exactly (no number coercion or whitespace trimming)', () => {
+    const g: Graph = {
+      id: 'g',
+      mode: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: '1.50', data: undefined },
+        { type: 'node', id: 'b', parentId: null, initialNodeId: null, label: '007', data: undefined },
+        { type: 'node', id: 'c', parentId: null, initialNodeId: null, label: '  hi  ', data: undefined },
+      ],
+      edges: [
+        { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', label: '  spaced  ', data: undefined },
+      ],
+      data: undefined,
+    };
+    const out = fromGEXF(toGEXF(g));
+    expect(out.nodes.map((n) => n.label)).toEqual(['1.50', '007', '  hi  ']);
+    expect(out.edges[0].label).toBe('  spaced  ');
   });
 });

@@ -260,7 +260,12 @@ export function fromGraphML(xml: string): Graph {
 
   const parser = new XMLParser({
     ignoreAttributes: false,
-    isArray: (name) => ['node', 'edge', 'data', 'key'].includes(name),
+    isArray: (name) =>
+      ['node', 'edge', 'data', 'key', 'graph', 'port'].includes(name),
+    // Keep <data> text verbatim: "1.50" must not become 1.5 and
+    // "  hi  " must not be trimmed. Numeric fields are parsed explicitly.
+    parseTagValue: false,
+    trimValues: false,
   });
 
   let parsed: any;
@@ -275,7 +280,8 @@ export function fromGraphML(xml: string): Graph {
     throw new Error('GraphML: missing <graphml> root element');
   }
 
-  const graphEl = graphml.graph;
+  // Multi-graph documents: import the first <graph> only.
+  const graphEl = asArray(graphml.graph)[0];
   if (!graphEl) {
     throw new Error('GraphML: missing <graph> element');
   }
@@ -288,51 +294,117 @@ export function fromGraphML(xml: string): Graph {
       ? tryParseJSON(graphDataMap.graphData)
       : undefined;
 
-  const nodes: GraphNode[] = asArray(graphEl.node).map((nodeEl: any) => {
+  // Standard GraphML nests subgraphs as <node><graph>…</graph></node> and
+  // allows edges inside nested <graph> elements. Collect nodes (with their
+  // structural parent) and edges recursively; node ids are document-global,
+  // so edge endpoint resolution is unaffected by nesting depth.
+  const nodeEntries: Array<{ el: any; structuralParentId: string | null }> = [];
+  const edgeEls: any[] = [];
+  function collectGraphContents(gEl: any, parentId: string | null) {
+    for (const nodeEl of asArray(gEl.node)) {
+      nodeEntries.push({ el: nodeEl, structuralParentId: parentId });
+      for (const subgraphEl of asArray(nodeEl.graph)) {
+        collectGraphContents(subgraphEl, String(nodeEl['@_id']));
+      }
+    }
+    edgeEls.push(...asArray(gEl.edge));
+  }
+  collectGraphContents(graphEl, null);
+
+  const nodes: GraphNode[] = nodeEntries.map(({ el: nodeEl, structuralParentId }) => {
     const dataMap = parseDataElements(nodeEl.data);
+    const id = String(nodeEl['@_id']);
     const node: GraphNode = {
       type: 'node',
-      id: String(nodeEl['@_id']),
-      parentId: dataMap.parentId ?? null,
+      id,
+      // Own-dialect <data key="parentId"> takes precedence over structural
+      // nesting in standard-GraphML subgraphs.
+      parentId: dataMap.parentId ?? structuralParentId,
       initialNodeId: dataMap.initialNodeId ?? null,
       label: dataMap.label ?? '',
       data:
         dataMap.data !== undefined ? tryParseJSON(dataMap.data) : undefined,
     };
 
-    if (dataMap.x !== undefined) node.x = parseNumber(dataMap.x);
-    if (dataMap.y !== undefined) node.y = parseNumber(dataMap.y);
-    if (dataMap.width !== undefined) node.width = parseNumber(dataMap.width);
-    if (dataMap.height !== undefined) node.height = parseNumber(dataMap.height);
+    if (dataMap.x !== undefined) node.x = parseNumber(dataMap.x, 'x', 'node', id);
+    if (dataMap.y !== undefined) node.y = parseNumber(dataMap.y, 'y', 'node', id);
+    if (dataMap.width !== undefined) {
+      node.width = parseNumber(dataMap.width, 'width', 'node', id);
+    }
+    if (dataMap.height !== undefined) {
+      node.height = parseNumber(dataMap.height, 'height', 'node', id);
+    }
     if (dataMap.shape !== undefined) node.shape = dataMap.shape;
     if (dataMap.color !== undefined) node.color = dataMap.color;
     if (dataMap.style !== undefined) node.style = tryParseJSON(dataMap.style);
-    if (dataMap.ports !== undefined) node.ports = tryParseJSON(dataMap.ports);
+    if (dataMap.ports !== undefined) {
+      // Own-dialect <data key="ports"> JSON takes precedence over native
+      // <port> elements.
+      node.ports = tryParseJSON(dataMap.ports);
+    } else if (nodeEl.port !== undefined) {
+      node.ports = collectPorts(nodeEl.port);
+    }
 
     return node;
   });
+  // All explicit edge ids, so synthesized ids can never collide with them.
+  const usedEdgeIds = new Set<string>(
+    edgeEls
+      .filter((edgeEl: any) => edgeEl['@_id'] != null)
+      .map((edgeEl: any) => String(edgeEl['@_id'])),
+  );
 
-  const edges: GraphEdge[] = asArray(graphEl.edge).map((edgeEl: any) => {
+  const edges: GraphEdge[] = edgeEls.map((edgeEl: any, i: number) => {
     const dataMap = parseDataElements(edgeEl.data);
+    const source = String(edgeEl['@_source']);
+    const target = String(edgeEl['@_target']);
+    // GraphML edge `id` is optional; synthesize a stable, unique one when
+    // absent so downstream indexing/rendering can tell edges apart.
+    let id: string;
+    if (edgeEl['@_id'] != null) {
+      id = String(edgeEl['@_id']);
+    } else {
+      id = `${source}-${target}-${i}`;
+      for (let suffix = 0; usedEdgeIds.has(id); suffix++) {
+        id = `${source}-${target}-${i}#e${suffix}`;
+      }
+      usedEdgeIds.add(id);
+    }
     const edge: GraphEdge = {
       type: 'edge',
-      id: String(edgeEl['@_id']),
-      sourceId: String(edgeEl['@_source']),
-      targetId: String(edgeEl['@_target']),
+      id,
+      sourceId: source,
+      targetId: target,
       label: dataMap.label ?? '',
       data:
         dataMap.data !== undefined ? tryParseJSON(dataMap.data) : undefined,
     };
 
-    if (dataMap.weight !== undefined) edge.weight = parseNumber(dataMap.weight);
-    if (dataMap.x !== undefined) edge.x = parseNumber(dataMap.x);
-    if (dataMap.y !== undefined) edge.y = parseNumber(dataMap.y);
-    if (dataMap.width !== undefined) edge.width = parseNumber(dataMap.width);
-    if (dataMap.height !== undefined) edge.height = parseNumber(dataMap.height);
+    if (dataMap.weight !== undefined) {
+      edge.weight = parseNumber(dataMap.weight, 'weight', 'edge', id);
+    }
+    if (dataMap.x !== undefined) edge.x = parseNumber(dataMap.x, 'x', 'edge', id);
+    if (dataMap.y !== undefined) edge.y = parseNumber(dataMap.y, 'y', 'edge', id);
+    if (dataMap.width !== undefined) {
+      edge.width = parseNumber(dataMap.width, 'width', 'edge', id);
+    }
+    if (dataMap.height !== undefined) {
+      edge.height = parseNumber(dataMap.height, 'height', 'edge', id);
+    }
     if (dataMap.color !== undefined) edge.color = dataMap.color;
     if (dataMap.style !== undefined) edge.style = tryParseJSON(dataMap.style);
-    if (dataMap.sourcePort !== undefined) edge.sourcePort = dataMap.sourcePort;
-    if (dataMap.targetPort !== undefined) edge.targetPort = dataMap.targetPort;
+    // Own-dialect <data key="sourcePort"/"targetPort"> takes precedence over
+    // the standard GraphML sourceport/targetport attributes.
+    if (dataMap.sourcePort !== undefined) {
+      edge.sourcePort = dataMap.sourcePort;
+    } else if (edgeEl['@_sourceport'] != null) {
+      edge.sourcePort = String(edgeEl['@_sourceport']);
+    }
+    if (dataMap.targetPort !== undefined) {
+      edge.targetPort = dataMap.targetPort;
+    } else if (edgeEl['@_targetport'] != null) {
+      edge.targetPort = String(edgeEl['@_targetport']);
+    }
 
     // Per-edge directedness override from the GraphML `directed` attribute.
     const directedAttr = edgeEl['@_directed'];
@@ -385,8 +457,40 @@ function tryParseJSON(str: string): any {
   }
 }
 
-function parseNumber(value: string): number {
-  return Number(value);
+/**
+ * Flattens native GraphML <port> elements (which may nest) into our port
+ * shape. Standard GraphML ports carry only a name; direction is unknowable,
+ * so they import as advisory 'inout' with null data.
+ */
+function collectPorts(portEls: any): GraphNode['ports'] {
+  const ports: NonNullable<GraphNode['ports']> = [];
+  for (const portEl of asArray(portEls)) {
+    if (portEl?.['@_name'] == null) continue;
+    ports.push({
+      name: String(portEl['@_name']),
+      direction: 'inout',
+      data: null,
+    });
+    if (portEl.port !== undefined) {
+      ports.push(...(collectPorts(portEl.port) ?? []));
+    }
+  }
+  return ports;
+}
+
+function parseNumber(
+  value: string,
+  key: string,
+  kind: 'node' | 'edge',
+  ownerId: string,
+): number {
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    throw new Error(
+      `GraphML: <data key="${key}"> value "${value}" on ${kind} "${ownerId}" is not a number. Fix the value or remove the attribute.`,
+    );
+  }
+  return parsed;
 }
 
 function parseDirection(value: string): Graph['direction'] {

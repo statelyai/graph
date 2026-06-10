@@ -76,6 +76,7 @@ export function toD3Graph(graph: Graph): D3Graph {
       };
       if (e.id) link.id = e.id;
       if (e.label) link.label = e.label;
+      if (e.mode) link.mode = e.mode;
       if (e.data !== undefined) link.data = e.data;
       if (e.weight !== undefined) link.weight = e.weight;
       if (e.x !== undefined) link.x = e.x;
@@ -143,6 +144,7 @@ export function fromD3Graph(d3: D3Graph): Graph {
       sourceId: typeof l.source === 'string' ? l.source : (l.source as any).id,
       targetId: typeof l.target === 'string' ? l.target : (l.target as any).id,
       label: l.label ?? '',
+      ...(l.mode && { mode: l.mode }),
       data: l.data,
       ...(l.weight !== undefined && { weight: l.weight }),
       ...(l.x !== undefined && { x: l.x }),

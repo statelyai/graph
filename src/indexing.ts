@@ -16,7 +16,6 @@ export interface GraphIndex {
   /** Staleness detection */
   nodeCount: number;
   edgeCount: number;
-  signature: string;
   nodesRef: Graph['nodes'];
   edgesRef: Graph['edges'];
 }
@@ -29,7 +28,13 @@ const indexes = new WeakMap<Graph, GraphIndex>();
 
 /**
  * Get or lazily build the index for a graph.
- * Auto-rebuilds when node/edge count changes.
+ * Auto-rebuilds when `graph.nodes`/`graph.edges` are **replaced** (e.g. an
+ * immutable-style `map`/`filter` update) or when their length changes.
+ *
+ * Mutating *fields* of an existing node/edge in place (e.g.
+ * `edge.sourceId = 'x'`, `node.parentId = 'y'`) is not detectable in O(1) —
+ * call {@link invalidateIndex} afterwards, or use the mutation API
+ * (`updateNode`/`updateEdge`), which keeps the index in sync.
  *
  * @example
  * ```ts
@@ -47,38 +52,35 @@ const indexes = new WeakMap<Graph, GraphIndex>();
  */
 export function getIndex(graph: Graph): GraphIndex {
   let idx = indexes.get(graph);
-  const sameStructure =
-    idx &&
-    idx.nodeCount === graph.nodes.length &&
-    idx.edgeCount === graph.edges.length;
-  const shouldCheckSignature =
-    idx !== undefined &&
-    sameStructure &&
-    idx.nodesRef === graph.nodes &&
-    idx.edgesRef === graph.edges;
-  const signature = shouldCheckSignature ? getIndexSignature(graph) : undefined;
+  // Rebuild when the arrays were replaced (immutable-style update) or
+  // counts changed — the cached index describes different arrays.
   if (
     !idx ||
+    idx.nodesRef !== graph.nodes ||
+    idx.edgesRef !== graph.edges ||
     idx.nodeCount !== graph.nodes.length ||
-    idx.edgeCount !== graph.edges.length ||
-    (signature !== undefined && idx.signature !== signature)
+    idx.edgeCount !== graph.edges.length
   ) {
-    idx = buildIndex(graph, signature ?? getIndexSignature(graph));
+    idx = buildIndex(graph);
     indexes.set(graph, idx);
   }
   return idx;
 }
 
 /**
- * Clear the cached index. Call this if you mutate graph.nodes/edges directly.
+ * Clear the cached index. Call this if you mutate fields of existing
+ * nodes/edges in place (e.g. `edge.targetId = 'a'`) — such mutations are not
+ * auto-detected. Array replacement and length changes are auto-detected.
  *
  * @example
  * ```ts
  * import { createGraph, invalidateIndex, getIndex } from '@statelyai/graph';
  *
- * const graph = createGraph({ nodes: [{ id: 'a' }], edges: [] });
- * // manually mutate nodes array
- * graph.nodes.push({ type: 'node', id: 'b', parentId: null, initialNodeId: null, label: '', data: undefined });
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a' }, { id: 'b' }],
+ *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+ * });
+ * graph.edges[0].targetId = 'a'; // in-place field mutation
  * invalidateIndex(graph); // forces rebuild on next getIndex()
  * ```
  */
@@ -88,18 +90,7 @@ export function invalidateIndex(graph: Graph): void {
 
 // Full rebuild
 
-function getIndexSignature(graph: Graph): string {
-  const nodeParts = graph.nodes.map(
-    (node) => `${node.id}\u0000${node.parentId ?? ''}`,
-  );
-  const edgeParts = graph.edges.map(
-    (edge) =>
-      `${edge.id}\u0000${edge.sourceId}\u0000${edge.targetId}`,
-  );
-  return `${nodeParts.join('\u0001')}\u0002${edgeParts.join('\u0001')}`;
-}
-
-function buildIndex(graph: Graph, signature: string): GraphIndex {
+function buildIndex(graph: Graph): GraphIndex {
   const nodeById = new Map<string, number>();
   const edgeById = new Map<string, number>();
   const outEdges = new Map<string, string[]>();
@@ -132,7 +123,6 @@ function buildIndex(graph: Graph, signature: string): GraphIndex {
     childNodes,
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
-    signature,
     nodesRef: graph.nodes,
     edgesRef: graph.edges,
   };
@@ -154,35 +144,6 @@ export function indexAddNode(
   idx.childNodes.get(parent)!.push(node.id);
 
   idx.nodeCount++;
-  idx.signature = '';
-}
-
-export function indexRemoveNode(
-  idx: GraphIndex,
-  node: GraphNode,
-  arrayIndex: number,
-): void {
-  idx.nodeById.delete(node.id);
-  idx.outEdges.delete(node.id);
-  idx.inEdges.delete(node.id);
-
-  // Remove from parent's children list
-  const siblings = idx.childNodes.get(node.parentId ?? null);
-  if (siblings) {
-    const pos = siblings.indexOf(node.id);
-    if (pos !== -1) siblings.splice(pos, 1);
-  }
-
-  // Remove from childNodes as a parent (children already removed/reparented by caller)
-  idx.childNodes.delete(node.id);
-
-  // Rebase: decrement array indices for nodes after the removed one
-  for (const [id, i] of idx.nodeById) {
-    if (i > arrayIndex) idx.nodeById.set(id, i - 1);
-  }
-
-  idx.nodeCount--;
-  idx.signature = '';
 }
 
 export function indexAddEdge(
@@ -194,35 +155,6 @@ export function indexAddEdge(
   idx.outEdges.get(edge.sourceId)?.push(edge.id);
   idx.inEdges.get(edge.targetId)?.push(edge.id);
   idx.edgeCount++;
-  idx.signature = '';
-}
-
-export function indexRemoveEdge(
-  idx: GraphIndex,
-  edge: GraphEdge,
-  arrayIndex: number,
-): void {
-  idx.edgeById.delete(edge.id);
-
-  // Remove from adjacency lists
-  const out = idx.outEdges.get(edge.sourceId);
-  if (out) {
-    const pos = out.indexOf(edge.id);
-    if (pos !== -1) out.splice(pos, 1);
-  }
-  const inE = idx.inEdges.get(edge.targetId);
-  if (inE) {
-    const pos = inE.indexOf(edge.id);
-    if (pos !== -1) inE.splice(pos, 1);
-  }
-
-  // Rebase: decrement array indices for edges after the removed one
-  for (const [id, i] of idx.edgeById) {
-    if (i > arrayIndex) idx.edgeById.set(id, i - 1);
-  }
-
-  idx.edgeCount--;
-  idx.signature = '';
 }
 
 /** Update childNodes index when a node's parentId changes. */
@@ -242,7 +174,6 @@ export function indexReparentNode(
   const np = newParentId ?? null;
   if (!idx.childNodes.has(np)) idx.childNodes.set(np, []);
   idx.childNodes.get(np)!.push(nodeId);
-  idx.signature = '';
 }
 
 /** Update adjacency lists when an edge's sourceId/targetId changes. */
@@ -270,5 +201,4 @@ export function indexUpdateEdgeEndpoints(
     }
     idx.inEdges.get(newTargetId)?.push(edgeId);
   }
-  idx.signature = '';
 }

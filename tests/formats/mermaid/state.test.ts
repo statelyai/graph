@@ -3,6 +3,7 @@ import {
   fromMermaidState,
   toMermaidState,
 } from '../../../src/formats/mermaid/state';
+import { getFormatSupportEntry } from '../../../src/formats/support';
 
 describe('Mermaid State Diagram Converter', () => {
   describe('fromMermaidState()', () => {
@@ -532,6 +533,191 @@ stateDiagram-v2
       });
       expect(output).toContain('classDef red fill:#f00,stroke:#333');
       expect(output).toContain('class Idle red');
+    });
+  });
+
+  describe('emit completeness', () => {
+    it('emits isolated plain states as bare lines', () => {
+      const output = toMermaidState({
+        id: '',
+        mode: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: 'A', data: {} },
+          { type: 'node', id: 'B', parentId: null, initialNodeId: null, label: 'B', data: {} },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      const lines = output.split('\n').map((l) => l.trim());
+      expect(lines).toContain('A');
+      expect(lines).toContain('B');
+    });
+
+    it('round-trips isolated plain states', () => {
+      const graph = fromMermaidState(
+        toMermaidState({
+          id: '',
+          mode: 'directed',
+          initialNodeId: null,
+          nodes: [
+            { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: 'A', data: {} },
+            { type: 'node', id: 'B', parentId: null, initialNodeId: null, label: 'B', data: {} },
+          ],
+          edges: [],
+          data: { diagramType: 'stateDiagram' },
+        }),
+      );
+      expect(graph.nodes.map((n) => n.id).sort()).toEqual(['A', 'B']);
+    });
+
+    it('emits plain children inside composite states', () => {
+      const output = toMermaidState({
+        id: '',
+        mode: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 'Parent', parentId: null, initialNodeId: null, label: 'Parent', data: {} },
+          { type: 'node', id: 'Child', parentId: 'Parent', initialNodeId: null, label: 'Child', data: {} },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      const graph = fromMermaidState(output);
+      expect(graph.nodes.find((n) => n.id === 'Child')?.parentId).toBe('Parent');
+    });
+
+    it('emits node label via the description form', () => {
+      const output = toMermaidState({
+        id: '',
+        mode: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 's1', parentId: null, initialNodeId: null, label: 'My Label', data: {} },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('state "My Label" as s1');
+    });
+
+    it('keeps description authoritative over label on emit', () => {
+      const output = toMermaidState({
+        id: '',
+        mode: 'directed',
+        initialNodeId: null,
+        nodes: [
+          { type: 'node', id: 's1', parentId: null, initialNodeId: null, label: 'L', data: { description: 'D' } },
+        ],
+        edges: [],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('state "D" as s1');
+      expect(output).not.toContain('"L"');
+    });
+
+    it('parses state "description" as stateId into label too', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    state "This is a description" as s1
+      `);
+      expect(graph.nodes[0].label).toBe('This is a description');
+      expect(graph.nodes[0].data.description).toBe('This is a description');
+    });
+
+    it('round-trips node labels', () => {
+      const graph = fromMermaidState(
+        toMermaidState({
+          id: '',
+          mode: 'directed',
+          initialNodeId: null,
+          nodes: [
+            { type: 'node', id: 's1', parentId: null, initialNodeId: null, label: 'My Label', data: {} },
+          ],
+          edges: [],
+          data: { diagramType: 'stateDiagram' },
+        }),
+      );
+      expect(graph.nodes.find((n) => n.id === 's1')?.label).toBe('My Label');
+    });
+
+    it('emits [*] --> initialNodeId when no start pseudo-node exists', () => {
+      const output = toMermaidState({
+        id: '',
+        mode: 'directed',
+        initialNodeId: 'A',
+        nodes: [
+          { type: 'node', id: 'A', parentId: null, initialNodeId: null, label: 'A', data: {} },
+          { type: 'node', id: 'B', parentId: null, initialNodeId: null, label: 'B', data: {} },
+        ],
+        edges: [
+          { type: 'edge', id: 'e0', sourceId: 'A', targetId: 'B', label: '', data: {} },
+        ],
+        data: { diagramType: 'stateDiagram' },
+      });
+      expect(output).toContain('[*] --> A');
+    });
+
+    it('does not double-emit [*] --> when a start pseudo-node exists', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    [*] --> Idle
+      `);
+      const output = toMermaidState(graph);
+      expect(output.match(/\[\*\] -->/g)).toHaveLength(1);
+    });
+
+    it('parses top-level [*] --> X into graph.initialNodeId', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Done
+      `);
+      expect(graph.initialNodeId).toBe('Idle');
+    });
+
+    it('does not set graph.initialNodeId for [*] inside a composite state', () => {
+      const graph = fromMermaidState(`
+stateDiagram-v2
+    state Active {
+        [*] --> A
+    }
+      `);
+      expect(graph.initialNodeId).toBeNull();
+    });
+
+    it('documents emit completeness accurately in the support matrix', () => {
+      const state = getFormatSupportEntry('mermaid/state');
+      const notes = state?.notes.join('\n') ?? '';
+      // Isolated states and labels now emit; a distinct label is still lost
+      // when a description is also present, so round-trip stays partial.
+      expect(state?.features.roundTrip).toBe('partial');
+      expect(notes).toContain('Isolated plain states emit');
+      expect(notes).toContain('initialNodeId');
+      expect(notes).not.toContain('dropped on emit');
+    });
+
+    it('round-trips plain nodes, labels, and initialNodeId together', () => {
+      const original = {
+        id: '',
+        mode: 'directed' as const,
+        initialNodeId: 'A',
+        nodes: [
+          { type: 'node' as const, id: 'A', parentId: null, initialNodeId: null, label: 'A', data: {} },
+          { type: 'node' as const, id: 'B', parentId: null, initialNodeId: null, label: 'State B', data: {} },
+          { type: 'node' as const, id: 'C', parentId: null, initialNodeId: null, label: 'C', data: {} },
+        ],
+        edges: [
+          { type: 'edge' as const, id: 'e0', sourceId: 'A', targetId: 'B', label: 'go', data: {} },
+        ],
+        data: { diagramType: 'stateDiagram' as const },
+      };
+      const graph = fromMermaidState(toMermaidState(original));
+      expect(graph.initialNodeId).toBe('A');
+      const real = graph.nodes.filter((n) => !n.data.isStart && !n.data.isEnd);
+      expect(real.map((n) => n.id).sort()).toEqual(['A', 'B', 'C']);
+      expect(real.find((n) => n.id === 'B')?.label).toBe('State B');
+      expect(graph.edges.some((e) => e.sourceId === 'A' && e.targetId === 'B' && e.label === 'go')).toBe(true);
     });
   });
 

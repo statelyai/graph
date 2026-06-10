@@ -4,6 +4,8 @@ import type {
   GraphEdge,
   NodeConfig,
   EdgeConfig,
+  NodeUpdate,
+  EdgeUpdate,
   GraphDiff,
   GraphPatch,
 } from './types';
@@ -24,6 +26,8 @@ function nodeToConfig<N>(node: GraphNode<N>): NodeConfig<N> {
   if (node.initialNodeId) config.initialNodeId = node.initialNodeId;
   if (node.label !== '') config.label = node.label;
   if (node.data !== undefined) config.data = node.data;
+  if (node.ports !== undefined)
+    config.ports = node.ports.map((p) => ({ ...p }));
   if (node.x !== undefined) config.x = node.x;
   if (node.y !== undefined) config.y = node.y;
   if (node.width !== undefined) config.width = node.width;
@@ -42,6 +46,10 @@ function edgeToConfig<E>(edge: GraphEdge<E>): EdgeConfig<E> {
   };
   if (edge.label !== '') config.label = edge.label;
   if (edge.data !== undefined) config.data = edge.data;
+  if (edge.weight !== undefined) config.weight = edge.weight;
+  if (edge.mode !== undefined) config.mode = edge.mode;
+  if (edge.sourcePort !== undefined) config.sourcePort = edge.sourcePort;
+  if (edge.targetPort !== undefined) config.targetPort = edge.targetPort;
   if (edge.x !== undefined) config.x = edge.x;
   if (edge.y !== undefined) config.y = edge.y;
   if (edge.width !== undefined) config.width = edge.width;
@@ -66,6 +74,7 @@ const NODE_COMPARE_KEYS = [
   'initialNodeId',
   'label',
   'data',
+  'ports',
   'x',
   'y',
   'width',
@@ -80,6 +89,10 @@ const EDGE_COMPARE_KEYS = [
   'targetId',
   'label',
   'data',
+  'weight',
+  'mode',
+  'sourcePort',
+  'targetPort',
   'x',
   'y',
   'width',
@@ -125,9 +138,13 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
       const oldPartial: Partial<GraphNode<N>> = {};
       const newPartial: Partial<GraphNode<N>> = {};
       for (const key of NODE_COMPARE_KEYS) {
-        if (differs((nodeA as any)[key], (nodeB as any)[key])) {
-          (oldPartial as any)[key] = (nodeA as any)[key];
-          (newPartial as any)[key] = (nodeB as any)[key];
+        // Normalize absent → null so diffs stay JSON-serializable and a
+        // removed optional field round-trips through patches (null unsets).
+        const oldValue = (nodeA as any)[key] ?? null;
+        const newValue = (nodeB as any)[key] ?? null;
+        if (differs(oldValue, newValue)) {
+          (oldPartial as any)[key] = oldValue;
+          (newPartial as any)[key] = newValue;
         }
       }
       if (Object.keys(oldPartial).length > 0) {
@@ -150,9 +167,12 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
       const oldPartial: Partial<GraphEdge<E>> = {};
       const newPartial: Partial<GraphEdge<E>> = {};
       for (const key of EDGE_COMPARE_KEYS) {
-        if (differs((edgeA as any)[key], (edgeB as any)[key])) {
-          (oldPartial as any)[key] = (edgeA as any)[key];
-          (newPartial as any)[key] = (edgeB as any)[key];
+        // Normalize absent → null (see node comparison above)
+        const oldValue = (edgeA as any)[key] ?? null;
+        const newValue = (edgeB as any)[key] ?? null;
+        if (differs(oldValue, newValue)) {
+          (oldPartial as any)[key] = oldValue;
+          (newPartial as any)[key] = newValue;
         }
       }
       if (Object.keys(oldPartial).length > 0) {
@@ -209,23 +229,25 @@ export function isEmptyDiff(diff: GraphDiff): boolean {
  * ```
  */
 export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
+  // Deep copy (graphs are JSON-serializable by contract) so nested values
+  // (ports, style, data) are not shared between the input and the inverse.
   return {
     nodes: {
-      added: diff.nodes.removed,
-      removed: diff.nodes.added,
+      added: diff.nodes.removed.map((c) => structuredClone(c)),
+      removed: diff.nodes.added.map((c) => structuredClone(c)),
       updated: diff.nodes.updated.map((c) => ({
         id: c.id,
-        old: c.new,
-        new: c.old,
+        old: structuredClone(c.new),
+        new: structuredClone(c.old),
       })),
     },
     edges: {
-      added: diff.edges.removed,
-      removed: diff.edges.added,
+      added: diff.edges.removed.map((c) => structuredClone(c)),
+      removed: diff.edges.added.map((c) => structuredClone(c)),
       updated: diff.edges.updated.map((c) => ({
         id: c.id,
-        old: c.new,
-        new: c.old,
+        old: structuredClone(c.new),
+        new: structuredClone(c.old),
       })),
     },
   };
@@ -235,7 +257,8 @@ export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
 
 /**
  * Compute an ordered patch list from graph `a` to graph `b`.
- * Order: delete edges → delete nodes → add nodes → add edges → update nodes → update edges.
+ * Order (see {@link toPatches}): add nodes → update edges → delete edges →
+ * delete nodes → add edges → update nodes.
  *
  * @example
  * ```ts
@@ -331,9 +354,11 @@ export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
 
   // 2. Update edges (move endpoints away from deleted nodes before they cascade)
   for (const change of diff.edges.updated) {
-    const data: Partial<Omit<EdgeConfig<E>, 'id'>> = {};
+    const data: EdgeUpdate<E> = {};
     for (const [key, value] of Object.entries(change.new)) {
-      (data as any)[key] = value;
+      // Absent fields appear as undefined when a diff was hand-built;
+      // map to null so the update unsets the field (JSON-safe).
+      (data as any)[key] = value ?? null;
     }
     patches.push({ op: 'updateEdge', id: change.id, data });
   }
@@ -355,9 +380,11 @@ export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
 
   // 6. Update nodes
   for (const change of diff.nodes.updated) {
-    const data: Partial<Omit<NodeConfig<N>, 'id'>> = {};
+    const data: NodeUpdate<N> = {};
     for (const [key, value] of Object.entries(change.new)) {
-      (data as any)[key] = value;
+      // Absent fields appear as undefined when a diff was hand-built;
+      // map to null so the update unsets the field (JSON-safe).
+      (data as any)[key] = value ?? null;
     }
     patches.push({ op: 'updateNode', id: change.id, data });
   }

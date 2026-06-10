@@ -2,6 +2,8 @@ import { bench, describe } from 'vitest';
 import {
   createVisualGraph,
   createGraph,
+  getNode,
+  getSuccessors,
   getBetweennessCentrality,
   getAllPairsShortestPaths,
   getConnectedComponents,
@@ -152,10 +154,30 @@ const allPairsDag = createSparseDag(60);
 const compoundGraph = createCompoundGraph(24, 6);
 const multiEdgeGraph = createMultiEdgeGraph(20, 3);
 const portHeavyGraph = createPortHeavyGraph(90, 6);
+const largeGraph = createGraph({
+  nodes: Array.from({ length: 10_000 }, (_, i) => ({ id: `n${i}` })),
+  edges: Array.from({ length: 20_000 }, (_, i) => ({
+    id: `e${i}`,
+    sourceId: `n${i % 10_000}`,
+    targetId: `n${(i * 7 + 1) % 10_000}`,
+  })),
+});
 const BENCH_OPTIONS = {
   time: 100,
   warmupTime: 20,
 };
+
+// Guards the O(1)-per-read index contract: a return to per-read content
+// scans makes these ~1,000× slower (see tests/perf-regression.test.ts).
+describe('index read path', () => {
+  bench('getNode(warm 10k-node graph)', () => {
+    getNode(largeGraph, 'n5000');
+  }, BENCH_OPTIONS);
+
+  bench('getSuccessors sweep(10k nodes, 20k edges)', () => {
+    for (const node of largeGraph.nodes) getSuccessors(largeGraph, node.id);
+  }, BENCH_OPTIONS);
+});
 
 describe('graph algorithms', () => {
   bench('getConnectedComponents(sparse DAG, 180 nodes)', () => {

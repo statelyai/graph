@@ -502,7 +502,7 @@ describe('reverseGraph', () => {
 // Additional MST tests
 
 describe('getMinimumSpanningTree (additional)', () => {
-  it('disconnected graph: MST covers only reachable component (prim)', () => {
+  it('disconnected graph: MST covers all components (prim)', () => {
     const g = createGraph({
       mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
@@ -512,8 +512,8 @@ describe('getMinimumSpanningTree (additional)', () => {
       ],
     });
     const mst = getMinimumSpanningTree(g, { algorithm: 'prim' });
-    // Prim starts from first node, only reaches a-b component
-    expect(mst.edges).toHaveLength(1);
+    // Prim restarts from each unvisited node, returning a spanning forest
+    expect(mst.edges).toHaveLength(2);
   });
 
   it('kruskal handles disconnected graph', () => {

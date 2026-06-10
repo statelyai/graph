@@ -522,3 +522,24 @@ flowchart TD
     });
   });
 });
+
+describe('edge label escaping', () => {
+  it('round-trips an edge label containing |', () => {
+    const input = [
+      'flowchart TD',
+      '    a --> b',
+    ].join('\n');
+    const g = fromMermaidFlowchart(input);
+    g.edges[0].label = 'a|b';
+    const out = fromMermaidFlowchart(toMermaidFlowchart(g));
+    expect(out.edges).toHaveLength(1);
+    expect(out.edges[0].sourceId).toBe('a');
+    expect(out.edges[0].targetId).toBe('b');
+    expect(out.edges[0].label).toBe('a|b');
+  });
+
+  it('parses the #124; entity back to |', () => {
+    const g = fromMermaidFlowchart('flowchart TD\n    a -->|x#124;y| b');
+    expect(g.edges[0].label).toBe('x|y');
+  });
+});

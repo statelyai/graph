@@ -1,10 +1,12 @@
 import type { Graph, GraphNode } from '../types';
 import { getIndex } from '../indexing';
 import {
+  getEffectiveModeKind,
   getNeighborIds,
   getSuccessorIds,
 } from './shared';
-import { getShortestPaths } from './paths';
+import { getEdgeMode } from '../mode';
+import { genCycles } from './paths';
 
 export function* bfs<N>(
   graph: Graph<N>,
@@ -56,7 +58,15 @@ export function* dfs<N>(
 }
 
 export function isAcyclic(graph: Graph): boolean {
-  if (graph.mode !== 'directed') {
+  // Dispatch on *effective* edge modes (per-edge overrides included).
+  // Genuinely mixed graphs use exact simple-cycle search with early exit —
+  // correct, but potentially expensive on large dense mixed graphs.
+  const kind = getEffectiveModeKind(graph);
+  if (kind === 'mixed') {
+    for (const _cycle of genCycles(graph)) return false;
+    return true;
+  }
+  if (kind === 'non-directed') {
     return isAcyclicUndirected(graph);
   }
   const WHITE = 0;
@@ -163,7 +173,19 @@ export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
   return components;
 }
 
+/**
+ * Returns a topological ordering of the graph's nodes, or `null` if no such
+ * ordering exists.
+ *
+ * Any edge whose effective mode (per {@link getEdgeMode}) is not `'directed'`
+ * makes ordering impossible — an undirected/bidirectional edge is mutual
+ * precedence, i.e. a 2-cycle — so the function returns `null`.
+ */
 export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
+  for (const edge of graph.edges) {
+    if (getEdgeMode(graph, edge) !== 'directed') return null;
+  }
+
   const idx = getIndex(graph);
   const inDegree = new Map<string, number>();
   for (const node of graph.nodes) inDegree.set(node.id, 0);
@@ -201,7 +223,23 @@ export function hasPath(
   sourceId: string,
   targetId: string,
 ): boolean {
-  return getShortestPaths(graph, { from: sourceId, to: targetId }).length > 0;
+  if (sourceId === targetId) return true;
+
+  const visited = new Set<string>([sourceId]);
+  const queue: string[] = [sourceId];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    for (const neighborId of getNeighborIds(graph, id)) {
+      if (neighborId === targetId) return true;
+      if (!visited.has(neighborId)) {
+        visited.add(neighborId);
+        queue.push(neighborId);
+      }
+    }
+  }
+
+  return false;
 }
 
 export function isConnected(graph: Graph): boolean {
@@ -209,6 +247,16 @@ export function isConnected(graph: Graph): boolean {
   return getConnectedComponents(graph).length <= 1;
 }
 
+/**
+ * Returns whether the graph is a tree: connected, acyclic, and with exactly
+ * `nodes.length - 1` edges (so directed diamonds and parallel edges are not
+ * trees). Empty and single-node graphs are considered trees.
+ */
 export function isTree(graph: Graph): boolean {
-  return isConnected(graph) && isAcyclic(graph);
+  if (graph.nodes.length === 0) return true;
+  return (
+    graph.edges.length === graph.nodes.length - 1 &&
+    isConnected(graph) &&
+    isAcyclic(graph)
+  );
 }

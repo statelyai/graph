@@ -358,3 +358,63 @@ describe('dotConverter', () => {
     expect(restored.edges[0].targetPort).toBe('in');
   });
 });
+
+describe('DOT escaping', () => {
+  it('round-trips labels containing newlines', () => {
+    const g: Graph = {
+      id: 'g',
+      mode: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'line1\nline2', data: undefined },
+        { type: 'node', id: 'b', parentId: null, initialNodeId: null, label: '', data: undefined },
+      ],
+      edges: [
+        { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', label: 'first\nsecond', data: undefined },
+      ],
+      data: undefined,
+    };
+    const out = fromDOT(toDOT(g));
+    expect(out.nodes.find((n) => n.id === 'a')!.label).toBe('line1\nline2');
+    expect(out.edges[0].label).toBe('first\nsecond');
+  });
+
+  it('round-trips labels containing backslashes', () => {
+    const g: Graph = {
+      id: 'g',
+      mode: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'C:\\temp', data: undefined },
+      ],
+      edges: [],
+      data: undefined,
+    };
+    const out = fromDOT(toDOT(g));
+    expect(out.nodes[0].label).toBe('C:\\temp');
+  });
+
+  it('quotes DOT reserved keywords used as ids', () => {
+    const g: Graph = {
+      id: 'g',
+      mode: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'node', parentId: null, initialNodeId: null, label: '', data: undefined },
+        { type: 'node', id: 'Graph', parentId: null, initialNodeId: null, label: '', data: undefined },
+      ],
+      edges: [
+        { type: 'edge', id: 'e1', sourceId: 'node', targetId: 'Graph', label: '', data: undefined },
+      ],
+      data: undefined,
+    };
+    const dot = toDOT(g);
+    expect(dot).toContain('"node"');
+    expect(dot).toContain('"Graph"');
+    const out = fromDOT(dot);
+    expect(out.nodes.map((n) => n.id).sort()).toEqual(['Graph', 'node']);
+    expect(out.edges).toHaveLength(1);
+    expect(out.edges[0].sourceId).toBe('node');
+    expect(out.edges[0].targetId).toBe('Graph');
+  });
+});

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fromD2, toD2, d2Converter } from '../../../src/formats/d2';
+import { createGraph } from '../../../src/graph';
+import type { Graph } from '../../../src/types';
 
 describe('d2 parser', () => {
   it('parses a basic directed edge with label', () => {
@@ -135,5 +137,45 @@ describe('d2 round-trip', () => {
   it('exposes a converter', () => {
     const g = d2Converter.from('a -> b');
     expect(typeof d2Converter.to(g)).toBe('string');
+  });
+});
+
+describe('toD2 with plain graphs', () => {
+  it('emits valid D2 for a graph not produced by fromD2 (null data)', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', label: 'go' }],
+    });
+    const text = toD2(g);
+    const round = fromD2(text);
+    expect(round.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+    expect(round.edges).toHaveLength(1);
+    expect(round.edges[0].sourceId).toBe('a');
+    expect(round.edges[0].targetId).toBe('b');
+    expect(round.edges[0].label).toBe('go');
+  });
+
+  it('emits valid D2 when node and edge data are undefined or plain objects', () => {
+    const g: Graph = {
+      id: '',
+      mode: 'directed',
+      initialNodeId: null,
+      nodes: [
+        { type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: undefined },
+        { type: 'node', id: 'b', parentId: null, initialNodeId: null, label: '', data: { custom: true } },
+      ],
+      edges: [
+        { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', label: '', data: undefined },
+        { type: 'edge', id: 'e2', sourceId: 'b', targetId: 'a', label: '', data: { weight: 3 }, mode: 'undirected' },
+      ],
+      data: undefined,
+    };
+    const text = toD2(g);
+    const round = fromD2(text);
+    expect(round.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+    expect(round.nodes.find((n) => n.id === 'a')!.label).toBe('A');
+    expect(round.edges).toHaveLength(2);
+    // Per-edge mode falls back to the connector glyph (-- for undirected).
+    expect(round.edges.some((e) => e.mode === 'undirected')).toBe(true);
   });
 });

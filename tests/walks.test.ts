@@ -261,3 +261,53 @@ describe('getCoverage', () => {
     expect(stats.visitedEdges).toEqual(expect.arrayContaining(['ab', 'bc']));
   });
 });
+
+describe('quick walk multi-hop detours', () => {
+  it('reconstructs multi-hop detour paths to reach far unvisited edges', () => {
+    // Undirected path a—b—c—d—e plus a branch a—f. Wherever the walk ends up,
+    // reaching the remaining branch requires a multi-hop BFS detour.
+    const g = createGraph({
+      mode: 'undirected',
+      initialNodeId: 'a',
+      nodes: ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id })),
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+        { id: 'cd', sourceId: 'c', targetId: 'd' },
+        { id: 'de', sourceId: 'd', targetId: 'e' },
+        { id: 'af', sourceId: 'a', targetId: 'f' },
+      ],
+    });
+    const steps = [...genQuickRandomWalk(g, { seed: 7 })];
+    const coverage = getCoverage(g, steps, { from: 'a' });
+    expect(coverage.edgeCoverage).toBe(1);
+    // Every step must be traversable from the previous position
+    let position = 'a';
+    for (const step of steps) {
+      expect([step.edge.sourceId, step.edge.targetId]).toContain(position);
+      position = step.node.id;
+    }
+  });
+
+  it('weighted walk ends when all traversable edges have zero weight', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 0 }],
+    });
+    const steps = [...genWeightedRandomWalk(g, { seed: 1 })];
+    expect(steps).toHaveLength(0);
+  });
+
+  it('takeUntilEdgeCoverage yields nothing for a zero target', () => {
+    const g = createGraph({
+      initialNodeId: 'a',
+      nodes: [{ id: 'a' }],
+      edges: [{ id: 'loop', sourceId: 'a', targetId: 'a' }],
+    });
+    const steps = [
+      ...takeUntilEdgeCoverage(genRandomWalk(g, { seed: 1 }), g, 0),
+    ];
+    expect(steps).toHaveLength(0);
+  });
+});

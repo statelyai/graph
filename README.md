@@ -86,6 +86,14 @@ const roots = getSources(graph); // nodes with no incoming edges
 
 Batch operations (`addEntities`, `deleteEntities`, `updateEntities`) let you apply multiple changes at once.
 
+`updateNode`/`updateEdge` accept any config field. Optional fields (position, size, `shape`, `color`, `style`, edge `weight`/`mode`/ports) can be **unset** by passing `null`; `undefined` leaves them unchanged:
+
+```ts
+updateNode(graph, 'a', { x: 100, color: 'red' }); // set
+updateEdge(graph, 'e1', { weight: 2, mode: 'undirected' });
+updateNode(graph, 'a', { color: null }); // unset
+```
+
 ## Hierarchy
 
 Nodes support parent-child relationships for compound/nested graphs. Query children, ancestors, descendants, depth, and least common ancestor. Use `flatten()` to decompose into a flat leaf-node graph.
@@ -201,7 +209,7 @@ isAcyclic(graph); // cycle check
 getShortestPath(graph, { from: 'a', to: 'c' }); // single shortest path
 getTopologicalSort(graph); // topological order (or null)
 getConnectedComponents(graph); // connected components
-getMinimumSpanningTree(graph, { weight: (e) => e.data?.weight ?? 1 }); // MST
+getMinimumSpanningTree(graph, { getWeight: (e) => e.weight ?? 1 }); // MST
 getPageRank(graph); // link analysis scores
 getLabelPropagationCommunities(graph); // community detection
 [...genGirvanNewmanCommunities(graph)]; // lazy community splits
@@ -272,29 +280,29 @@ source information instead of preserving it as metadata.
 
 <!-- format support matrix derived from src/formats/support.ts -->
 
-| Format              | Hierarchy | Ports   | Visual  | Round-trip | Notes                                                                      |
-| ------------------- | --------- | ------- | ------- | ---------- | -------------------------------------------------------------------------- |
-| `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                  |
-| `cytoscape`         | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through element data.            |
-| `d3`                | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through the loose JSON shape.    |
-| `d2`                | full      | full    | full    | full       | D2 syntax, hierarchy, ports, styles, and connector modes round-trip.       |
-| `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete. |
-| `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                            |
-| `elk`               | full      | full    | full    | full       | Metadata round-trips through reserved layout options.                      |
-| `gexf`              | full      | full    | full    | full       | Custom attributes preserve metadata beyond the standard viz module.        |
-| `gml`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through direct and JSON fields.  |
-| `graphml`           | full      | full    | partial | partial    | Ports round-trip through `<data>` fields.                                  |
-| `jgf`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through `metadata` objects.      |
-| `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                               |
-| `xyflow`            | full      | full    | full    | full       | Metadata round-trips through reserved data fields.                         |
-| `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                             |
-| `mermaid/class`     | none      | none    | none    | partial    | Class syntax is stored conservatively.                                     |
-| `mermaid/er`        | none      | none    | none    | partial    | Focuses on entities and cardinality.                                       |
-| `mermaid/flowchart` | partial   | none    | partial | partial    | `linkStyle` indices are fragile.                                           |
-| `mermaid/ishikawa`  | full      | none    | none    | partial    | Preserves hierarchy, not fishbone layout.                                  |
-| `mermaid/mindmap`   | full      | none    | partial | partial    | Icon syntax is not fully re-emitted.                                       |
-| `mermaid/sequence`  | partial   | none    | none    | partial    | Actor links and menu syntax are incomplete.                                |
-| `mermaid/state`     | full      | none    | partial | full       | State syntax round-trips through graph and node data.                      |
+| Format              | Hierarchy | Ports   | Visual  | Round-trip | Notes                                                                                                                                        |
+| ------------------- | --------- | ------- | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                                                                                    |
+| `cytoscape`         | full      | full    | full    | full       | Graph/node/edge metadata (incl. per-edge `mode`) round-trips through element data.                                                           |
+| `d3`                | full      | full    | full    | full       | Graph/node/edge metadata (incl. per-edge `mode`) round-trips through the loose JSON shape.                                                   |
+| `d2`                | full      | full    | full    | full       | Hierarchy, ports, styles, and connector modes round-trip; nested `vars` sub-blocks are dropped.                                              |
+| `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete.                                                                   |
+| `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                                                                                              |
+| `elk`               | full      | full    | full    | full       | Metadata round-trips through reserved layout options; port ids are emitted as `nodeId__portName` (document-unique, as ELK requires).         |
+| `gexf`              | full      | full    | full    | full       | Custom attributes preserve metadata; `bidirectional` maps to directed.                                                                       |
+| `gml`               | full      | full    | full    | full       | Metadata round-trips through direct and JSON fields; per-edge/graph `mode` via a dialect key.                                                |
+| `graphml`           | full      | full    | partial | full       | Emit is own-dialect (`<data>` fields, flat); import handles both dialects incl. standard nested `<graph>`, native `<port>` elements, and `sourceport`/`targetport` attributes. Multi-graph files import the first graph. |
+| `jgf`               | full      | full    | full    | full       | Metadata (incl. per-edge/graph `mode`) round-trips through `metadata` objects.                                                               |
+| `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                                                                                                 |
+| `xyflow`            | full      | full    | full    | full       | Metadata (incl. weight, ports, per-edge `mode`) round-trips through reserved data fields; parents are ordered before children for React Flow. |
+| `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                                                                                               |
+| `mermaid/class`     | none      | none    | none    | partial    | Class syntax is stored conservatively.                                                                                                       |
+| `mermaid/er`        | none      | none    | none    | partial    | Focuses on entities and cardinality.                                                                                                         |
+| `mermaid/flowchart` | partial   | none    | partial | partial    | `linkStyle` indices are fragile.                                                                                                             |
+| `mermaid/ishikawa`  | full      | none    | none    | partial    | Preserves hierarchy, not fishbone layout.                                                                                                    |
+| `mermaid/mindmap`   | full      | none    | partial | partial    | Icon syntax is not fully re-emitted.                                                                                                         |
+| `mermaid/sequence`  | partial   | none    | none    | partial    | Actor links and menu syntax are incomplete.                                                                                                  |
+| `mermaid/state`     | full      | none    | partial | partial    | Isolated states and labels now emit (labels via the description form); `initialNodeId` round-trips as `[*] -->`.                             |
 
 Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
 

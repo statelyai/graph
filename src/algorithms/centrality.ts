@@ -1,5 +1,7 @@
 import type { Graph } from '../types';
 import { getIndex } from '../indexing';
+import { getEdgeMode } from '../mode';
+import { getDegree, getInDegree, getOutDegree } from '../queries';
 
 export interface IterativeCentralityOptions {
   alpha?: number;
@@ -27,11 +29,13 @@ function getNeighborIds(graph: Graph, nodeId: string): string[] {
     }
   }
 
-  if (graph.mode !== 'directed') {
-    for (const edgeId of idx.inEdges.get(nodeId) ?? []) {
-      const edgeIndex = idx.edgeById.get(edgeId);
-      if (edgeIndex !== undefined) {
-        neighbors.push(graph.edges[edgeIndex].sourceId);
+  // Edges whose effective mode is not 'directed' are traversable both ways
+  for (const edgeId of idx.inEdges.get(nodeId) ?? []) {
+    const edgeIndex = idx.edgeById.get(edgeId);
+    if (edgeIndex !== undefined) {
+      const edge = graph.edges[edgeIndex];
+      if (getEdgeMode(graph, edge) !== 'directed') {
+        neighbors.push(edge.sourceId);
       }
     }
   }
@@ -50,11 +54,13 @@ function getIncomingIds(graph: Graph, nodeId: string): string[] {
     }
   }
 
-  if (graph.mode !== 'directed') {
-    for (const edgeId of idx.outEdges.get(nodeId) ?? []) {
-      const edgeIndex = idx.edgeById.get(edgeId);
-      if (edgeIndex !== undefined) {
-        incoming.push(graph.edges[edgeIndex].targetId);
+  // Edges whose effective mode is not 'directed' also point "in"
+  for (const edgeId of idx.outEdges.get(nodeId) ?? []) {
+    const edgeIndex = idx.edgeById.get(edgeId);
+    if (edgeIndex !== undefined) {
+      const edge = graph.edges[edgeIndex];
+      if (getEdgeMode(graph, edge) !== 'directed') {
+        incoming.push(edge.targetId);
       }
     }
   }
@@ -124,18 +130,10 @@ function getReachableDistances(graph: Graph, startId: string): Map<string, numbe
  */
 export function getDegreeCentrality(graph: Graph): Record<string, number> {
   const scale = graph.nodes.length > 1 ? 1 / (graph.nodes.length - 1) : 0;
-  const idx = getIndex(graph);
   const scores = createEmptyScoreMap(graph);
 
   for (const node of graph.nodes) {
-    const outDegree = idx.outEdges.get(node.id)?.length ?? 0;
-    const inDegree = idx.inEdges.get(node.id)?.length ?? 0;
-    const degree =
-      graph.mode !== 'directed'
-        ? new Set([...(idx.outEdges.get(node.id) ?? []), ...(idx.inEdges.get(node.id) ?? [])])
-            .size
-        : outDegree + inDegree;
-    scores[node.id] = degree * scale;
+    scores[node.id] = getDegree(graph, node.id) * scale;
   }
 
   return scores;
@@ -148,11 +146,10 @@ export function getDegreeCentrality(graph: Graph): Record<string, number> {
  */
 export function getInDegreeCentrality(graph: Graph): Record<string, number> {
   const scale = graph.nodes.length > 1 ? 1 / (graph.nodes.length - 1) : 0;
-  const idx = getIndex(graph);
   const scores = createEmptyScoreMap(graph);
 
   for (const node of graph.nodes) {
-    scores[node.id] = (idx.inEdges.get(node.id)?.length ?? 0) * scale;
+    scores[node.id] = getInDegree(graph, node.id) * scale;
   }
 
   return scores;
@@ -165,11 +162,10 @@ export function getInDegreeCentrality(graph: Graph): Record<string, number> {
  */
 export function getOutDegreeCentrality(graph: Graph): Record<string, number> {
   const scale = graph.nodes.length > 1 ? 1 / (graph.nodes.length - 1) : 0;
-  const idx = getIndex(graph);
   const scores = createEmptyScoreMap(graph);
 
   for (const node of graph.nodes) {
-    scores[node.id] = (idx.outEdges.get(node.id)?.length ?? 0) * scale;
+    scores[node.id] = getOutDegree(graph, node.id) * scale;
   }
 
   return scores;

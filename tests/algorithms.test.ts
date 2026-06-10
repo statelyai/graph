@@ -587,34 +587,33 @@ describe('getSimplePaths', () => {
 });
 
 describe('genSimplePaths', () => {
-  it('yields the first path lazily without exploring later branches', () => {
-    const graph = createGraph({
-      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 't' }],
-      edges: [
-        { id: 'ab', sourceId: 'a', targetId: 'b' },
-        { id: 'bt', sourceId: 'b', targetId: 't' },
-        { id: 'ac', sourceId: 'a', targetId: 'c' },
-        { id: 'ct', sourceId: 'c', targetId: 't' },
-      ],
+  it('yields the first path lazily without enumerating all paths', () => {
+    // Chain of 30 diamond gadgets → 2^30 simple paths. Eager enumeration
+    // would never finish; a lazy generator yields the first path instantly.
+    const nodes = [{ id: 'n0' }];
+    const edges: { id: string; sourceId: string; targetId: string }[] = [];
+    const DIAMONDS = 30;
+    for (let i = 0; i < DIAMONDS; i++) {
+      const from = `n${i}`;
+      const to = `n${i + 1}`;
+      nodes.push({ id: `${from}_top` }, { id: `${from}_bottom` }, { id: to });
+      edges.push(
+        { id: `${from}-top`, sourceId: from, targetId: `${from}_top` },
+        { id: `${from}-bottom`, sourceId: from, targetId: `${from}_bottom` },
+        { id: `top-${to}`, sourceId: `${from}_top`, targetId: to },
+        { id: `bottom-${to}`, sourceId: `${from}_bottom`, targetId: to },
+      );
+    }
+    const graph = createGraph({ nodes, edges });
+
+    const iterator = genSimplePaths(graph, {
+      from: 'n0',
+      to: `n${DIAMONDS}`,
     });
-
-    // Prebuild the index so the proxy only affects traversal after iteration starts.
-    getIndex(graph);
-
-    const originalEdges = graph.edges;
-    graph.edges = new Proxy(originalEdges, {
-      get(target, prop, receiver) {
-        if (prop === '3') {
-          throw new Error('later branch should not be touched before first yield');
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-    });
-
-    const iterator = genSimplePaths(graph, { from: 'a', to: 't' });
     const first = iterator.next();
 
     expect(first.done).toBe(false);
-    expect(first.value.steps.map((step) => step.node.id)).toEqual(['b', 't']);
+    // Each diamond contributes 2 steps, so the first path has 2 * DIAMONDS steps
+    expect(first.value.steps).toHaveLength(2 * DIAMONDS);
   });
 });

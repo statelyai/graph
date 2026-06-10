@@ -25,7 +25,8 @@ export function escapeMermaidLabel(s: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '#quot;')
     .replace(/;/g, '#59;')
-    .replace(/#(?!quot;|59;|35;)/g, '#35;');
+    .replace(/\|/g, '#124;')
+    .replace(/#(?!quot;|59;|35;|124;)/g, '#35;');
 }
 
 /** Unescape a Mermaid label back to plain text. */
@@ -33,6 +34,7 @@ export function unescapeMermaidLabel(s: string): string {
   return s
     .replace(/#quot;/g, '"')
     .replace(/#59;/g, ';')
+    .replace(/#124;/g, '|')
     .replace(/#35;/g, '#');
 }
 

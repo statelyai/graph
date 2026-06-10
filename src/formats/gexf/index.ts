@@ -67,7 +67,9 @@ export function toGEXF(graph: Graph): string {
 
     const node: any = {
       '@_id': n.id,
-      '@_label': n.label || n.id,
+      // GEXF requires a label attribute; emit empty string so empty labels
+      // round-trip instead of being replaced by the node id.
+      '@_label': n.label ?? '',
     };
     if (n.parentId) node['@_pid'] = n.parentId;
     if (attvalues.length > 0) node.attvalues = { attvalue: attvalues };
@@ -210,6 +212,9 @@ export function fromGEXF(xml: string): Graph {
     ignoreAttributes: false,
     isArray: (name) =>
       ['node', 'edge', 'attribute', 'attvalue', 'attributes'].includes(name),
+    // Keep attribute text verbatim: labels like "  hi  " must not be trimmed.
+    // Numeric fields are parsed explicitly.
+    trimValues: false,
   });
 
   let parsed: any;
@@ -272,19 +277,24 @@ export function fromGEXF(xml: string): Graph {
       // Viz properties
       const pos = n['viz:position'];
       if (pos) {
-        node.x = Number(pos['@_x'] ?? 0);
-        node.y = Number(pos['@_y'] ?? 0);
+        node.x = parseNumber(pos['@_x'] ?? 0, '<viz:position> x', 'node', id);
+        node.y = parseNumber(pos['@_y'] ?? 0, '<viz:position> y', 'node', id);
       }
       const size = n['viz:size'];
       if (size) {
-        node.width = Number(size['@_value'] ?? 0);
-        node.height = Number(size['@_value'] ?? 0);
+        node.width = parseNumber(size['@_value'] ?? 0, '<viz:size>', 'node', id);
+        node.height = node.width;
       }
       if (attvals['width'] !== undefined) {
-        node.width = Number(attvals['width']);
+        node.width = parseNumber(attvals['width'], 'width attribute', 'node', id);
       }
       if (attvals['height'] !== undefined) {
-        node.height = Number(attvals['height']);
+        node.height = parseNumber(
+          attvals['height'],
+          'height attribute',
+          'node',
+          id,
+        );
       }
       const color = n['viz:color'];
       if (color) {
@@ -311,9 +321,10 @@ export function fromGEXF(xml: string): Graph {
   const edgeEls = graphEl.edges?.edge ?? graphEl.edge;
   const edges: GraphEdge[] = asArray(edgeEls).map((e: any, i: number) => {
     const attvals = getAttValues(e, attrMap);
+    const id = String(e['@_id'] ?? `e${i}`);
     const edge: GraphEdge = {
       type: 'edge',
-      id: String(e['@_id'] ?? `e${i}`),
+      id,
       sourceId: String(e['@_source']),
       targetId: String(e['@_target']),
       label: e['@_label'] ?? '',
@@ -322,15 +333,19 @@ export function fromGEXF(xml: string): Graph {
           ? tryParseJSON(attvals['data'])
           : undefined,
       ...(attvals['weight'] !== undefined && {
-        weight: Number(attvals['weight']),
+        weight: parseNumber(attvals['weight'], 'weight attribute', 'edge', id),
       }),
-      ...(attvals['x'] !== undefined && { x: Number(attvals['x']) }),
-      ...(attvals['y'] !== undefined && { y: Number(attvals['y']) }),
+      ...(attvals['x'] !== undefined && {
+        x: parseNumber(attvals['x'], 'x attribute', 'edge', id),
+      }),
+      ...(attvals['y'] !== undefined && {
+        y: parseNumber(attvals['y'], 'y attribute', 'edge', id),
+      }),
       ...(attvals['width'] !== undefined && {
-        width: Number(attvals['width']),
+        width: parseNumber(attvals['width'], 'width attribute', 'edge', id),
       }),
       ...(attvals['height'] !== undefined && {
-        height: Number(attvals['height']),
+        height: parseNumber(attvals['height'], 'height attribute', 'edge', id),
       }),
       ...(attvals['style'] !== undefined && {
         style: tryParseJSON(attvals['style']),
@@ -402,6 +417,21 @@ function tryParseJSON(str: string): any {
   } catch {
     return str;
   }
+}
+
+function parseNumber(
+  value: any,
+  field: string,
+  kind: 'node' | 'edge',
+  ownerId: string,
+): number {
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    throw new Error(
+      `GEXF: ${field} value "${value}" on ${kind} "${ownerId}" is not a number. Fix the value or remove the attribute.`,
+    );
+  }
+  return parsed;
 }
 
 function hex(n: number): string {

@@ -29,6 +29,10 @@ export function toGML(graph: Graph): string {
   const lines: string[] = [];
   lines.push('graph [');
   lines.push(`  directed ${graph.mode === 'undirected' ? 0 : 1}`);
+  // GML `directed` is binary; preserve bidirectional via a dialect key.
+  if (graph.mode === 'bidirectional') {
+    lines.push(`  mode ${gmlString(graph.mode)}`);
+  }
   if (graph.id) lines.push(`  id ${gmlString(graph.id)}`);
   if (graph.initialNodeId) {
     lines.push(`  initialNodeId ${gmlString(graph.initialNodeId)}`);
@@ -101,6 +105,7 @@ export function toGML(graph: Graph): string {
     lines.push(`    id ${gmlString(edge.id)}`);
     lines.push(`    source ${gmlString(edge.sourceId)}`);
     lines.push(`    target ${gmlString(edge.targetId)}`);
+    if (edge.mode) lines.push(`    mode ${gmlString(edge.mode)}`);
     if (edge.label) lines.push(`    label ${gmlString(edge.label)}`);
     if (edge.data !== undefined)
       lines.push(`    data ${gmlString(JSON.stringify(edge.data))}`);
@@ -196,10 +201,18 @@ export function fromGML(gml: string): Graph {
         ...(n['shape'] && { shape: n['shape'] }),
         ...(n['color'] && { color: n['color'] }),
         ...(n['style'] !== undefined && { style: tryParseJSON(n['style']) }),
-        ...(gfx?.x !== undefined && { x: gfx.x }),
-        ...(gfx?.y !== undefined && { y: gfx.y }),
-        ...(gfx?.w !== undefined && { width: gfx.w }),
-        ...(gfx?.h !== undefined && { height: gfx.h }),
+        ...(gfx?.x !== undefined && {
+          x: parseNumber(gfx.x, 'graphics x', 'node', id),
+        }),
+        ...(gfx?.y !== undefined && {
+          y: parseNumber(gfx.y, 'graphics y', 'node', id),
+        }),
+        ...(gfx?.w !== undefined && {
+          width: parseNumber(gfx.w, 'graphics w', 'node', id),
+        }),
+        ...(gfx?.h !== undefined && {
+          height: parseNumber(gfx.h, 'graphics h', 'node', id),
+        }),
       });
       // Recurse into nested child nodes
       if (n['node'] !== undefined) {
@@ -212,14 +225,18 @@ export function fromGML(gml: string): Graph {
   const edgeEntries = asArray(graphBlock['edge']);
   for (const e of edgeEntries) {
     const gfx = e['graphics'];
+    const id = String(e['id'] ?? `e${edges.length}`);
     edges.push({
       type: 'edge',
-      id: String(e['id'] ?? `e${edges.length}`),
+      id,
       sourceId: String(e['source'] ?? ''),
       targetId: String(e['target'] ?? ''),
       label: e['label'] ?? '',
+      ...(e['mode'] && { mode: String(e['mode']) as Graph['mode'] }),
       data: e['data'] !== undefined ? tryParseJSON(e['data']) : undefined,
-      ...(e['weight'] !== undefined && { weight: Number(e['weight']) }),
+      ...(e['weight'] !== undefined && {
+        weight: parseNumber(e['weight'], 'weight', 'edge', id),
+      }),
       ...(e['sourcePort'] !== undefined && {
         sourcePort: String(e['sourcePort']),
       }),
@@ -228,16 +245,28 @@ export function fromGML(gml: string): Graph {
       }),
       ...(e['color'] && { color: e['color'] }),
       ...(e['style'] !== undefined && { style: tryParseJSON(e['style']) }),
-      ...(gfx?.x !== undefined && { x: gfx.x }),
-      ...(gfx?.y !== undefined && { y: gfx.y }),
-      ...(gfx?.w !== undefined && { width: gfx.w }),
-      ...(gfx?.h !== undefined && { height: gfx.h }),
+      ...(gfx?.x !== undefined && {
+        x: parseNumber(gfx.x, 'graphics x', 'edge', id),
+      }),
+      ...(gfx?.y !== undefined && {
+        y: parseNumber(gfx.y, 'graphics y', 'edge', id),
+      }),
+      ...(gfx?.w !== undefined && {
+        width: parseNumber(gfx.w, 'graphics w', 'edge', id),
+      }),
+      ...(gfx?.h !== undefined && {
+        height: parseNumber(gfx.h, 'graphics h', 'edge', id),
+      }),
     });
   }
 
   return {
     id: graphId,
-    mode: directed ? 'directed' : 'undirected',
+    mode: graphBlock['mode']
+      ? (String(graphBlock['mode']) as Graph['mode'])
+      : directed
+        ? 'directed'
+        : 'undirected',
     initialNodeId: graphBlock['initialNodeId'] ?? null,
     nodes,
     edges,
@@ -392,6 +421,21 @@ function tryParseJSON(str: any): any {
   } catch {
     return str;
   }
+}
+
+function parseNumber(
+  value: any,
+  field: string,
+  kind: 'node' | 'edge',
+  ownerId: string,
+): number {
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    throw new Error(
+      `GML: ${field} value "${value}" on ${kind} "${ownerId}" is not a number. Fix the value or remove the attribute.`,
+    );
+  }
+  return parsed;
 }
 
 /**
