@@ -769,8 +769,9 @@ export function updateEdge<N, E>(
   applyOptionalUpdates(updated, update, EDGE_OPTIONAL_KEYS);
   graph.edges[arrayIdx] = updated;
 
-  // Per-edge mode changes alter derived traversal caches (CSR arcs)
-  if (update.mode !== undefined) {
+  // Mode changes alter derived traversal caches (CSR arcs); weight changes
+  // alter the CSR's cached negative-weight flag
+  if (update.mode !== undefined || update.weight !== undefined) {
     touchIndex(idx);
   }
 
