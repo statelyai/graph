@@ -391,6 +391,10 @@ export function getParent<N>(
 /**
  * Returns all ancestors from the node up to the root (nearest parent first).
  *
+ * If the parent chain contains a cycle (authored `parentId` cycles are not
+ * rejected by `createGraph`), the walk stops at the first repeated node and
+ * returns the ancestors collected so far — each ancestor appears exactly once.
+ *
  * @example
  * ```ts
  * const graph = createGraph({
@@ -413,10 +417,13 @@ export function getAncestors<N>(
   let ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return result;
   let current = graph.nodes[ni];
+  const seen = new Set<string>([nodeId]);
   while (current && current.parentId) {
+    if (seen.has(current.parentId)) break; // parent cycle: stop at first repeat
     const pi = idx.nodeById.get(current.parentId);
     if (pi === undefined) break;
     const p = graph.nodes[pi];
+    seen.add(p.id);
     result.push(p);
     current = p;
   }
@@ -425,6 +432,10 @@ export function getAncestors<N>(
 
 /**
  * Returns all descendants recursively (depth-first).
+ *
+ * If the hierarchy contains a parent cycle (authored `parentId` cycles are
+ * not rejected by `createGraph`), each node is visited at most once: the walk
+ * stops at the first repeated node and returns the descendants collected so far.
  *
  * @example
  * ```ts
@@ -445,9 +456,12 @@ export function getDescendants<N>(
 ): GraphNode<N>[] {
   const idx = getIndex(graph);
   const result: GraphNode<N>[] = [];
+  const seen = new Set<string>([nodeId]);
   const collect = (id: string) => {
     const childIds = idx.childNodes.get(id) ?? [];
     for (const childId of childIds) {
+      if (seen.has(childId)) continue; // parent cycle: stop at first repeat
+      seen.add(childId);
       const ci = idx.nodeById.get(childId);
       if (ci !== undefined) {
         result.push(graph.nodes[ci]);
@@ -524,6 +538,10 @@ export function isLeaf(graph: Graph, nodeId: string): boolean {
  * Depth of a node in the hierarchy (root = 0).
  * Returns -1 if the node is not found.
  *
+ * If the parent chain contains a cycle (authored `parentId` cycles are not
+ * rejected by `createGraph`), the walk stops at the first repeated node and
+ * returns the number of unique ancestors walked up to that point.
+ *
  * @example
  * ```ts
  * const graph = createGraph({
@@ -544,7 +562,10 @@ export function getDepth(graph: Graph, nodeId: string): number {
   let ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return -1;
   let current = graph.nodes[ni];
+  const seen = new Set<string>([nodeId]);
   while (current.parentId) {
+    if (seen.has(current.parentId)) break; // parent cycle: stop at first repeat
+    seen.add(current.parentId);
     d++;
     const pi = idx.nodeById.get(current.parentId);
     if (pi === undefined) break;
@@ -589,6 +610,10 @@ export function getSiblings<N>(
  * Least Common Ancestor -- deepest proper ancestor of all given nodes.
  * A proper ancestor excludes the input nodes themselves.
  *
+ * If a parent chain contains a cycle (authored `parentId` cycles are not
+ * rejected by `createGraph`), each chain walk stops at the first repeated
+ * node, so every ancestor is considered exactly once.
+ *
  * @example
  * ```ts
  * const graph = createGraph({
@@ -614,10 +639,13 @@ export function getLCA<N>(
   const idx = getIndex(graph);
   const getAncestorChain = (id: string): string[] => {
     const result: string[] = [id];
+    const seen = new Set<string>([id]);
     let ni = idx.nodeById.get(id);
     if (ni === undefined) return result;
     let current = graph.nodes[ni];
     while (current.parentId) {
+      if (seen.has(current.parentId)) break; // parent cycle: stop at first repeat
+      seen.add(current.parentId);
       result.push(current.parentId);
       const pi = idx.nodeById.get(current.parentId);
       if (pi === undefined) break;

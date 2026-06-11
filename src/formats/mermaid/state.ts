@@ -37,6 +37,26 @@ export type MermaidStateGraph = Graph<StateNodeData, StateEdgeData, StateGraphDa
 type StateNode = GraphNode<StateNodeData>;
 type StateEdge = GraphEdge<StateEdgeData>;
 
+/**
+ * Whether a node is a parallel-region marker. Region nodes are generated with
+ * the exact id `${parentId}_region_${integer}`, so a node only counts when its
+ * id matches that structure for its *actual* parent and that parent is a
+ * parallel state. User ids that merely contain `_region_` (e.g.
+ * `foo_region_bar`) are ordinary states.
+ */
+function isParallelRegionNode(
+  node: StateNode | undefined,
+  nodesById: Map<string, StateNode>,
+): boolean {
+  if (!node || !node.parentId) return false;
+  const parent = nodesById.get(node.parentId);
+  if (parent?.data?.stateType !== 'parallel') return false;
+  const prefix = `${node.parentId}_region_`;
+  return (
+    node.id.startsWith(prefix) && /^\d+$/.test(node.id.slice(prefix.length))
+  );
+}
+
 // --- Parser ---
 
 /**
@@ -193,7 +213,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       if (parentStack.length > 1) {
         // If we're inside a region, pop the region first
         const top = parentStack[parentStack.length - 1];
-        if (top && top.includes('_region_')) {
+        if (top && isParallelRegionNode(nodeMap.get(top), nodeMap)) {
           parentStack.pop();
         }
         parentStack.pop();
@@ -207,7 +227,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
         // Find the composite parent (skip region nodes)
         for (let s = parentStack.length - 1; s >= 0; s--) {
           const id = parentStack[s];
-          if (id && !id.includes('_region_')) return id;
+          if (id && !isParallelRegionNode(nodeMap.get(id), nodeMap)) return id;
         }
         return null;
       })();
@@ -260,7 +280,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
         } else {
           // Subsequent `--`: pop current region, create next
           const top = parentStack[parentStack.length - 1];
-          if (top && top.includes('_region_')) {
+          if (top && isParallelRegionNode(nodeMap.get(top), nodeMap)) {
             parentStack.pop();
           }
 
@@ -467,6 +487,10 @@ export function toMermaidState(graph: MermaidStateGraph): string {
     if (mDir) lines.push(`    direction ${mDir}`);
   }
 
+  const nodesById = new Map<string, StateNode>(
+    graph.nodes.map((node) => [node.id, node]),
+  );
+
   // Build children map
   const childrenMap = new Map<string | null, StateNode[]>();
   for (const node of graph.nodes) {
@@ -494,7 +518,7 @@ export function toMermaidState(graph: MermaidStateGraph): string {
       if (node.data?.isStart || node.data?.isEnd) continue;
 
       // Skip region nodes (emitted by their parallel parent)
-      if (node.id.includes('_region_')) continue;
+      if (isParallelRegionNode(node, nodesById)) continue;
 
       // Description is authoritative; a distinct label falls back to the
       // description form so it is not dropped on emit.
@@ -519,8 +543,8 @@ export function toMermaidState(graph: MermaidStateGraph): string {
         }
         if (node.data?.stateType === 'parallel') {
           // Emit region children separated by --
-          const regions = (childrenMap.get(node.id) ?? []).filter(
-            (r) => r.id.includes('_region_'),
+          const regions = (childrenMap.get(node.id) ?? []).filter((r) =>
+            isParallelRegionNode(r, nodesById),
           );
           for (let ri = 0; ri < regions.length; ri++) {
             if (ri > 0) lines.push(`${indent}    --`);

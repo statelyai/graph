@@ -532,3 +532,48 @@ describe('getRelativeDistance', () => {
     expect(getRelativeDistance(g, 's3')).toBe(2);
   });
 });
+
+describe('Hierarchy queries with parent cycles', () => {
+  // createGraph() does not validate parentId references, so authored parent
+  // cycles (x → y → x) reach the hierarchy queries. Each walk must terminate,
+  // stopping at the first repeated node.
+  function makeCycleGraph() {
+    return createGraph({
+      nodes: [
+        { id: 'x', parentId: 'y' },
+        { id: 'y', parentId: 'x' },
+        { id: 'z', parentId: 'x' },
+      ],
+    });
+  }
+
+  it('getAncestors() stops at the first repeated ancestor', () => {
+    const g = makeCycleGraph();
+    expect(getAncestors(g, 'x').map((n) => n.id)).toEqual(['y']);
+    expect(getAncestors(g, 'y').map((n) => n.id)).toEqual(['x']);
+    // Tail into the cycle: each ancestor appears exactly once.
+    expect(getAncestors(g, 'z').map((n) => n.id)).toEqual(['x', 'y']);
+  });
+
+  it('getDepth() returns the number of unique ancestors walked', () => {
+    const g = makeCycleGraph();
+    expect(getDepth(g, 'x')).toBe(1);
+    expect(getDepth(g, 'y')).toBe(1);
+    expect(getDepth(g, 'z')).toBe(2);
+  });
+
+  it('getDescendants() visits each node at most once', () => {
+    const g = makeCycleGraph();
+    expect(getDescendants(g, 'x').map((n) => n.id).sort()).toEqual(['y', 'z']);
+    expect(getDescendants(g, 'y').map((n) => n.id).sort()).toEqual(['x', 'z']);
+  });
+
+  it('getLCA() terminates on cyclic ancestor chains', () => {
+    const g = makeCycleGraph();
+    // x and y are each other's only ancestors; neither is a proper
+    // ancestor of both inputs once inputs are excluded.
+    expect(getLCA(g, 'x', 'y')).toBeUndefined();
+    // z's chain is [z, x, y]; y's chain is [y, x] → common proper ancestor: x.
+    expect(getLCA(g, 'z', 'y')?.id).toBe('x');
+  });
+});

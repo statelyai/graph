@@ -774,4 +774,62 @@ stateDiagram-v2
       expect(real2.map((n) => n.id).sort()).toEqual(real1.map((n) => n.id).sort());
     });
   });
+
+  describe('_region_ substring in user state ids', () => {
+    it('round-trips an isolated plain state whose id contains _region_', () => {
+      const input = `stateDiagram-v2
+    foo_region_bar`;
+      const graph = fromMermaidState(input);
+      expect(graph.nodes.map((n) => n.id)).toContain('foo_region_bar');
+
+      const output = toMermaidState(graph);
+      const reparsed = fromMermaidState(output);
+      expect(reparsed.nodes.map((n) => n.id)).toContain('foo_region_bar');
+    });
+
+    it('round-trips a _region_ id as a child of a non-parallel composite', () => {
+      const input = `stateDiagram-v2
+    state box {
+        foo_region_bar
+    }`;
+      const graph = fromMermaidState(input);
+      const node = graph.nodes.find((n) => n.id === 'foo_region_bar');
+      expect(node?.parentId).toBe('box');
+
+      const output = toMermaidState(graph);
+      const reparsed = fromMermaidState(output);
+      const reparsedNode = reparsed.nodes.find((n) => n.id === 'foo_region_bar');
+      expect(reparsedNode).toBeDefined();
+      expect(reparsedNode?.parentId).toBe('box');
+    });
+
+    it('does not mis-pop the parent stack when closing a composite whose id contains _region_', () => {
+      const graph = fromMermaidState(`stateDiagram-v2
+    state outer {
+        state foo_region_bar {
+            inner
+        }
+        sibling
+    }`);
+      expect(graph.nodes.find((n) => n.id === 'inner')?.parentId).toBe(
+        'foo_region_bar',
+      );
+      expect(graph.nodes.find((n) => n.id === 'sibling')?.parentId).toBe(
+        'outer',
+      );
+    });
+
+    it('still hides real parallel region nodes on emit', () => {
+      const graph = fromMermaidState(`stateDiagram-v2
+    state Active {
+        A
+        --
+        B
+    }`);
+      const output = toMermaidState(graph);
+      expect(output).not.toContain('Active_region_0');
+      expect(output).not.toContain('Active_region_1');
+      expect(output).toContain('--');
+    });
+  });
 });

@@ -88,6 +88,10 @@ export { GraphInstance } from './graph';
 // Mode helpers
 export { getEdgeMode, isEdgeDirected } from './mode';
 
+// Validation
+export { getGraphIssues } from './validate';
+export type { GraphIssue } from './validate';
+
 // Indexing
 export { invalidateIndex } from './indexing';
 

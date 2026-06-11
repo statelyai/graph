@@ -1,5 +1,9 @@
 import * as z from 'zod';
 import type { Graph, GraphEdge, GraphNode, GraphPort } from './types';
+import {
+  getGraphIssues as getStructuralGraphIssues,
+  type GraphIssue,
+} from './validate';
 
 const StyleSchema = z.record(
   z.string(),
@@ -133,74 +137,38 @@ function createIssue(
   return { code, message, path };
 }
 
-function getDuplicateIndexes<T>(
-  items: T[],
-  getKey: (item: T) => string | undefined | null,
-): Map<string, number[]> {
-  const indexesByKey = new Map<string, number[]>();
-  items.forEach((item, index) => {
-    const key = getKey(item);
-    if (key == null) return;
-    const indexes = indexesByKey.get(key) ?? [];
-    indexes.push(index);
-    indexesByKey.set(key, indexes);
-  });
-  for (const [key, indexes] of indexesByKey) {
-    if (indexes.length < 2) indexesByKey.delete(key);
+/** Maps structural issue codes from `validate.ts` to this module's codes. */
+const STRUCTURAL_CODE_MAP: Record<string, string> = {
+  'duplicate-node-id': 'duplicate_node_id',
+  'duplicate-edge-id': 'duplicate_edge_id',
+  'missing-initial-node': 'missing_initial_node',
+  'missing-parent': 'missing_parent',
+  'missing-node-initial': 'missing_node_initial',
+  'duplicate-port-name': 'duplicate_port_name',
+  'parent-cycle': 'parent_cycle',
+  'missing-source-port': 'missing_source_port',
+  'missing-target-port': 'missing_target_port',
+};
+
+function toValidationIssue(issue: GraphIssue): GraphValidationIssue {
+  const path = issue.path ?? [];
+  let code = STRUCTURAL_CODE_MAP[issue.code] ?? issue.code;
+  if (issue.code === 'dangling-edge-endpoint') {
+    code =
+      path[path.length - 1] === 'sourceId'
+        ? 'missing_source_node'
+        : 'missing_target_node';
   }
-  return indexesByKey;
+  return { code, message: issue.message, path };
 }
 
 function getGraphInvariantIssues(graph: Graph): GraphValidationIssue[] {
-  const issues: GraphValidationIssue[] = [];
-  const nodeIndexes = new Map<string, number>();
-  const nodesById = new Map<string, GraphNode>();
+  // Structural invariants (dangling references, duplicates, cycles, ports)
+  // are delegated to getGraphIssues() in validate.ts.
+  const issues = getStructuralGraphIssues(graph).map(toValidationIssue);
 
-  for (const [id, indexes] of getDuplicateIndexes(
-    graph.nodes,
-    (node) => node.id,
-  )) {
-    for (const index of indexes) {
-      issues.push(
-        createIssue('duplicate_node_id', `Duplicate node id "${id}"`, [
-          'nodes',
-          index,
-          'id',
-        ]),
-      );
-    }
-  }
-
-  for (const [id, indexes] of getDuplicateIndexes(
-    graph.edges,
-    (edge) => edge.id,
-  )) {
-    for (const index of indexes) {
-      issues.push(
-        createIssue('duplicate_edge_id', `Duplicate edge id "${id}"`, [
-          'edges',
-          index,
-          'id',
-        ]),
-      );
-    }
-  }
-
-  graph.nodes.forEach((node, index) => {
-    nodeIndexes.set(node.id, index);
-    nodesById.set(node.id, node);
-  });
-
-  if (graph.initialNodeId && !nodeIndexes.has(graph.initialNodeId)) {
-    issues.push(
-      createIssue(
-        'missing_initial_node',
-        `Initial node "${graph.initialNodeId}" does not exist`,
-        ['initialNodeId'],
-      ),
-    );
-  }
-
+  // Empty-string ids pass the structural checks above (they are treated as
+  // ordinary, possibly-dangling references) but are rejected here.
   graph.nodes.forEach((node, index) => {
     if (node.id === '') {
       issues.push(
@@ -219,58 +187,8 @@ function getGraphInvariantIssues(graph: Graph): GraphValidationIssue[] {
           ['nodes', index, 'parentId'],
         ),
       );
-    } else if (node.parentId != null && !nodeIndexes.has(node.parentId)) {
-      issues.push(
-        createIssue(
-          'missing_parent',
-          `Parent node "${node.parentId}" does not exist`,
-          ['nodes', index, 'parentId'],
-        ),
-      );
-    }
-    if (node.initialNodeId && !nodeIndexes.has(node.initialNodeId)) {
-      issues.push(
-        createIssue(
-          'missing_node_initial',
-          `Initial node "${node.initialNodeId}" does not exist`,
-          ['nodes', index, 'initialNodeId'],
-        ),
-      );
-    }
-    for (const [name, indexes] of getDuplicateIndexes(
-      node.ports ?? [],
-      (port) => port.name,
-    )) {
-      for (const portIndex of indexes) {
-        issues.push(
-          createIssue(
-            'duplicate_port_name',
-            `Duplicate port name "${name}" on node "${node.id}"`,
-            ['nodes', index, 'ports', portIndex, 'name'],
-          ),
-        );
-      }
     }
   });
-
-  for (const node of graph.nodes) {
-    const seen = new Set<string>();
-    let current: string | null | undefined = node.parentId;
-    while (current != null) {
-      if (current === node.id || seen.has(current)) {
-        issues.push(
-          createIssue(
-            'parent_cycle',
-            `Node "${node.id}" is part of a parent cycle`,
-            ['nodes', nodeIndexes.get(node.id) ?? 0, 'parentId'],
-          ),
-        );
-        break;
-      }
-      seen.add(current);
-      current = nodesById.get(current)?.parentId;
-    }
-  }
 
   graph.edges.forEach((edge, index) => {
     if (edge.id === '') {
@@ -280,52 +198,6 @@ function getGraphInvariantIssues(graph: Graph): GraphValidationIssue[] {
           index,
           'id',
         ]),
-      );
-    }
-    const source = nodesById.get(edge.sourceId);
-    const target = nodesById.get(edge.targetId);
-    if (!source) {
-      issues.push(
-        createIssue(
-          'missing_source_node',
-          `Source node "${edge.sourceId}" does not exist`,
-          ['edges', index, 'sourceId'],
-        ),
-      );
-    }
-    if (!target) {
-      issues.push(
-        createIssue(
-          'missing_target_node',
-          `Target node "${edge.targetId}" does not exist`,
-          ['edges', index, 'targetId'],
-        ),
-      );
-    }
-    if (
-      source &&
-      edge.sourcePort !== undefined &&
-      !source.ports?.some((port) => port.name === edge.sourcePort)
-    ) {
-      issues.push(
-        createIssue(
-          'missing_source_port',
-          `Port "${edge.sourcePort}" does not exist on source node "${edge.sourceId}"`,
-          ['edges', index, 'sourcePort'],
-        ),
-      );
-    }
-    if (
-      target &&
-      edge.targetPort !== undefined &&
-      !target.ports?.some((port) => port.name === edge.targetPort)
-    ) {
-      issues.push(
-        createIssue(
-          'missing_target_port',
-          `Port "${edge.targetPort}" does not exist on target node "${edge.targetId}"`,
-          ['edges', index, 'targetPort'],
-        ),
       );
     }
   });
