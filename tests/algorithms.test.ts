@@ -617,3 +617,53 @@ describe('genSimplePaths', () => {
     expect(first.value.steps).toHaveLength(2 * DIAMONDS);
   });
 });
+
+describe('single-target shortest path early exit', () => {
+  it('returns the same path and distance as a full search', () => {
+    const g = createGraph({
+      nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id })),
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'e2', sourceId: 'b', targetId: 'c', weight: 2 },
+        { id: 'e3', sourceId: 'a', targetId: 'c', weight: 5 },
+        { id: 'e4', sourceId: 'c', targetId: 'd', weight: 1 },
+        { id: 'e5', sourceId: 'd', targetId: 'e', weight: 9 },
+      ],
+    });
+    const single = getShortestPath(g, { from: 'a', to: 'd' });
+    const viaFull = getShortestPaths(g, { from: 'a' }).find(
+      (p) => p.steps.at(-1)?.node.id === 'd',
+    );
+    expect(single?.steps.map((s) => s.edge.id)).toEqual(
+      viaFull?.steps.map((s) => s.edge.id),
+    );
+  });
+
+  it('keeps all tie paths through zero-weight edges to the target', () => {
+    // Two equally-shortest paths to d, one via a zero-weight edge whose
+    // predecessor settles at the same distance as the target — the early
+    // exit must not drop it.
+    const g = createGraph({
+      nodes: ['a', 'b', 'c', 'd'].map((id) => ({ id })),
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 2 },
+        { id: 'bd', sourceId: 'b', targetId: 'd', weight: 0 },
+        { id: 'ad', sourceId: 'a', targetId: 'd', weight: 2 },
+        { id: 'ac', sourceId: 'a', targetId: 'c', weight: 9 },
+      ],
+    });
+    const paths = getShortestPaths(g, { from: 'a', to: 'd' });
+    const routes = paths.map((p) => p.steps.map((s) => s.edge.id).join(','));
+    expect(routes).toHaveLength(2);
+    expect(routes).toContain('ad');
+    expect(routes).toContain('ab,bd');
+  });
+
+  it('still reports unreachable targets as no path', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'island' }],
+      edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }],
+    });
+    expect(getShortestPath(g, { from: 'a', to: 'island' })).toBeUndefined();
+  });
+});

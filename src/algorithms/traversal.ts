@@ -14,21 +14,27 @@ export function* bfs<N>(
   graph: Graph<N>,
   startId: string,
 ): Generator<GraphNode<N>> {
-  const idx = getIndex(graph);
-  const visited = new Set<string>();
-  const queue: string[] = [startId];
-  visited.add(startId);
+  const csr = getCSR(graph);
+  const start = csr.indexOf.get(startId);
+  if (start === undefined) return;
 
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    const ni = idx.nodeById.get(id);
-    if (ni === undefined) continue;
-    yield graph.nodes[ni];
+  const n = csr.ids.length;
+  const visited = new Uint8Array(n);
+  const queue = new Int32Array(n);
+  visited[start] = 1;
+  queue[0] = start;
+  let head = 0;
+  let tail = 1;
 
-    for (const neighborId of getNeighborIds(graph, id)) {
-      if (!visited.has(neighborId)) {
-        visited.add(neighborId);
-        queue.push(neighborId);
+  while (head < tail) {
+    const u = queue[head++];
+    yield graph.nodes[u];
+
+    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+      const v = csr.outTargets[a];
+      if (!visited[v]) {
+        visited[v] = 1;
+        queue[tail++] = v;
       }
     }
   }
@@ -38,22 +44,24 @@ export function* dfs<N>(
   graph: Graph<N>,
   startId: string,
 ): Generator<GraphNode<N>> {
-  const idx = getIndex(graph);
-  const visited = new Set<string>();
-  const stack: string[] = [startId];
+  const csr = getCSR(graph);
+  const start = csr.indexOf.get(startId);
+  if (start === undefined) return;
+
+  const n = csr.ids.length;
+  const visited = new Uint8Array(n);
+  const stack: number[] = [start];
 
   while (stack.length > 0) {
-    const id = stack.pop()!;
-    if (visited.has(id)) continue;
-    visited.add(id);
+    const u = stack.pop()!;
+    if (visited[u]) continue;
+    visited[u] = 1;
+    yield graph.nodes[u];
 
-    const ni = idx.nodeById.get(id);
-    if (ni === undefined) continue;
-    yield graph.nodes[ni];
-
-    for (const neighborId of getNeighborIds(graph, id)) {
-      if (!visited.has(neighborId)) {
-        stack.push(neighborId);
+    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+      const v = csr.outTargets[a];
+      if (!visited[v]) {
+        stack.push(v);
       }
     }
   }

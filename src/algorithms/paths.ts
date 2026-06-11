@@ -26,6 +26,13 @@ function computeShortestDistances<N, E>(
   sourceId: string,
   getWeight?: (edge: GraphEdge<E>) => number,
   algorithm?: 'dijkstra' | 'bellman-ford',
+  /**
+   * Early-exit target: stop once every node at distance ≤ dist(target) is
+   * settled (not merely when the target settles — equal-distance predecessors
+   * via zero-weight edges must still be recorded so *all* shortest paths to
+   * the target survive). Bellman-Ford ignores this (it must relax globally).
+   */
+  stopAtId?: string,
 ): {
   dist: Map<string, number>;
   prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>;
@@ -54,6 +61,9 @@ function computeShortestDistances<N, E>(
   distArr[source] = 0;
   prevArr[source] = [];
 
+  const stopAt = stopAtId !== undefined ? csr.indexOf.get(stopAtId) : undefined;
+  let stopDistance = Infinity;
+
   const useBFS = !getWeight && !graph.edges.some((edge) => edge.weight !== undefined);
 
   if (useBFS) {
@@ -64,6 +74,9 @@ function computeShortestDistances<N, E>(
 
     while (head < tail) {
       const u = queue[head++];
+      // Early exit: everything at distance ≤ dist(target) has been dequeued
+      if (distArr[u] > stopDistance) break;
+      if (u === stopAt) stopDistance = distArr[u];
       const nextDistance = distArr[u] + 1;
 
       for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
@@ -88,6 +101,9 @@ function computeShortestDistances<N, E>(
     while (pq.size > 0) {
       const { pos: u, dist: distance } = pq.pop()!;
       if (visited[u] || distance !== distArr[u]) continue;
+      // Early exit: all nodes at distance ≤ dist(target) are settled
+      if (distance > stopDistance) break;
+      if (u === stopAt) stopDistance = distance;
       visited[u] = 1;
 
       for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
@@ -112,9 +128,12 @@ function computeShortestDistances<N, E>(
     }
   }
 
-  // Convert reached nodes back to the id-keyed shape reconstruction expects
+  // Convert reached nodes back to the id-keyed shape reconstruction expects.
+  // After an early exit, nodes beyond the stop distance hold tentative
+  // (unsettled) values — exclude them; they cannot lie on any shortest path
+  // to the target.
   for (let i = 0; i < n; i++) {
-    if (distArr[i] === Infinity) continue;
+    if (distArr[i] === Infinity || distArr[i] > stopDistance) continue;
     dist.set(csr.ids[i], distArr[i]);
     const pairs = prevArr[i];
     const predecessors: Array<{ from: string; edge: GraphEdge<E> }> = [];
@@ -261,6 +280,7 @@ export function* genShortestPaths<N, E>(
     sourceId,
     opts?.getWeight,
     opts?.algorithm,
+    opts?.to, // single-target queries early-exit the search
   );
 
   const targets = opts?.to
