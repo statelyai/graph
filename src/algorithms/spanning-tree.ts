@@ -1,6 +1,7 @@
 import type { Graph, GraphEdge, MSTOptions } from '../types';
 import { getIndex } from '../indexing';
 import { createGraph } from '../graph';
+import { toNodeConfig, toEdgeConfig } from '../config';
 import { getEdgeMode } from '../mode';
 import { MinPriorityQueue } from './shared';
 
@@ -20,18 +21,8 @@ export function getMinimumSpanningTree<N, E>(
     id: graph.id,
     mode: graph.mode,
     initialNodeId: graph.initialNodeId ?? undefined,
-    nodes: graph.nodes.map((node) => {
-      const { type, parentId, initialNodeId, ...rest } = node;
-      return {
-        ...rest,
-        parentId: parentId ?? undefined,
-        initialNodeId: initialNodeId ?? undefined,
-      };
-    }),
-    edges: mstEdges.map((edge) => {
-      const { type, ...rest } = edge;
-      return rest;
-    }),
+    nodes: graph.nodes.map((node) => toNodeConfig(node)),
+    edges: mstEdges.map((edge) => toEdgeConfig(edge)),
   });
 }
 

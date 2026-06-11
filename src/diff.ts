@@ -17,47 +17,9 @@ import {
   updateNode,
   updateEdge,
 } from './graph';
+import { toNodeConfig, toEdgeConfig } from './config';
 
 // Internal helpers
-
-function nodeToConfig<N>(node: GraphNode<N>): NodeConfig<N> {
-  const config: NodeConfig<N> = { id: node.id };
-  if (node.parentId) config.parentId = node.parentId;
-  if (node.initialNodeId) config.initialNodeId = node.initialNodeId;
-  if (node.label !== '') config.label = node.label;
-  if (node.data !== undefined) config.data = node.data;
-  if (node.ports !== undefined)
-    config.ports = node.ports.map((p) => ({ ...p }));
-  if (node.x !== undefined) config.x = node.x;
-  if (node.y !== undefined) config.y = node.y;
-  if (node.width !== undefined) config.width = node.width;
-  if (node.height !== undefined) config.height = node.height;
-  if (node.shape !== undefined) config.shape = node.shape;
-  if (node.color !== undefined) config.color = node.color;
-  if (node.style !== undefined) config.style = node.style;
-  return config;
-}
-
-function edgeToConfig<E>(edge: GraphEdge<E>): EdgeConfig<E> {
-  const config: EdgeConfig<E> = {
-    id: edge.id,
-    sourceId: edge.sourceId,
-    targetId: edge.targetId,
-  };
-  if (edge.label !== '') config.label = edge.label;
-  if (edge.data !== undefined) config.data = edge.data;
-  if (edge.weight !== undefined) config.weight = edge.weight;
-  if (edge.mode !== undefined) config.mode = edge.mode;
-  if (edge.sourcePort !== undefined) config.sourcePort = edge.sourcePort;
-  if (edge.targetPort !== undefined) config.targetPort = edge.targetPort;
-  if (edge.x !== undefined) config.x = edge.x;
-  if (edge.y !== undefined) config.y = edge.y;
-  if (edge.width !== undefined) config.width = edge.width;
-  if (edge.height !== undefined) config.height = edge.height;
-  if (edge.color !== undefined) config.color = edge.color;
-  if (edge.style !== undefined) config.style = edge.style;
-  return config;
-}
 
 /** Shallow-compare two values, returning true if they differ. */
 function differs(a: unknown, b: unknown): boolean {
@@ -133,7 +95,7 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   for (const [id, nodeB] of bNodeMap) {
     const nodeA = aNodeMap.get(id);
     if (!nodeA) {
-      diff.nodes.added.push(nodeToConfig(nodeB));
+      diff.nodes.added.push(toNodeConfig(nodeB));
     } else {
       const oldPartial: Partial<GraphNode<N>> = {};
       const newPartial: Partial<GraphNode<N>> = {};
@@ -154,7 +116,7 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   }
   for (const [id, nodeA] of aNodeMap) {
     if (!bNodeMap.has(id)) {
-      diff.nodes.removed.push(nodeToConfig(nodeA));
+      diff.nodes.removed.push(toNodeConfig(nodeA));
     }
   }
 
@@ -162,7 +124,7 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   for (const [id, edgeB] of bEdgeMap) {
     const edgeA = aEdgeMap.get(id);
     if (!edgeA) {
-      diff.edges.added.push(edgeToConfig(edgeB));
+      diff.edges.added.push(toEdgeConfig(edgeB));
     } else {
       const oldPartial: Partial<GraphEdge<E>> = {};
       const newPartial: Partial<GraphEdge<E>> = {};
@@ -182,7 +144,7 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   }
   for (const [id, edgeA] of aEdgeMap) {
     if (!bEdgeMap.has(id)) {
-      diff.edges.removed.push(edgeToConfig(edgeA));
+      diff.edges.removed.push(toEdgeConfig(edgeA));
     }
   }
 
