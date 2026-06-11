@@ -31,6 +31,14 @@ export interface GraphCSR {
   /** the arc's origin node position */
   inOrigins: Int32Array;
   inEdgeIndex: Int32Array;
+  /**
+   * Index into `graph.edges` of the first edge with a negative *default*
+   * weight (`edge.weight`), or -1. Lets sublinear searches (early-exit,
+   * bidirectional) enforce the throw-on-negative contract in O(1) without
+   * scanning edges they would never visit. Only valid for the default
+   * weight; custom `getWeight` callbacks need their own scan.
+   */
+  firstNegativeEdge: number;
 }
 
 interface CsrCacheEntry {
@@ -69,8 +77,12 @@ function buildCSR(graph: Graph): GraphCSR {
   const nonDirected = new Uint8Array(m);
   const outCounts = new Int32Array(n);
   const inCounts = new Int32Array(n);
+  let firstNegativeEdge = -1;
   for (let e = 0; e < m; e++) {
     const edge = graph.edges[e];
+    if (firstNegativeEdge === -1 && (edge.weight ?? 1) < 0) {
+      firstNegativeEdge = e;
+    }
     const s = indexOf.get(edge.sourceId);
     const t = indexOf.get(edge.targetId);
     if (s === undefined || t === undefined) {
@@ -129,5 +141,6 @@ function buildCSR(graph: Graph): GraphCSR {
     inOffsets,
     inOrigins,
     inEdgeIndex,
+    firstNegativeEdge,
   };
 }

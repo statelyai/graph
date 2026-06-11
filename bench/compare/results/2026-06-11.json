@@ -1,0 +1,3119 @@
+{
+  "cells": [
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 1.6572499999999764,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.03587500000000432,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.10804200000001174,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.624541999999991,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.023500000000012733,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 42.52579100000003,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.292459000000008,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 5.280999999999949,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.22937499999989086,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.10824999999999818,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 1.1410829999999805,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.41966600000000653,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 80.30025000000023,
+      "samples": 19
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.033457999999882304,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 2.2952500000001237,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.321042000000034,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.3524999999999636,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.031291000000237545,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 15.298874999999953,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.23870799999986048,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 2.7991250000000036,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 1.0604170000001432,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.8736669999998412,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 36.72600000000011,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 16.41404199999988,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 22.931166999999732,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 20.238541000000623,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 37.06670800000029,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 937.9499159999996,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 3.2271250000012515,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 1.0626249999986612,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.0012079999996785773,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.0058339999995951075,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.7879999999986467,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.020916999999826658,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 2.7100419999987935,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.20391600000039034,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 3.5125829999997222,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.00020899999981338624,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.0011670000003505265,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.9959999999991851,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.4758330000004207,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 4.086416000000099,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.05158399999891117,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 1.756666999999652,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.00945799999863084,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.010249999999359716,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.09729200000037963,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 12.733167000000321,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.0001250000004802132,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 1.513249999999971,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.6931669999994483,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 1.0826250000009168,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 27.425250000000233,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 1.137125000001106,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 4.097583000000668,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 28.132665999999517,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 36.02024999999958,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 153.37262499999997,
+      "samples": 10
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 3.17266699999891,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 0.8423750000001746,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.026083999999173102,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.21941699999842967,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.8426249999993161,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.011125000000902219,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 3.7695409999996627,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.17450000000098953,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 1.9721250000002328,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.16904199999953562,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.9616249999999127,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.5164590000003955,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.2568749999991269,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 18.58758300000045,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.05050000000119326,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 1.2527079999999842,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.16266699999687262,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.2991249999977299,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.03262499999982538,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 4.329916999999114,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.08091700000295532,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.9485409999979311,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.2548339999993914,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.2448339999973541,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 17.237458999999944,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 10.843541999998706,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 14.77558300000237,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 30.587625000000116,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 24.761084000001574,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 304.4726249999985,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 1.983542000001762,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 0.9496670000007725,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.024208000002545305,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.15766699999949196,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.5356250000004366,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.015125000001717126,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 15.921916999999667,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.2013330000008864,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 3.1415840000008757,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.1639999999970314,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.6462909999972908,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 0.9255830000001879,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.45508300000074087,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 35.49116700000013,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.04183299999931478,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 1.5094159999971453,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.21924999999828287,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 0.3528340000011667,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.08475000000180444,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 12.157415999998193,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 0.07562500000130967,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 2.3330000000023574,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 0.28208299999823794,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 0.7639170000002196,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "build",
+      "medianMs": 23.423124999997526,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "bfs",
+      "medianMs": 12.145582999997714,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "sssp",
+      "medianMs": 18.452041000000463,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "pagerank",
+      "medianMs": 36.6159579999985,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "components",
+      "medianMs": 38.7644999999975,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "betweenness",
+      "medianMs": 457.9767079999983,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 1000,
+      "workload": "degreeSweep",
+      "medianMs": 3.553708999999799,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 6.997250000000349,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.40333300000202144,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 0.14404100000319886,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 5.297541999996611,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 0.3531670000011218,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 4.581125000000611,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 55.85437499999898,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 9.6506249999984,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 0.3309579999986454,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 11.501875000001746,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 9.56091699999888,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.42283300000053714,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 18.877917000001617,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 4.290499999999156,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 5.859874999998283,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.326959000001807,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 110.1608750000014,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 3.8303329999980633,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 28.028667000002315,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Maximum call stack size exceeded"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 21.97362499999872,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 407.45979200000147,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 228.1295839999948,
+      "samples": 7
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 359.53216699999757,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 7702.884624999999,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 526.3320420000091,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 54.88970800000243,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 8.119999999995343,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.005999999993946403,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 0.044125000000349246,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 5.091625000000931,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 0.2223329999978887,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 3.18604200000118,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 39.25650000000314,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.00016599999798927456,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 0.0017090000037569553,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 6.4129160000011325,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 12.084917000000132,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.4026670000021113,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 35.26187500001106,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.04529200000979472,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 0.012208000000100583,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.3426659999968251,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 103.30120799998986,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.00008399999933317304,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 5.962457999994513,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 7.60487500000454,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 46.33474999999453,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 410.5085420000105,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 19.570166000004974,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 42.782290999995894,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 11869.450958000001,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 509.8199170000007,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 56.96020799998951,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 5.05304199999955,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.21295799998915754,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 1.7127909999981057,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 5.662750000003143,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 0.10150000000430737,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 1.7623750000057044,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 25.848457999993116,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 2.754916999998386,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 16.156290999992052,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 6.467583999998169,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 3.5536250000004657,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.45187500001338776,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 8.955417000004672,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 2.9545409999991534,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 3.4410420000058366,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.34725000000617,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 53.29858400000376,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 1.6585829999967245,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 18.948666999989655,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Maximum call stack size exceeded"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 11.445165999990422,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 255.89979199999652,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 123.32091599999694,
+      "samples": 12
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 192.57841700001154,
+      "samples": 8
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 6258.304499999998,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 302.46933300001547,
+      "samples": 6
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 27.296709000016563,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 5.6000829999975394,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 0.3224999999802094,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 2.037958000000799,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 6.898084000014933,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 0.30108400000608526,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 2.695625000022119,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 31.635917000006884,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 3.4742499999993015,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 13.03187499998603,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 7.151833000010811,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 5.919624999980442,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.4449159999785479,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 12.770416000013938,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 2.602666999999201,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 4.311959000013303,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 0.3326669999805745,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 68.3590419999964,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 1.3503750000090804,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 18.823666999989655,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Maximum call stack size exceeded"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 16.28366700001061,
+      "samples": 25
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "build",
+      "medianMs": 330.076166999992,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "bfs",
+      "medianMs": 170.9904169999936,
+      "samples": 9
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "sssp",
+      "medianMs": 268.83183399998234,
+      "samples": 6
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "pagerank",
+      "medianMs": 7486.262667000003,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "components",
+      "medianMs": 464.0738340000098,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 10000,
+      "workload": "degreeSweep",
+      "medianMs": 39.65258300001733,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 55.961791000008816,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 4.556791999988491,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 0.6024160000088159,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 54.55587499999092,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 4.413082999992184,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 103.69412500000908,
+      "samples": 15
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 659.5293339999916,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 125.77191699997638,
+      "samples": 11
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 1.3144580000080168,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 190.18633399999817,
+      "samples": 8
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 225.01908399999957,
+      "samples": 7
+    },
+    {
+      "lib": "graphology",
+      "shape": "random",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 5.16487499998766,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 291.38429200000246,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 92.6710000000021,
+      "samples": 16
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 125.21799999999348,
+      "samples": 13
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "random",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 4.732958000007784,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 1500.0771660000028,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 60.53779099998064,
+      "samples": 24
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 431.28779199998826,
+      "samples": 5
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "too-slow"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "random",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 412.237374999997,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 4476.544874999992,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 6555.048084000009,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 5940.654416000005,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Invalid array length"
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 13448.29150000005,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "random",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 753.3918340000091,
+      "samples": 5
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 96.30887499998789,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 0.04412500001490116,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 0.3402500000083819,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 95.93829200003529,
+      "samples": 14
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 3.3116250000311993,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 94.21925000002375,
+      "samples": 15
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 650.6852920000092,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 0.00016599998343735933,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 0.0017080000252462924,
+      "samples": 25
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 157.43183399998816,
+      "samples": 10
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 248.26433299999917,
+      "samples": 6
+    },
+    {
+      "lib": "graphology",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 6.156582999974489,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 253.53604099998483,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 0.054041999974288046,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 0.024333000008482486,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 4.445750000013504,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 1524.5405000000028,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 0.0002080000122077763,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 66.98083299997961,
+      "samples": 21
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Maximum call stack size exceeded"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 616.7877920000465,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 3717.91866700002,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 309.3724579999689,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 636.855791000009,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null,
+      "skipped": "too-slow"
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 16249.133416000055,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "scaleFree",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 830.7402500000317,
+      "samples": 5
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 62.95295900001656,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 2.251499999954831,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 27.406333999999333,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 127.14287500001956,
+      "samples": 10
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 1.8662500000209548,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 106.98295799997868,
+      "samples": 14
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 497.4723750000121,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 86.20216699998127,
+      "samples": 17
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 382.9230409999727,
+      "samples": 5
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 119.8731249999837,
+      "samples": 13
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 90.10879099997692,
+      "samples": 17
+    },
+    {
+      "lib": "graphology",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 11.879040999978315,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 209.07650000002468,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 41.380208000016864,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 66.01883300003828,
+      "samples": 21
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 5.581875000032596,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 848.4686670000083,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 58.38845800003037,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 337.9398330000113,
+      "samples": 5
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "too-slow"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 199.70699999999488,
+      "samples": 8
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 2441.977125000034,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 1721.8343330000062,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 3710.318249999953,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Invalid array length"
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 3920.8540410000132,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "grid",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 334.5471660000039,
+      "samples": 5
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 54.211749999958556,
+      "samples": 1
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 3.438458000018727,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 35.1512910000165,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 92.42183300002944,
+      "samples": 14
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 3.915374999982305,
+      "samples": 25
+    },
+    {
+      "lib": "@statelyai/graph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 93.4883329999866,
+      "samples": 17
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 510.86262500000885,
+      "samples": 1
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 81.92991599999368,
+      "samples": 18
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 408.1994999999879,
+      "samples": 5
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": 196.50766699999804,
+      "samples": 8
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 195.6433749999851,
+      "samples": 8
+    },
+    {
+      "lib": "graphology",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 11.324708999949507,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 193.8215419999906,
+      "samples": 1
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 33.10283300001174,
+      "samples": 25
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 68.63145799998892,
+      "samples": 20
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "ngraph",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 4.0822090000147,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 1014.2610410000198,
+      "samples": 1
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 46.41729200002737,
+      "samples": 25
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 385.8422089999658,
+      "samples": 5
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": null,
+      "skipped": "too-slow"
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "betweenness",
+      "medianMs": null
+    },
+    {
+      "lib": "@dagrejs/graphlib",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 300.8881249999977,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "build",
+      "medianMs": 3418.9767920000013,
+      "samples": 1
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "bfs",
+      "medianMs": 2395.9717080000555,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "sssp",
+      "medianMs": 5268.479541000095,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "pagerank",
+      "medianMs": null,
+      "skipped": "error",
+      "error": "Invalid array length"
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "components",
+      "medianMs": 8170.7785419999855,
+      "samples": 5
+    },
+    {
+      "lib": "cytoscape (headless)",
+      "shape": "layeredDag",
+      "size": 100000,
+      "workload": "degreeSweep",
+      "medianMs": 634.3416250000009,
+      "samples": 5
+    }
+  ]
+}

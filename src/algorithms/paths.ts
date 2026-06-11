@@ -26,6 +26,13 @@ function computeShortestDistances<N, E>(
   sourceId: string,
   getWeight?: (edge: GraphEdge<E>) => number,
   algorithm?: 'dijkstra' | 'bellman-ford',
+  /**
+   * Early-exit target: stop once every node at distance ≤ dist(target) is
+   * settled (not merely when the target settles — equal-distance predecessors
+   * via zero-weight edges must still be recorded so *all* shortest paths to
+   * the target survive). Bellman-Ford ignores this (it must relax globally).
+   */
+  stopAtId?: string,
 ): {
   dist: Map<string, number>;
   prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>;
@@ -54,6 +61,22 @@ function computeShortestDistances<N, E>(
   distArr[source] = 0;
   prevArr[source] = [];
 
+  const stopAt = stopAtId !== undefined ? csr.indexOf.get(stopAtId) : undefined;
+  let stopDistance = Infinity;
+
+  // An early-exit search may finish without scanning a reachable negative
+  // edge, so the throw-on-negative contract needs an up-front check; the
+  // full search keeps its scan-time checks (identical observable behavior)
+  if (stopAt !== undefined) {
+    assertNoNegativeWeights(
+      graph,
+      csr,
+      getWeight,
+      'Dijkstra',
+      "Use { algorithm: 'bellman-ford' } instead.",
+    );
+  }
+
   const useBFS = !getWeight && !graph.edges.some((edge) => edge.weight !== undefined);
 
   if (useBFS) {
@@ -64,6 +87,9 @@ function computeShortestDistances<N, E>(
 
     while (head < tail) {
       const u = queue[head++];
+      // Early exit: everything at distance ≤ dist(target) has been dequeued
+      if (distArr[u] > stopDistance) break;
+      if (u === stopAt) stopDistance = distArr[u];
       const nextDistance = distArr[u] + 1;
 
       for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
@@ -88,6 +114,9 @@ function computeShortestDistances<N, E>(
     while (pq.size > 0) {
       const { pos: u, dist: distance } = pq.pop()!;
       if (visited[u] || distance !== distArr[u]) continue;
+      // Early exit: all nodes at distance ≤ dist(target) are settled
+      if (distance > stopDistance) break;
+      if (u === stopAt) stopDistance = distance;
       visited[u] = 1;
 
       for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
@@ -112,9 +141,12 @@ function computeShortestDistances<N, E>(
     }
   }
 
-  // Convert reached nodes back to the id-keyed shape reconstruction expects
+  // Convert reached nodes back to the id-keyed shape reconstruction expects.
+  // After an early exit, nodes beyond the stop distance hold tentative
+  // (unsettled) values — exclude them; they cannot lie on any shortest path
+  // to the target.
   for (let i = 0; i < n; i++) {
-    if (distArr[i] === Infinity) continue;
+    if (distArr[i] === Infinity || distArr[i] > stopDistance) continue;
     dist.set(csr.ids[i], distArr[i]);
     const pairs = prevArr[i];
     const predecessors: Array<{ from: string; edge: GraphEdge<E> }> = [];
@@ -261,6 +293,7 @@ export function* genShortestPaths<N, E>(
     sourceId,
     opts?.getWeight,
     opts?.algorithm,
+    opts?.to, // single-target queries early-exit the search
   );
 
   const targets = opts?.to
@@ -289,10 +322,199 @@ export function getShortestPath<N, E>(
   graph: Graph<N, E>,
   opts: SinglePathOptions<E>,
 ): GraphPath<N, E> | undefined {
+  // Single-pair queries use bidirectional Dijkstra — on random/small-world
+  // graphs the two half-balls meet long before a unidirectional search would
+  // reach the target. Bellman-Ford (negative weights) keeps the full search.
+  if (opts.algorithm !== 'bellman-ford') {
+    const sourceId = resolveFrom(graph, opts);
+    return bidirectionalShortestPath(graph, sourceId, opts.to, opts.getWeight);
+  }
   for (const path of genShortestPaths(graph, opts)) {
     return path;
   }
   return undefined;
+}
+
+/**
+ * Sublinear searches (early-exit, bidirectional) may legitimately terminate
+ * without ever scanning a negative edge, so the throw-on-negative contract
+ * must be enforced up front: O(1) via the CSR's cached flag for the default
+ * weight, or one O(edges) sweep for a custom `getWeight`.
+ */
+function assertNoNegativeWeights<N, E>(
+  graph: Graph<N, E>,
+  csr: ReturnType<typeof getCSR>,
+  getWeight: ((edge: GraphEdge<E>) => number) | undefined,
+  algorithmName: string,
+  remedy: string,
+): void {
+  let offending: GraphEdge<E> | undefined;
+  let weight = 0;
+  if (getWeight === undefined) {
+    if (csr.firstNegativeEdge !== -1) {
+      offending = graph.edges[csr.firstNegativeEdge] as GraphEdge<E>;
+      weight = offending.weight ?? 1;
+    }
+  } else {
+    for (const edge of graph.edges) {
+      const w = getWeight(edge as GraphEdge<E>);
+      if (w < 0) {
+        offending = edge as GraphEdge<E>;
+        weight = w;
+        break;
+      }
+    }
+  }
+  if (offending) {
+    throw new Error(
+      `Negative edge weight ${weight} on edge "${offending.sourceId}->${offending.targetId}" (id "${offending.id}"): ${algorithmName} requires non-negative weights. ${remedy}`,
+    );
+  }
+}
+
+/**
+ * Bidirectional Dijkstra for a single source→target query. Forward search
+ * runs on the traversable arcs, backward search on the reverse arcs; `mu`
+ * tracks the best meeting cost and the search stops when the two frontiers
+ * prove no better meeting exists (Pohl's `topF + topB >= mu` condition).
+ * Returns one shortest path (ties broken arbitrarily, as before).
+ */
+function bidirectionalShortestPath<N, E>(
+  graph: Graph<N, E>,
+  sourceId: string,
+  targetId: string,
+  getWeight?: (edge: GraphEdge<E>) => number,
+): GraphPath<N, E> | undefined {
+  const csr = getCSR(graph);
+  const source = csr.indexOf.get(sourceId);
+  const target = csr.indexOf.get(targetId);
+  if (source === undefined || target === undefined) return undefined;
+
+  const sourceNode = graph.nodes[source];
+  if (source === target) return { source: sourceNode, steps: [] };
+
+  assertNoNegativeWeights(
+    graph,
+    csr,
+    getWeight,
+    'Dijkstra',
+    "Use { algorithm: 'bellman-ford' } instead.",
+  );
+
+  const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const n = csr.ids.length;
+  const distF = new Float64Array(n).fill(Infinity);
+  const distB = new Float64Array(n).fill(Infinity);
+  const predF = new Int32Array(n).fill(-1);
+  const predFEdge = new Int32Array(n).fill(-1);
+  const predB = new Int32Array(n).fill(-1); // next node *toward the target*
+  const predBEdge = new Int32Array(n).fill(-1);
+  const settledF = new Uint8Array(n);
+  const settledB = new Uint8Array(n);
+  const compare = (a: { dist: number }, b: { dist: number }) => a.dist - b.dist;
+  const pqF = new MinPriorityQueue<{ pos: number; dist: number }>(compare);
+  const pqB = new MinPriorityQueue<{ pos: number; dist: number }>(compare);
+
+  distF[source] = 0;
+  distB[target] = 0;
+  pqF.push({ pos: source, dist: 0 });
+  pqB.push({ pos: target, dist: 0 });
+
+  let mu = Infinity;
+  let meet = -1;
+
+  /** Discard stale/settled heap entries; return the next valid key. */
+  const validTop = (
+    pq: MinPriorityQueue<{ pos: number; dist: number }>,
+    dist: Float64Array,
+    settled: Uint8Array,
+  ): number | undefined => {
+    for (;;) {
+      const top = pq.peek();
+      if (top === undefined) return undefined;
+      if (settled[top.pos] || top.dist !== dist[top.pos]) {
+        pq.pop();
+        continue;
+      }
+      return top.dist;
+    }
+  };
+
+  const scanForward = () => {
+    const { pos: u, dist: d } = pqF.pop()!;
+    settledF[u] = 1;
+    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+      const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
+      const weight = effectiveWeight(edge);
+      const v = csr.outTargets[a];
+      const next = d + weight;
+      if (next < distF[v]) {
+        distF[v] = next;
+        predF[v] = u;
+        predFEdge[v] = csr.outEdgeIndex[a];
+        pqF.push({ pos: v, dist: next });
+      }
+      // distB[v] is the cost of a real backward path (tentative or settled),
+      // so next + distB[v] is the cost of a real s→t path
+      if (distB[v] !== Infinity && next + distB[v] < mu) {
+        mu = next + distB[v];
+        meet = v;
+      }
+    }
+  };
+
+  const scanBackward = () => {
+    const { pos: u, dist: d } = pqB.pop()!;
+    settledB[u] = 1;
+    for (let a = csr.inOffsets[u]; a < csr.inOffsets[u + 1]; a++) {
+      const edge = graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>;
+      const weight = effectiveWeight(edge);
+      const v = csr.inOrigins[a];
+      const next = d + weight;
+      if (next < distB[v]) {
+        distB[v] = next;
+        predB[v] = u;
+        predBEdge[v] = csr.inEdgeIndex[a];
+        pqB.push({ pos: v, dist: next });
+      }
+      if (distF[v] !== Infinity && next + distF[v] < mu) {
+        mu = next + distF[v];
+        meet = v;
+      }
+    }
+  };
+
+  for (;;) {
+    const topF = validTop(pqF, distF, settledF);
+    const topB = validTop(pqB, distB, settledB);
+    // A side running dry means its dist array is final everywhere reachable,
+    // so mu already equals the optimum (or stays Infinity: no path)
+    if (topF === undefined || topB === undefined) break;
+    if (topF + topB >= mu) break;
+    if (topF <= topB) scanForward();
+    else scanBackward();
+  }
+
+  if (meet === -1) return undefined;
+
+  // Forward half: meet → source, reversed
+  const steps: GraphStep<N, E>[] = [];
+  for (let v = meet; v !== source; v = predF[v]) {
+    steps.unshift({
+      edge: graph.edges[predFEdge[v]] as GraphEdge<E>,
+      node: graph.nodes[v],
+    });
+  }
+  // Backward half: meet → target
+  for (let v = meet; v !== target; ) {
+    const nextNode = predB[v];
+    steps.push({
+      edge: graph.edges[predBEdge[v]] as GraphEdge<E>,
+      node: graph.nodes[nextNode],
+    });
+    v = nextNode;
+  }
+  return { source: sourceNode, steps };
 }
 
 export function getSimplePaths<N, E>(
@@ -799,6 +1021,16 @@ export function getAStarPath<N, E>(
     (a, b) => a.f - b.f,
   );
 
+  // A* with a heuristic may finish without scanning a reachable negative
+  // edge — enforce the throw-on-negative contract up front
+  assertNoNegativeWeights(
+    graph,
+    csr,
+    opts.getWeight,
+    'A*',
+    "Use getShortestPath with { algorithm: 'bellman-ford' } instead.",
+  );
+
   gScore[source] = 0;
   openSet.push({ pos: source, f: heuristic(sourceId) });
 
@@ -824,12 +1056,6 @@ export function getAStarPath<N, E>(
     for (let a = csr.outOffsets[current]; a < csr.outOffsets[current + 1]; a++) {
       const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
       const weight = getWeight(edge);
-      if (weight < 0) {
-        throw new Error(
-          `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): A* requires non-negative weights. Use getShortestPath with { algorithm: 'bellman-ford' } instead.`,
-        );
-      }
-
       const neighbor = csr.outTargets[a];
       if (closed[neighbor]) continue;
 

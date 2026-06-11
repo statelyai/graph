@@ -617,3 +617,198 @@ describe('genSimplePaths', () => {
     expect(first.value.steps).toHaveLength(2 * DIAMONDS);
   });
 });
+
+describe('single-target shortest path early exit', () => {
+  it('returns the same path and distance as a full search', () => {
+    const g = createGraph({
+      nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id })),
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'e2', sourceId: 'b', targetId: 'c', weight: 2 },
+        { id: 'e3', sourceId: 'a', targetId: 'c', weight: 5 },
+        { id: 'e4', sourceId: 'c', targetId: 'd', weight: 1 },
+        { id: 'e5', sourceId: 'd', targetId: 'e', weight: 9 },
+      ],
+    });
+    const single = getShortestPath(g, { from: 'a', to: 'd' });
+    const viaFull = getShortestPaths(g, { from: 'a' }).find(
+      (p) => p.steps.at(-1)?.node.id === 'd',
+    );
+    expect(single?.steps.map((s) => s.edge.id)).toEqual(
+      viaFull?.steps.map((s) => s.edge.id),
+    );
+  });
+
+  it('keeps all tie paths through zero-weight edges to the target', () => {
+    // Two equally-shortest paths to d, one via a zero-weight edge whose
+    // predecessor settles at the same distance as the target — the early
+    // exit must not drop it.
+    const g = createGraph({
+      nodes: ['a', 'b', 'c', 'd'].map((id) => ({ id })),
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 2 },
+        { id: 'bd', sourceId: 'b', targetId: 'd', weight: 0 },
+        { id: 'ad', sourceId: 'a', targetId: 'd', weight: 2 },
+        { id: 'ac', sourceId: 'a', targetId: 'c', weight: 9 },
+      ],
+    });
+    const paths = getShortestPaths(g, { from: 'a', to: 'd' });
+    const routes = paths.map((p) => p.steps.map((s) => s.edge.id).join(','));
+    expect(routes).toHaveLength(2);
+    expect(routes).toContain('ad');
+    expect(routes).toContain('ab,bd');
+  });
+
+  it('still reports unreachable targets as no path', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'island' }],
+      edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }],
+    });
+    expect(getShortestPath(g, { from: 'a', to: 'island' })).toBeUndefined();
+  });
+});
+
+describe('bidirectional single-pair shortest path', () => {
+  function mulberry32(seed: number) {
+    let s = seed | 0;
+    return () => {
+      s = (s + 0x6d2b79f5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function randomGraph(seed: number, mode: 'directed' | 'undirected', mixed = false) {
+    const rng = mulberry32(seed);
+    const n = 60;
+    const edges = [];
+    for (let i = 0; i < 3 * n; i++) {
+      const s = Math.floor(rng() * n);
+      const t = Math.floor(rng() * n);
+      if (s === t) continue;
+      edges.push({
+        id: `e${i}`,
+        sourceId: `n${s}`,
+        targetId: `n${t}`,
+        weight: Math.floor(rng() * 10), // includes zero weights
+        ...(mixed && rng() < 0.3 ? { mode: 'undirected' as const } : {}),
+      });
+    }
+    return createGraph({
+      mode,
+      nodes: Array.from({ length: n }, (_, i) => ({ id: `n${i}` })),
+      edges,
+    });
+  }
+
+  function pathCost(path: { steps: { edge: { weight?: number } }[] }) {
+    return path.steps.reduce((sum, s) => sum + (s.edge.weight ?? 1), 0);
+  }
+
+  it.each([
+    ['directed', false],
+    ['undirected', false],
+    ['directed', true],
+  ] as const)('matches full-search distances (%s, mixed=%s)', (mode, mixed) => {
+    for (let seed = 1; seed <= 8; seed++) {
+      const g = randomGraph(seed, mode as 'directed' | 'undirected', mixed);
+      // Full search distances as the oracle
+      const full = getShortestPaths(g, { from: 'n0' });
+      const fullCost = new Map(
+        full.map((p) => [p.steps.at(-1)?.node.id ?? 'n0', pathCost(p)]),
+      );
+      for (const to of ['n1', 'n17', 'n42', 'n59']) {
+        const path = getShortestPath(g, { from: 'n0', to });
+        if (!fullCost.has(to)) {
+          expect(path).toBeUndefined();
+          continue;
+        }
+        expect(path).toBeDefined();
+        expect(pathCost(path!)).toBe(fullCost.get(to));
+        // Path must be genuinely traversable from n0 to the target
+        let position = 'n0';
+        for (const step of path!.steps) {
+          expect([step.edge.sourceId, step.edge.targetId]).toContain(position);
+          position = step.node.id;
+        }
+        expect(position).toBe(to);
+      }
+    }
+  });
+
+  it('throws on negative weights, naming the edge', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'e2', sourceId: 'b', targetId: 'c', weight: -3 },
+      ],
+    });
+    expect(() => getShortestPath(g, { from: 'a', to: 'c' })).toThrowError(
+      /Negative edge weight -3 .* "e2".*bellman-ford/,
+    );
+  });
+
+  it('bellman-ford fallback still handles negative weights', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', weight: 5 },
+        { id: 'e2', sourceId: 'b', targetId: 'c', weight: -3 },
+        { id: 'e3', sourceId: 'a', targetId: 'c', weight: 4 },
+      ],
+    });
+    const path = getShortestPath(g, { from: 'a', to: 'c', algorithm: 'bellman-ford' });
+    expect(path?.steps.map((s) => s.edge.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('handles from === to, unknown ids, and unreachable targets', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'island' }],
+      edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }],
+    });
+    expect(getShortestPath(g, { from: 'a', to: 'a' })?.steps).toEqual([]);
+    expect(getShortestPath(g, { from: 'a', to: 'island' })).toBeUndefined();
+    expect(getShortestPath(g, { from: 'a', to: 'ghost' })).toBeUndefined();
+  });
+});
+
+describe('negative weights beyond the search frontier', () => {
+  // Sublinear searches (early exit, bidirectional, A*) may never scan a
+  // negative edge that lies past the target — they must still throw.
+  const makeGraph = () =>
+    createGraph({
+      nodes: ['a', 'b', 'far1', 'far2'].map((id) => ({ id })),
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'bf', sourceId: 'b', targetId: 'far1', weight: 100 },
+        { id: 'neg', sourceId: 'far1', targetId: 'far2', weight: -50 },
+      ],
+    });
+
+  it('getShortestPath throws even when the negative edge is past the target', () => {
+    expect(() => getShortestPath(makeGraph(), { from: 'a', to: 'b' })).toThrowError(
+      /Negative edge weight -50 .* "neg".*bellman-ford/,
+    );
+  });
+
+  it('getShortestPaths({ to }) throws as well', () => {
+    expect(() => getShortestPaths(makeGraph(), { from: 'a', to: 'b' })).toThrowError(
+      /Negative edge weight -50/,
+    );
+  });
+
+  it('respects custom getWeight in the up-front check', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'bc', sourceId: 'b', targetId: 'c', weight: 1 },
+      ],
+    });
+    expect(() =>
+      getShortestPath(g, { from: 'a', to: 'b', getWeight: (e) => (e.id === 'bc' ? -1 : 1) }),
+    ).toThrowError(/Negative edge weight -1/);
+  });
+});

@@ -16,6 +16,10 @@ export class MinPriorityQueue<T> {
     this.bubbleUp(this.items.length - 1);
   }
 
+  peek(): T | undefined {
+    return this.items[0];
+  }
+
   pop(): T | undefined {
     if (this.items.length === 0) return undefined;
 
