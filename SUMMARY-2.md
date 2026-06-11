@@ -195,11 +195,28 @@ judgment below recommended).
 (Cooper–Harvey–Kennedy, paper example verified; statechart framing in docs),
 `getTransitiveReduction` (DAG-only with descriptive errors, fields preserved).
 
-**Updated next-3 after this scope:** (1) competitor benchmark harness + published comparison
-page — the prerequisite for claiming "fastest" publicly; (2) port Dijkstra/A*/simple-paths
-onto CSR (paths still run on Map adjacency; same win available, more reconstruction care);
-(3) the previous next-5 items that remain (mixed-`isAcyclic` fast path, schema-validation
-parity, mermaid `_region_` hardening).
+**Second extension (owner-directed): pathfinding + hardening.** End state **1,526 tests in
+60 files**, `pnpm verify` green, PR #22 open.
+
+- **CSR pathfinding**: Dijkstra/BFS shortest paths and A* ported (50k nodes / 200k edges:
+  single-target Dijkstra 329 → 58 ms, A* 27 → 7 ms; all-targets 514 → 342 ms — that one is
+  bound by materializing 50k `GraphPath` objects, the remaining optimization candidate).
+  Differential Dijkstra oracle re-validated the rewrite.
+- **Mixed `isAcyclic` polynomial fast path**: directed-only cycle check, union-find over
+  non-directed edges, SCC singleton check; exact enumeration only inside ambiguous multi-node
+  SCCs. A 2^30-path acyclic mixed graph that previously hung resolves in milliseconds
+  (failing-first verified via 20 s timeout).
+- **Malformed-input hardening**: `getAncestors`/`getDescendants`/`getDepth`/`getLCA` terminate
+  on authored parent cycles (stop at first repeated node, documented); new zod-free
+  `getGraphIssues` core export (10 issue codes, entity-naming messages; schemas'
+  `validateGraph` delegates to it); mermaid/state `_region_` detection is now an exact
+  structural match — user ids containing the substring survive round-trips.
+
+**Updated next-3:** (1) competitor benchmark harness + published comparison page — still the
+prerequisite for claiming "fastest" publicly; (2) lazy path materialization for
+`getShortestPaths` all-targets (reconstruction is now the bottleneck, not traversal);
+(3) typedoc site + React Flow ↔ ELK ↔ Mermaid demo + graphlib migration guide (docs/adoption,
+deferred by owner instruction to "save documentation for last").
 
 ## Convergence judgment
 

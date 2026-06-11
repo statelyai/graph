@@ -157,7 +157,18 @@ getEdgesByPort(graph, 'render', 'input'); // [e1]
 
 <!-- validation helpers exported from src/schemas.ts -->
 
-Use the `@statelyai/graph/schemas` subpath when you want runtime validation or JSON Schema generation. `validateGraph()` combines shape checks with graph invariants such as duplicate ids, dangling edges, missing parents, missing initial nodes, duplicate ports, invalid port references, and parent cycles.
+For structural invariant checking without zod, the core export `getGraphIssues(graph)` returns machine-readable issues (duplicate ids, dangling edge endpoints, missing parents, parent cycles, missing initial nodes, duplicate or invalid port references) — the recommended gate for untrusted or imported graphs:
+
+```ts
+import { getGraphIssues } from '@statelyai/graph';
+
+const issues = getGraphIssues(importedGraph);
+if (issues.length > 0) {
+  console.error(issues.map((issue) => issue.message));
+}
+```
+
+Use the `@statelyai/graph/schemas` subpath when you want full runtime shape validation or JSON Schema generation. `validateGraph()` combines zod shape checks with the same graph invariants.
 
 ```ts
 import { GraphSchema, isGraph, validateGraph } from '@statelyai/graph/schemas';
