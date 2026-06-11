@@ -132,6 +132,9 @@ export function createGraphEdge<T = any>(config: EdgeConfig<T>): GraphEdge<T> {
   if (config.targetPort !== undefined) edge.targetPort = config.targetPort;
   if (config.mode !== undefined) edge.mode = config.mode;
   if (config.weight !== undefined) edge.weight = config.weight;
+  if (config.points !== undefined)
+    edge.points = config.points.map((p) => ({ ...p }));
+  if (config.routing !== undefined) edge.routing = config.routing;
   if (config.x !== undefined) edge.x = config.x;
   if (config.y !== undefined) edge.y = config.y;
   if (config.width !== undefined) edge.width = config.width;
@@ -561,6 +564,8 @@ const NODE_OPTIONAL_KEYS = [
 const EDGE_OPTIONAL_KEYS = [
   'weight',
   'mode',
+  'points',
+  'routing',
   'x',
   'y',
   'width',

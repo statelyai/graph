@@ -26,6 +26,8 @@ export function toGEXF(graph: Graph): string {
     { '@_id': 'a_edgeWidth', '@_title': 'width', '@_type': 'double' },
     { '@_id': 'a_edgeHeight', '@_title': 'height', '@_type': 'double' },
     { '@_id': 'a_edgeStyle', '@_title': 'style', '@_type': 'string' },
+    { '@_id': 'a_edgePoints', '@_title': 'points', '@_type': 'string' },
+    { '@_id': 'a_edgeRouting', '@_title': 'routing', '@_type': 'string' },
     { '@_id': 'a_sourcePort', '@_title': 'sourcePort', '@_type': 'string' },
     { '@_id': 'a_targetPort', '@_title': 'targetPort', '@_type': 'string' },
   ];
@@ -121,6 +123,15 @@ export function toGEXF(graph: Graph): string {
     const edgeAttvalues = edge.attvalues?.attvalue ?? [];
     if (e.weight !== undefined) {
       edgeAttvalues.push({ '@_for': 'a_edgeWeight', '@_value': e.weight });
+    }
+    if (e.points !== undefined) {
+      edgeAttvalues.push({
+        '@_for': 'a_edgePoints',
+        '@_value': JSON.stringify(e.points),
+      });
+    }
+    if (e.routing !== undefined) {
+      edgeAttvalues.push({ '@_for': 'a_edgeRouting', '@_value': e.routing });
     }
     if (e.x !== undefined) {
       edgeAttvalues.push({ '@_for': 'a_edgeX', '@_value': e.x });
@@ -334,6 +345,12 @@ export function fromGEXF(xml: string): Graph {
           : undefined,
       ...(attvals['weight'] !== undefined && {
         weight: parseNumber(attvals['weight'], 'weight attribute', 'edge', id),
+      }),
+      ...(attvals['points'] !== undefined && {
+        points: tryParseJSON(attvals['points']),
+      }),
+      ...(attvals['routing'] !== undefined && {
+        routing: attvals['routing'] as GraphEdge['routing'],
       }),
       ...(attvals['x'] !== undefined && {
         x: parseNumber(attvals['x'], 'x attribute', 'edge', id),

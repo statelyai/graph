@@ -109,6 +109,18 @@ export function toGraphML(graph: Graph): string {
       '@_attr.type': 'double',
     },
     {
+      '@_id': 'points',
+      '@_for': 'edge',
+      '@_attr.name': 'points',
+      '@_attr.type': 'string',
+    },
+    {
+      '@_id': 'routing',
+      '@_for': 'edge',
+      '@_attr.name': 'routing',
+      '@_attr.type': 'string',
+    },
+    {
       '@_id': 'ports',
       '@_for': 'node',
       '@_attr.name': 'ports',
@@ -187,6 +199,12 @@ export function toGraphML(graph: Graph): string {
     if (edge.color) data.push({ '@_key': 'color', '#text': edge.color });
     if (edge.weight !== undefined) {
       data.push({ '@_key': 'weight', '#text': edge.weight });
+    }
+    if (edge.points !== undefined) {
+      data.push({ '@_key': 'points', '#text': JSON.stringify(edge.points) });
+    }
+    if (edge.routing !== undefined) {
+      data.push({ '@_key': 'routing', '#text': edge.routing });
     }
     if (edge.sourcePort !== undefined) {
       data.push({ '@_key': 'sourcePort', '#text': edge.sourcePort });
@@ -382,6 +400,12 @@ export function fromGraphML(xml: string): Graph {
 
     if (dataMap.weight !== undefined) {
       edge.weight = parseNumber(dataMap.weight, 'weight', 'edge', id);
+    }
+    if (dataMap.points !== undefined) {
+      edge.points = tryParseJSON(dataMap.points);
+    }
+    if (dataMap.routing !== undefined) {
+      edge.routing = dataMap.routing as GraphEdge['routing'];
     }
     if (dataMap.x !== undefined) edge.x = parseNumber(dataMap.x, 'x', 'edge', id);
     if (dataMap.y !== undefined) edge.y = parseNumber(dataMap.y, 'y', 'edge', id);

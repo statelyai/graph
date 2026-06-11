@@ -52,6 +52,10 @@ export const EdgeSchema = z.object({
   sourcePort: z.string().optional(),
   targetPort: z.string().optional(),
   mode: ModeSchema.optional(),
+  points: z
+    .array(z.object({ x: z.number(), y: z.number() }))
+    .optional(),
+  routing: z.enum(['polyline', 'orthogonal', 'splines']).optional(),
   data: z.any(),
   x: z.number().optional(),
   y: z.number().optional(),

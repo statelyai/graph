@@ -110,6 +110,12 @@ export function toGML(graph: Graph): string {
     if (edge.data !== undefined)
       lines.push(`    data ${gmlString(JSON.stringify(edge.data))}`);
     if (edge.weight !== undefined) lines.push(`    weight ${edge.weight}`);
+    if (edge.points !== undefined) {
+      lines.push(`    points ${gmlString(JSON.stringify(edge.points))}`);
+    }
+    if (edge.routing !== undefined) {
+      lines.push(`    routing ${gmlString(edge.routing)}`);
+    }
     if (edge.sourcePort !== undefined) {
       lines.push(`    sourcePort ${gmlString(edge.sourcePort)}`);
     }
@@ -236,6 +242,10 @@ export function fromGML(gml: string): Graph {
       data: e['data'] !== undefined ? tryParseJSON(e['data']) : undefined,
       ...(e['weight'] !== undefined && {
         weight: parseNumber(e['weight'], 'weight', 'edge', id),
+      }),
+      ...(e['points'] !== undefined && { points: tryParseJSON(e['points']) }),
+      ...(e['routing'] !== undefined && {
+        routing: String(e['routing']) as Graph['edges'][number]['routing'],
       }),
       ...(e['sourcePort'] !== undefined && {
         sourcePort: String(e['sourcePort']),

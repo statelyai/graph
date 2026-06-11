@@ -89,6 +89,19 @@ describe('GraphML', () => {
     });
   });
 
+  it('round-trips edge points and routing', () => {
+    const fixture = getFullyFeaturedGraphFixture();
+    const parsed = fromGraphML(toGraphML(fixture));
+
+    const edge = parsed.edges.find((e) => e.id === 'e1');
+    expect(edge?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 50, y: 25 },
+      { x: 100, y: 50 },
+    ]);
+    expect(edge?.routing).toBe('orthogonal');
+  });
+
   it('handles undirected graphs', () => {
     const g: Graph = {
       ...sampleGraph,
