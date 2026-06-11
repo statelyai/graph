@@ -177,7 +177,9 @@ const parsed = GraphSchema.parse(unknownValue);
 
 <!-- algorithm functions exported from src/algorithms.ts -->
 
-Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (label propagation, Girvan-Newman, greedy modularity, modularity scoring), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow (max-flow/min-cut), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+
+Hot algorithm loops (centrality, components) run on an internal compressed-sparse-row snapshot — cached and invalidated transparently like the rest of the index — so they stay fast on large graphs without changing the plain-JSON model. Algorithm results are differential-tested against graphology on seeded random graphs.
 
 ```ts
 import {
@@ -191,9 +193,13 @@ import {
   getConnectedComponents,
   getMinimumSpanningTree,
   getPageRank,
+  getLouvainCommunities,
   getLabelPropagationCommunities,
   genGirvanNewmanCommunities,
   getBridges,
+  getMaxFlow,
+  getDominatorTree,
+  getTransitiveReduction,
   isIsomorphic,
 } from '@statelyai/graph';
 
@@ -211,9 +217,13 @@ getTopologicalSort(graph); // topological order (or null)
 getConnectedComponents(graph); // connected components
 getMinimumSpanningTree(graph, { getWeight: (e) => e.weight ?? 1 }); // MST
 getPageRank(graph); // link analysis scores
+getLouvainCommunities(graph); // community detection (Louvain)
 getLabelPropagationCommunities(graph); // community detection
 [...genGirvanNewmanCommunities(graph)]; // lazy community splits
 getBridges(graph); // bridge edges
+getMaxFlow(graph, { from: 'a', to: 'c' }); // max flow + min cut
+getDominatorTree(graph, { from: 'a' }); // immediate dominators
+getTransitiveReduction(graph); // minimal equivalent DAG
 isIsomorphic(graph, otherGraph); // structural equivalence
 ```
 
