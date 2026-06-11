@@ -231,3 +231,123 @@ describe('xyflow', () => {
     expect(graph.edges).toHaveLength(0);
   });
 });
+
+describe('xyflow parent ordering', () => {
+  const baseNode = {
+    type: 'node' as const,
+    initialNodeId: null,
+    label: '',
+    data: undefined,
+    x: 0,
+    y: 0,
+    width: 10,
+    height: 10,
+  };
+
+  it('emits parent nodes before their children regardless of authored order', () => {
+    // React Flow requires parents to precede children in the nodes array.
+    const graph: VisualGraph = {
+      id: '',
+      mode: 'directed',
+      initialNodeId: null,
+      direction: 'down',
+      nodes: [
+        { ...baseNode, id: 'grandchild', parentId: 'child' },
+        { ...baseNode, id: 'child', parentId: 'parent' },
+        { ...baseNode, id: 'sibling', parentId: 'parent' },
+        { ...baseNode, id: 'parent', parentId: null },
+      ],
+      edges: [],
+      data: undefined,
+    };
+    const flow = toXYFlow(graph);
+    const ids = flow.nodes.map((n) => n.id);
+    expect(ids.indexOf('parent')).toBeLessThan(ids.indexOf('child'));
+    expect(ids.indexOf('parent')).toBeLessThan(ids.indexOf('sibling'));
+    expect(ids.indexOf('child')).toBeLessThan(ids.indexOf('grandchild'));
+    // Stable within the constraint: child was authored before sibling.
+    expect(ids.indexOf('child')).toBeLessThan(ids.indexOf('sibling'));
+    // Round-trip keeps every node.
+    const out = fromXYFlow(flow);
+    expect(out.nodes.map((n) => n.id).sort()).toEqual([
+      'child',
+      'grandchild',
+      'parent',
+      'sibling',
+    ]);
+    expect(out.nodes.find((n) => n.id === 'child')?.parentId).toBe('parent');
+  });
+
+  it('keeps authored order for nodes in a parentId cycle instead of hanging', () => {
+    const graph: VisualGraph = {
+      id: '',
+      mode: 'directed',
+      initialNodeId: null,
+      direction: 'down',
+      nodes: [
+        { ...baseNode, id: 'a', parentId: 'b' },
+        { ...baseNode, id: 'b', parentId: 'a' },
+        { ...baseNode, id: 'root', parentId: null },
+      ],
+      edges: [],
+      data: undefined,
+    };
+    const flow = toXYFlow(graph);
+    expect(flow.nodes.map((n) => n.id)).toEqual(['root', 'a', 'b']);
+  });
+});
+
+describe('xyflow undefined data', () => {
+  it('round-trips data: undefined without leaking internal metadata', () => {
+    const graph: VisualGraph = {
+      id: '',
+      mode: 'directed',
+      initialNodeId: null,
+      direction: 'down',
+      nodes: [
+        {
+          type: 'node',
+          id: 'a',
+          parentId: null,
+          initialNodeId: null,
+          label: '',
+          data: undefined,
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+        },
+        {
+          type: 'node',
+          id: 'b',
+          parentId: null,
+          initialNodeId: null,
+          label: '',
+          data: undefined,
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+        },
+      ],
+      edges: [
+        {
+          type: 'edge',
+          id: 'e1',
+          sourceId: 'a',
+          targetId: 'b',
+          label: '',
+          data: undefined,
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        },
+      ],
+      data: undefined,
+    };
+    const out = fromXYFlow(toXYFlow(graph));
+    expect(out.nodes[0].data).toBeUndefined();
+    expect(out.edges[0].data).toBeUndefined();
+  });
+});

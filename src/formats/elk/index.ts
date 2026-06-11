@@ -81,8 +81,16 @@ const ELK_TO_DIRECTION: Record<string, 'up' | 'down' | 'left' | 'right'> = {
 function convertEdge(edge: VisualEdge): ElkExtendedEdge {
   const elkEdge: ElkExtendedEdge = {
     id: edge.id,
-    sources: [edge.sourcePort ?? edge.sourceId],
-    targets: [edge.targetPort ?? edge.targetId],
+    sources: [
+      edge.sourcePort != null
+        ? `${edge.sourceId}__${edge.sourcePort}`
+        : edge.sourceId,
+    ],
+    targets: [
+      edge.targetPort != null
+        ? `${edge.targetId}__${edge.targetPort}`
+        : edge.targetId,
+    ],
   };
   if (edge.label) {
     elkEdge.labels = [{ text: edge.label }];
@@ -94,6 +102,7 @@ function convertEdge(edge: VisualEdge): ElkExtendedEdge {
       sourcePort: edge.sourcePort,
       targetPort: edge.targetPort,
       label: edge.label,
+      mode: edge.mode,
       data: edge.data,
       weight: edge.weight,
       color: edge.color,
@@ -106,9 +115,12 @@ function convertEdge(edge: VisualEdge): ElkExtendedEdge {
   });
 }
 
-function convertPort(port: VisualPort): ElkPort {
+function convertPort(nodeId: string, port: VisualPort): ElkPort {
+  // ELK requires document-unique ids; bare port names are only unique per
+  // node, so qualify with the owning node id. The original name round-trips
+  // through metadata.
   const elkPort: ElkPort = {
-    id: port.name,
+    id: `${nodeId}__${port.name}`,
     x: port.x,
     y: port.y,
     width: port.width,
@@ -125,6 +137,7 @@ function convertPort(port: VisualPort): ElkPort {
   }
   return addMetadata(elkPort, {
     port: {
+      name: port.name,
       data: port.data,
       style: port.style,
     },
@@ -143,7 +156,7 @@ function convertNode(graph: VisualGraph, node: VisualNode): ElkNode {
     elkNode.labels = [{ text: node.label }];
   }
   if (node.ports && node.ports.length > 0) {
-    elkNode.ports = node.ports.map(convertPort);
+    elkNode.ports = node.ports.map((port) => convertPort(node.id, port));
   }
   addMetadata(elkNode, {
     node: {
@@ -260,7 +273,7 @@ function flattenElkNodes(
   nodes: VisualNode[],
   edges: VisualEdge[],
   edgeIdx: { value: number },
-  portOwner: Map<string, string>,
+  portOwner: Map<string, { nodeId: string; portName: string }>,
 ): void {
   if (elkNode.children) {
     for (const child of elkNode.children) {
@@ -291,15 +304,18 @@ function flattenElkNodes(
       // Parse ELK ports
       if (child.ports && child.ports.length > 0) {
         node.ports = (child.ports as ElkPort[]).map((elkPort): VisualPort => {
-          portOwner.set(elkPort.id, child.id);
           const metadata = readMetadata(elkPort)?.port;
+          // Metadata carries the original port name; external ELK input
+          // (no metadata) uses the raw port id as the name.
+          const portName = metadata?.name ?? elkPort.id;
+          portOwner.set(elkPort.id, { nodeId: child.id, portName });
           const sideOpt =
             elkPort.layoutOptions?.['org.eclipse.elk.port.side'];
           let direction: 'in' | 'out' | 'inout' = 'inout';
           if (sideOpt === 'WEST') direction = 'in';
           else if (sideOpt === 'EAST') direction = 'out';
           return {
-            name: elkPort.id,
+            name: portName,
             direction,
             label:
               (elkPort.labels as ElkLabel[] | undefined)?.[0]?.text,
@@ -326,13 +342,13 @@ function flattenElkNodes(
         for (const target of elkEdge.targets) {
           // Resolve: if source/target is a port ID, map to node + port
           const metadata = readMetadata(elkEdge)?.edge;
-          const sourceNodeId = portOwner.get(source);
-          const targetNodeId = portOwner.get(target);
+          const sourceOwner = portOwner.get(source);
+          const targetOwner = portOwner.get(target);
           const edge: VisualEdge = {
             type: 'edge',
             id: elkEdge.id ?? `e${edgeIdx.value++}`,
-            sourceId: metadata?.sourceId ?? sourceNodeId ?? source,
-            targetId: metadata?.targetId ?? targetNodeId ?? target,
+            sourceId: metadata?.sourceId ?? sourceOwner?.nodeId ?? source,
+            targetId: metadata?.targetId ?? targetOwner?.nodeId ?? target,
             label:
               metadata && 'label' in metadata
                 ? (metadata.label as string | null)
@@ -345,16 +361,17 @@ function flattenElkNodes(
             y: metadata?.y ?? 0,
             width: metadata?.width ?? 0,
             height: metadata?.height ?? 0,
+            ...(metadata?.mode !== undefined && { mode: metadata.mode }),
             ...(metadata?.weight !== undefined && { weight: metadata.weight }),
             ...(metadata?.color !== undefined && { color: metadata.color }),
             ...(metadata?.style !== undefined && { style: metadata.style }),
           };
           if (metadata && 'sourcePort' in metadata) {
             edge.sourcePort = metadata.sourcePort;
-          } else if (sourceNodeId) edge.sourcePort = source;
+          } else if (sourceOwner) edge.sourcePort = sourceOwner.portName;
           if (metadata && 'targetPort' in metadata) {
             edge.targetPort = metadata.targetPort;
-          } else if (targetNodeId) edge.targetPort = target;
+          } else if (targetOwner) edge.targetPort = targetOwner.portName;
           edges.push(edge);
         }
       }
@@ -386,7 +403,7 @@ export function fromELK(elkRoot: ElkNode): VisualGraph {
   const nodes: VisualNode[] = [];
   const edges: VisualEdge[] = [];
   const edgeIdx = { value: 0 };
-  const portOwner = new Map<string, string>();
+  const portOwner = new Map<string, { nodeId: string; portName: string }>();
 
   flattenElkNodes(elkRoot, null, nodes, edges, edgeIdx, portOwner);
 

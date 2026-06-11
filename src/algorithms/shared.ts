@@ -74,6 +74,26 @@ export class MinPriorityQueue<T> {
   }
 }
 
+/**
+ * Classify a graph by the *effective* mode of its edges (per-edge `mode`
+ * overrides included): all-directed, all-non-directed, or genuinely mixed.
+ * Edge-less graphs fall back to `graph.mode`.
+ */
+export function getEffectiveModeKind(
+  graph: Graph,
+): 'directed' | 'non-directed' | 'mixed' {
+  let sawDirected = false;
+  let sawNonDirected = false;
+  for (const edge of graph.edges) {
+    if (getEdgeMode(graph, edge) === 'directed') sawDirected = true;
+    else sawNonDirected = true;
+    if (sawDirected && sawNonDirected) return 'mixed';
+  }
+  if (sawDirected) return 'directed';
+  if (sawNonDirected) return 'non-directed';
+  return graph.mode === 'directed' ? 'directed' : 'non-directed';
+}
+
 export function getNeighborIds(graph: Graph, nodeId: string): string[] {
   const idx = getIndex(graph);
   const ids: string[] = [];

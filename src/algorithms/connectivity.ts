@@ -113,8 +113,12 @@ function traverseConnectivity<N, E>(
         state.bridges.add(neighbor.edgeId);
       }
 
-      if (parentEdgeId !== null && state.low.get(neighbor.nodeId)! >= state.disc.get(nodeId)!) {
-        state.articulationPoints.add(nodeId);
+      if (state.low.get(neighbor.nodeId)! >= state.disc.get(nodeId)!) {
+        if (parentEdgeId !== null) {
+          state.articulationPoints.add(nodeId);
+        }
+        // Pop for the root's children too, so each child subtree forms its
+        // own biconnected component instead of being lumped together.
         popComponentUntil(state, neighbor.edgeId);
       }
     } else if (state.disc.get(neighbor.nodeId)! < state.disc.get(nodeId)!) {

@@ -41,7 +41,9 @@ export function getEdgesOf<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge<
 }
 
 /**
- * Returns incoming edges to a node.
+ * Returns incoming edges to a node, by *authored* direction
+ * (`edge.targetId === nodeId`), regardless of edge mode. For mode-aware
+ * traversal use {@link getPredecessors} or {@link getEdgesOf}.
  *
  * @example
  * ```ts
@@ -62,7 +64,9 @@ export function getInEdges<N, E>(graph: Graph<N, E>, nodeId: string): GraphEdge<
 }
 
 /**
- * Returns outgoing edges from a node.
+ * Returns outgoing edges from a node, by *authored* direction
+ * (`edge.sourceId === nodeId`), regardless of edge mode. For mode-aware
+ * traversal use {@link getSuccessors} or {@link getEdgesOf}.
  *
  * @example
  * ```ts
@@ -130,7 +134,9 @@ export function getEdgesBetween<N, E>(
 // --- Neighbor queries ---
 
 /**
- * Returns direct successor nodes (targets of outgoing edges).
+ * Returns direct successor nodes — nodes reachable by traversing one edge
+ * away from `nodeId`. Edges whose effective mode is not `'directed'` are
+ * traversable both ways, so their other endpoint also counts as a successor.
  *
  * @example
  * ```ts
@@ -147,22 +153,28 @@ export function getEdgesBetween<N, E>(
  */
 export function getSuccessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
-  const edgeIds = idx.outEdges.get(nodeId) ?? [];
   const seen = new Set<string>();
   const result: GraphNode<N>[] = [];
-  for (const eid of edgeIds) {
+  const add = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const ni = idx.nodeById.get(id);
+    if (ni !== undefined) result.push(graph.nodes[ni]);
+  };
+  for (const eid of idx.outEdges.get(nodeId) ?? []) {
+    add(graph.edges[idx.edgeById.get(eid)!].targetId);
+  }
+  for (const eid of idx.inEdges.get(nodeId) ?? []) {
     const e = graph.edges[idx.edgeById.get(eid)!];
-    if (!seen.has(e.targetId)) {
-      seen.add(e.targetId);
-      const ni = idx.nodeById.get(e.targetId);
-      if (ni !== undefined) result.push(graph.nodes[ni]);
-    }
+    if (getEdgeMode(graph, e) !== 'directed') add(e.sourceId);
   }
   return result;
 }
 
 /**
- * Returns direct predecessor nodes (sources of incoming edges).
+ * Returns direct predecessor nodes — nodes from which `nodeId` is reachable
+ * by traversing one edge. Edges whose effective mode is not `'directed'` are
+ * traversable both ways, so their other endpoint also counts as a predecessor.
  *
  * @example
  * ```ts
@@ -179,16 +191,20 @@ export function getSuccessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[
  */
 export function getPredecessors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[] {
   const idx = getIndex(graph);
-  const edgeIds = idx.inEdges.get(nodeId) ?? [];
   const seen = new Set<string>();
   const result: GraphNode<N>[] = [];
-  for (const eid of edgeIds) {
+  const add = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const ni = idx.nodeById.get(id);
+    if (ni !== undefined) result.push(graph.nodes[ni]);
+  };
+  for (const eid of idx.inEdges.get(nodeId) ?? []) {
+    add(graph.edges[idx.edgeById.get(eid)!].sourceId);
+  }
+  for (const eid of idx.outEdges.get(nodeId) ?? []) {
     const e = graph.edges[idx.edgeById.get(eid)!];
-    if (!seen.has(e.sourceId)) {
-      seen.add(e.sourceId);
-      const ni = idx.nodeById.get(e.sourceId);
-      if (ni !== undefined) result.push(graph.nodes[ni]);
-    }
+    if (getEdgeMode(graph, e) !== 'directed') add(e.targetId);
   }
   return result;
 }
@@ -224,9 +240,10 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
 // --- Degree queries ---
 
 /**
- * Returns the total degree of a node (inDegree + outDegree).
- * For graphs whose default mode is not `'directed'`, each incident edge is
- * counted once.
+ * Returns the total degree of a node (number of incident edge endpoints).
+ * Each incident edge whose effective mode is not `'directed'` is counted
+ * once (a non-directed self-loop counts once; a directed self-loop counts
+ * twice — once in, once out).
  *
  * @example
  * ```ts
@@ -243,18 +260,26 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
  */
 export function getDegree(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
-  if (graph.mode !== 'directed') {
-    // Count unique edges (an edge where sourceId === targetId === nodeId should count once)
-    const out = idx.outEdges.get(nodeId) ?? [];
-    const inE = idx.inEdges.get(nodeId) ?? [];
-    const all = new Set([...out, ...inE]);
-    return all.size;
+  const out = idx.outEdges.get(nodeId) ?? [];
+  const inE = idx.inEdges.get(nodeId) ?? [];
+  let degree = 0;
+  const countedNonDirected = new Set<string>();
+  for (const eid of [...out, ...inE]) {
+    const e = graph.edges[idx.edgeById.get(eid)!];
+    if (getEdgeMode(graph, e) === 'directed') {
+      degree++; // a directed self-loop appears in both lists → counts twice
+    } else if (!countedNonDirected.has(eid)) {
+      countedNonDirected.add(eid);
+      degree++;
+    }
   }
-  return (idx.inEdges.get(nodeId)?.length ?? 0) + (idx.outEdges.get(nodeId)?.length ?? 0);
+  return degree;
 }
 
 /**
- * Returns the in-degree of a node (number of incoming edges).
+ * Returns the in-degree of a node — the number of edges traversable *into*
+ * the node. Edges whose effective mode is not `'directed'` count toward both
+ * endpoints' in-degree (once per edge).
  *
  * @example
  * ```ts
@@ -267,11 +292,20 @@ export function getDegree(graph: Graph, nodeId: string): number {
  * ```
  */
 export function getInDegree(graph: Graph, nodeId: string): number {
-  return getIndex(graph).inEdges.get(nodeId)?.length ?? 0;
+  const idx = getIndex(graph);
+  let degree = idx.inEdges.get(nodeId)?.length ?? 0;
+  for (const eid of idx.outEdges.get(nodeId) ?? []) {
+    const e = graph.edges[idx.edgeById.get(eid)!];
+    // Non-directed edges also point "in"; skip self-loops (already counted above)
+    if (getEdgeMode(graph, e) !== 'directed' && e.targetId !== nodeId) degree++;
+  }
+  return degree;
 }
 
 /**
- * Returns the out-degree of a node (number of outgoing edges).
+ * Returns the out-degree of a node — the number of edges traversable *out of*
+ * the node. Edges whose effective mode is not `'directed'` count toward both
+ * endpoints' out-degree (once per edge).
  *
  * @example
  * ```ts
@@ -284,7 +318,14 @@ export function getInDegree(graph: Graph, nodeId: string): number {
  * ```
  */
 export function getOutDegree(graph: Graph, nodeId: string): number {
-  return getIndex(graph).outEdges.get(nodeId)?.length ?? 0;
+  const idx = getIndex(graph);
+  let degree = idx.outEdges.get(nodeId)?.length ?? 0;
+  for (const eid of idx.inEdges.get(nodeId) ?? []) {
+    const e = graph.edges[idx.edgeById.get(eid)!];
+    // Non-directed edges also point "out"; skip self-loops (already counted above)
+    if (getEdgeMode(graph, e) !== 'directed' && e.sourceId !== nodeId) degree++;
+  }
+  return degree;
 }
 
 // --- Hierarchy queries ---
@@ -350,6 +391,10 @@ export function getParent<N>(
 /**
  * Returns all ancestors from the node up to the root (nearest parent first).
  *
+ * If the parent chain contains a cycle (authored `parentId` cycles are not
+ * rejected by `createGraph`), the walk stops at the first repeated node and
+ * returns the ancestors collected so far — each ancestor appears exactly once.
+ *
  * @example
  * ```ts
  * const graph = createGraph({
@@ -372,10 +417,13 @@ export function getAncestors<N>(
   let ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return result;
   let current = graph.nodes[ni];
+  const seen = new Set<string>([nodeId]);
   while (current && current.parentId) {
+    if (seen.has(current.parentId)) break; // parent cycle: stop at first repeat
     const pi = idx.nodeById.get(current.parentId);
     if (pi === undefined) break;
     const p = graph.nodes[pi];
+    seen.add(p.id);
     result.push(p);
     current = p;
   }
@@ -384,6 +432,10 @@ export function getAncestors<N>(
 
 /**
  * Returns all descendants recursively (depth-first).
+ *
+ * If the hierarchy contains a parent cycle (authored `parentId` cycles are
+ * not rejected by `createGraph`), each node is visited at most once: the walk
+ * stops at the first repeated node and returns the descendants collected so far.
  *
  * @example
  * ```ts
@@ -404,9 +456,12 @@ export function getDescendants<N>(
 ): GraphNode<N>[] {
   const idx = getIndex(graph);
   const result: GraphNode<N>[] = [];
+  const seen = new Set<string>([nodeId]);
   const collect = (id: string) => {
     const childIds = idx.childNodes.get(id) ?? [];
     for (const childId of childIds) {
+      if (seen.has(childId)) continue; // parent cycle: stop at first repeat
+      seen.add(childId);
       const ci = idx.nodeById.get(childId);
       if (ci !== undefined) {
         result.push(graph.nodes[ci]);
@@ -483,6 +538,10 @@ export function isLeaf(graph: Graph, nodeId: string): boolean {
  * Depth of a node in the hierarchy (root = 0).
  * Returns -1 if the node is not found.
  *
+ * If the parent chain contains a cycle (authored `parentId` cycles are not
+ * rejected by `createGraph`), the walk stops at the first repeated node and
+ * returns the number of unique ancestors walked up to that point.
+ *
  * @example
  * ```ts
  * const graph = createGraph({
@@ -503,7 +562,10 @@ export function getDepth(graph: Graph, nodeId: string): number {
   let ni = idx.nodeById.get(nodeId);
   if (ni === undefined) return -1;
   let current = graph.nodes[ni];
+  const seen = new Set<string>([nodeId]);
   while (current.parentId) {
+    if (seen.has(current.parentId)) break; // parent cycle: stop at first repeat
+    seen.add(current.parentId);
     d++;
     const pi = idx.nodeById.get(current.parentId);
     if (pi === undefined) break;
@@ -548,6 +610,10 @@ export function getSiblings<N>(
  * Least Common Ancestor -- deepest proper ancestor of all given nodes.
  * A proper ancestor excludes the input nodes themselves.
  *
+ * If a parent chain contains a cycle (authored `parentId` cycles are not
+ * rejected by `createGraph`), each chain walk stops at the first repeated
+ * node, so every ancestor is considered exactly once.
+ *
  * @example
  * ```ts
  * const graph = createGraph({
@@ -573,10 +639,13 @@ export function getLCA<N>(
   const idx = getIndex(graph);
   const getAncestorChain = (id: string): string[] => {
     const result: string[] = [id];
+    const seen = new Set<string>([id]);
     let ni = idx.nodeById.get(id);
     if (ni === undefined) return result;
     let current = graph.nodes[ni];
     while (current.parentId) {
+      if (seen.has(current.parentId)) break; // parent cycle: stop at first repeat
+      seen.add(current.parentId);
       result.push(current.parentId);
       const pi = idx.nodeById.get(current.parentId);
       if (pi === undefined) break;
@@ -751,7 +820,8 @@ export function getRelativeDistance(
 // --- Graph-level queries ---
 
 /**
- * Nodes with no incoming edges (inDegree 0).
+ * Nodes with no incoming edges (inDegree 0). A node incident to an edge whose
+ * effective mode is not `'directed'` is never a source (the edge points in).
  *
  * @example
  * ```ts
@@ -767,12 +837,12 @@ export function getRelativeDistance(
  * ```
  */
 export function getSources<N>(graph: Graph<N>): GraphNode<N>[] {
-  const idx = getIndex(graph);
-  return graph.nodes.filter((n) => (idx.inEdges.get(n.id)?.length ?? 0) === 0);
+  return graph.nodes.filter((n) => getInDegree(graph, n.id) === 0);
 }
 
 /**
- * Nodes with no outgoing edges (outDegree 0).
+ * Nodes with no outgoing edges (outDegree 0). A node incident to an edge whose
+ * effective mode is not `'directed'` is never a sink (the edge points out).
  *
  * @example
  * ```ts
@@ -788,8 +858,7 @@ export function getSources<N>(graph: Graph<N>): GraphNode<N>[] {
  * ```
  */
 export function getSinks<N>(graph: Graph<N>): GraphNode<N>[] {
-  const idx = getIndex(graph);
-  return graph.nodes.filter((n) => (idx.outEdges.get(n.id)?.length ?? 0) === 0);
+  return graph.nodes.filter((n) => getOutDegree(graph, n.id) === 0);
 }
 
 // --- Port queries ---

@@ -1,10 +1,14 @@
 import type { Graph, GraphNode } from '../types';
 import { getIndex } from '../indexing';
 import {
+  getEffectiveModeKind,
   getNeighborIds,
   getSuccessorIds,
 } from './shared';
-import { getShortestPaths } from './paths';
+import { getEdgeMode } from '../mode';
+import { genCycles, getStronglyConnectedComponents } from './paths';
+import { getCSR } from './csr';
+import { getSubgraph } from '../transforms';
 
 export function* bfs<N>(
   graph: Graph<N>,
@@ -56,7 +60,12 @@ export function* dfs<N>(
 }
 
 export function isAcyclic(graph: Graph): boolean {
-  if (graph.mode !== 'directed') {
+  // Dispatch on *effective* edge modes (per-edge overrides included).
+  const kind = getEffectiveModeKind(graph);
+  if (kind === 'mixed') {
+    return isAcyclicMixed(graph);
+  }
+  if (kind === 'non-directed') {
     return isAcyclicUndirected(graph);
   }
   const WHITE = 0;
@@ -78,6 +87,81 @@ export function isAcyclic(graph: Graph): boolean {
 
   for (const node of graph.nodes) {
     if (color.get(node.id) === WHITE && hasCycle(node.id)) return false;
+  }
+  return true;
+}
+
+/**
+ * Acyclicity for graphs mixing directed and non-directed edges.
+ *
+ * Polynomial fast paths first: a cycle among directed edges alone, a cycle
+ * among non-directed edges alone (union-find), or all-singleton reachability
+ * SCCs (then no mixed cycle can exist either). Only ambiguous multi-node
+ * SCCs fall back to exact simple-cycle enumeration, restricted to that SCC.
+ */
+function isAcyclicMixed(graph: Graph): boolean {
+  const idx = getIndex(graph);
+
+  // (1) Cycle using only effective-directed edges
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>();
+  for (const node of graph.nodes) color.set(node.id, WHITE);
+  const hasDirectedCycle = (id: string): boolean => {
+    color.set(id, GRAY);
+    for (const eid of idx.outEdges.get(id) ?? []) {
+      const edge = graph.edges[idx.edgeById.get(eid)!];
+      if (getEdgeMode(graph, edge) !== 'directed') continue;
+      const current = color.get(edge.targetId);
+      if (current === GRAY) return true;
+      if (current === WHITE && hasDirectedCycle(edge.targetId)) return true;
+    }
+    color.set(id, BLACK);
+    return false;
+  };
+  for (const node of graph.nodes) {
+    if (color.get(node.id) === WHITE && hasDirectedCycle(node.id)) return false;
+  }
+
+  // (2) Cycle using only non-directed edges (union-find: a non-directed edge
+  // joining an already-connected pair, or a non-directed self-loop)
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    let root = id;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    let cursor = id;
+    while (parent.get(cursor) !== root) {
+      const next = parent.get(cursor)!;
+      parent.set(cursor, root);
+      cursor = next;
+    }
+    return root;
+  };
+  for (const node of graph.nodes) parent.set(node.id, node.id);
+  for (const edge of graph.edges) {
+    if (getEdgeMode(graph, edge) === 'directed') continue;
+    if (edge.sourceId === edge.targetId) return false;
+    const rootA = find(edge.sourceId);
+    const rootB = find(edge.targetId);
+    if (rootA === rootB) return false;
+    parent.set(rootA, rootB);
+  }
+
+  // (3) Every simple cycle lies within one mutual-reachability SCC; if all
+  // SCCs are singletons (self-loops were caught above), the graph is acyclic
+  const multiNodeSccs = getStronglyConnectedComponents(graph).filter(
+    (component) => component.length > 1,
+  );
+  if (multiNodeSccs.length === 0) return true;
+
+  // (4) Exact enumeration, restricted to each ambiguous SCC
+  for (const component of multiNodeSccs) {
+    const subgraph = getSubgraph(
+      graph,
+      component.map((node) => node.id),
+    );
+    for (const _cycle of genCycles(subgraph)) return false;
   }
   return true;
 }
@@ -121,38 +205,38 @@ function isAcyclicUndirected(graph: Graph): boolean {
 }
 
 export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
-  const idx = getIndex(graph);
-  const visited = new Set<string>();
+  // Weakly-connected components: every edge connects regardless of mode, so
+  // walk the CSR arcs in both directions (out arcs + in-arc origins).
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const visited = new Uint8Array(n);
+  const queue = new Int32Array(n);
   const components: GraphNode<N>[][] = [];
 
-  for (const node of graph.nodes) {
-    if (visited.has(node.id)) continue;
+  for (let s = 0; s < n; s++) {
+    if (visited[s]) continue;
     const component: GraphNode<N>[] = [];
-    const queue: string[] = [node.id];
-    visited.add(node.id);
+    visited[s] = 1;
+    queue[0] = s;
+    let head = 0;
+    let tail = 1;
 
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const ni = idx.nodeById.get(id);
-      if (ni !== undefined) component.push(graph.nodes[ni]);
+    while (head < tail) {
+      const u = queue[head++];
+      component.push(graph.nodes[u]);
 
-      for (const eid of idx.outEdges.get(id) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const neighborId = graph.edges[ai].targetId;
-        if (!visited.has(neighborId)) {
-          visited.add(neighborId);
-          queue.push(neighborId);
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const v = csr.outTargets[a];
+        if (!visited[v]) {
+          visited[v] = 1;
+          queue[tail++] = v;
         }
       }
-
-      for (const eid of idx.inEdges.get(id) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const neighborId = graph.edges[ai].sourceId;
-        if (!visited.has(neighborId)) {
-          visited.add(neighborId);
-          queue.push(neighborId);
+      for (let a = csr.inOffsets[u]; a < csr.inOffsets[u + 1]; a++) {
+        const v = csr.inOrigins[a];
+        if (!visited[v]) {
+          visited[v] = 1;
+          queue[tail++] = v;
         }
       }
     }
@@ -163,7 +247,19 @@ export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
   return components;
 }
 
+/**
+ * Returns a topological ordering of the graph's nodes, or `null` if no such
+ * ordering exists.
+ *
+ * Any edge whose effective mode (per {@link getEdgeMode}) is not `'directed'`
+ * makes ordering impossible — an undirected/bidirectional edge is mutual
+ * precedence, i.e. a 2-cycle — so the function returns `null`.
+ */
 export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
+  for (const edge of graph.edges) {
+    if (getEdgeMode(graph, edge) !== 'directed') return null;
+  }
+
   const idx = getIndex(graph);
   const inDegree = new Map<string, number>();
   for (const node of graph.nodes) inDegree.set(node.id, 0);
@@ -201,7 +297,23 @@ export function hasPath(
   sourceId: string,
   targetId: string,
 ): boolean {
-  return getShortestPaths(graph, { from: sourceId, to: targetId }).length > 0;
+  if (sourceId === targetId) return true;
+
+  const visited = new Set<string>([sourceId]);
+  const queue: string[] = [sourceId];
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    for (const neighborId of getNeighborIds(graph, id)) {
+      if (neighborId === targetId) return true;
+      if (!visited.has(neighborId)) {
+        visited.add(neighborId);
+        queue.push(neighborId);
+      }
+    }
+  }
+
+  return false;
 }
 
 export function isConnected(graph: Graph): boolean {
@@ -209,6 +321,16 @@ export function isConnected(graph: Graph): boolean {
   return getConnectedComponents(graph).length <= 1;
 }
 
+/**
+ * Returns whether the graph is a tree: connected, acyclic, and with exactly
+ * `nodes.length - 1` edges (so directed diamonds and parallel edges are not
+ * trees). Empty and single-node graphs are considered trees.
+ */
 export function isTree(graph: Graph): boolean {
-  return isConnected(graph) && isAcyclic(graph);
+  if (graph.nodes.length === 0) return true;
+  return (
+    graph.edges.length === graph.nodes.length - 1 &&
+    isConnected(graph) &&
+    isAcyclic(graph)
+  );
 }

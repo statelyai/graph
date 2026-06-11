@@ -21,6 +21,8 @@ export type {
   DeleteNodeOptions,
   EntitiesConfig,
   EntitiesUpdate,
+  NodeUpdate,
+  EdgeUpdate,
   GraphStep,
   GraphPath,
   PathOptions,
@@ -47,6 +49,10 @@ export type {
   GirvanNewmanOptions,
   LabelPropagationOptions,
   IsomorphismOptions,
+  LouvainOptions,
+  MaxFlowOptions,
+  MaxFlowResult,
+  DominatorTreeOptions,
 } from './algorithms';
 
 // Factory & helpers
@@ -81,6 +87,10 @@ export { GraphInstance } from './graph';
 
 // Mode helpers
 export { getEdgeMode, isEdgeDirected } from './mode';
+
+// Validation
+export { getGraphIssues } from './validate';
+export type { GraphIssue } from './validate';
 
 // Indexing
 export { invalidateIndex } from './indexing';
@@ -163,6 +173,10 @@ export {
   getArticulationPoints,
   getBiconnectedComponents,
   isIsomorphic,
+  getLouvainCommunities,
+  getMaxFlow,
+  getDominatorTree,
+  getTransitiveReduction,
 } from './algorithms';
 
 // Equivalence

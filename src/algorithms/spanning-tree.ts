@@ -1,6 +1,8 @@
 import type { Graph, GraphEdge, MSTOptions } from '../types';
 import { getIndex } from '../indexing';
 import { createGraph } from '../graph';
+import { toNodeConfig, toEdgeConfig } from '../config';
+import { getEdgeMode } from '../mode';
 import { MinPriorityQueue } from './shared';
 
 export function getMinimumSpanningTree<N, E>(
@@ -19,21 +21,8 @@ export function getMinimumSpanningTree<N, E>(
     id: graph.id,
     mode: graph.mode,
     initialNodeId: graph.initialNodeId ?? undefined,
-    nodes: graph.nodes.map((node) => ({
-      id: node.id,
-      parentId: node.parentId ?? undefined,
-      initialNodeId: node.initialNodeId ?? undefined,
-      label: node.label,
-      data: node.data,
-    })),
-    edges: mstEdges.map((edge) => ({
-      id: edge.id,
-      sourceId: edge.sourceId,
-      targetId: edge.targetId,
-      label: edge.label,
-      data: edge.data,
-      ...(edge.weight !== undefined && { weight: edge.weight }),
-    })),
+    nodes: graph.nodes.map((node) => toNodeConfig(node)),
+    edges: mstEdges.map((edge) => toEdgeConfig(edge)),
   });
 }
 
@@ -60,34 +49,37 @@ function primMST<N, E>(
       }
     }
 
-    if (graph.mode !== 'directed') {
-      for (const eid of idx.inEdges.get(nodeId) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const edge = graph.edges[ai] as GraphEdge<E>;
-        if (!inMST.has(edge.sourceId)) {
-          candidates.push({ weight: getWeight(edge), edge });
-        }
+    // Edges whose effective mode is not 'directed' are traversable both ways
+    for (const eid of idx.inEdges.get(nodeId) ?? []) {
+      const ai = idx.edgeById.get(eid);
+      if (ai === undefined) continue;
+      const edge = graph.edges[ai] as GraphEdge<E>;
+      if (getEdgeMode(graph, edge) !== 'directed' && !inMST.has(edge.sourceId)) {
+        candidates.push({ weight: getWeight(edge), edge });
       }
     }
   }
 
-  const startId = graph.nodes[0].id;
-  inMST.add(startId);
-  addEdgesOf(startId);
+  // Restart from each unvisited node so disconnected graphs yield a full
+  // spanning forest (matching Kruskal).
+  for (const node of graph.nodes) {
+    if (inMST.has(node.id)) continue;
+    inMST.add(node.id);
+    addEdgesOf(node.id);
 
-  while (candidates.size > 0 && inMST.size < graph.nodes.length) {
-    const { edge } = candidates.pop()!;
+    while (candidates.size > 0 && inMST.size < graph.nodes.length) {
+      const { edge } = candidates.pop()!;
 
-    const targetId =
-      graph.mode !== 'directed' && inMST.has(edge.targetId)
-        ? edge.sourceId
-        : edge.targetId;
+      const targetId =
+        getEdgeMode(graph, edge) !== 'directed' && inMST.has(edge.targetId)
+          ? edge.sourceId
+          : edge.targetId;
 
-    if (inMST.has(targetId)) continue;
-    inMST.add(targetId);
-    mstEdges.push(edge);
-    addEdgesOf(targetId);
+      if (inMST.has(targetId)) continue;
+      inMST.add(targetId);
+      mstEdges.push(edge);
+      addEdgesOf(targetId);
+    }
   }
 
   return mstEdges;

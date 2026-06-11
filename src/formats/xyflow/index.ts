@@ -58,8 +58,47 @@ function readMetadata(value: unknown): XYFlowMetadata | undefined {
 
 function readUserData(value: unknown): unknown {
   const metadata = readMetadata(value);
-  if (metadata && 'data' in metadata) return metadata.data;
-  return value;
+  // No metadata blob: external xyflow input — pass the data through as-is.
+  if (!metadata) return value;
+  // Metadata blob present: the original user data (possibly `undefined`) was
+  // captured at conversion time; never leak the wrapper object itself.
+  return 'data' in metadata ? metadata.data : undefined;
+}
+
+/**
+ * React Flow requires parent nodes to appear before their children in the
+ * nodes array. Reorders iteratively, keeping authored order otherwise: each
+ * pass emits nodes whose parent is already emitted (or absent). Nodes left
+ * over by a parentId cycle are appended in authored order rather than hanging.
+ */
+function orderParentsFirst(nodes: XYFlowNode[]): XYFlowNode[] {
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const emitted = new Set<string>();
+  const result: XYFlowNode[] = [];
+  let remaining = nodes;
+  while (remaining.length > 0) {
+    const deferred: XYFlowNode[] = [];
+    for (const node of remaining) {
+      if (
+        !node.parentId ||
+        emitted.has(node.parentId) ||
+        // Parent isn't in the graph at all: treat as a root.
+        !nodeIds.has(node.parentId)
+      ) {
+        result.push(node);
+        emitted.add(node.id);
+      } else {
+        deferred.push(node);
+      }
+    }
+    if (deferred.length === remaining.length) {
+      // No progress: parentId cycle. Keep the rest in authored order.
+      result.push(...deferred);
+      break;
+    }
+    remaining = deferred;
+  }
+  return result;
 }
 
 // --- Conversion ---
@@ -98,7 +137,7 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
         },
       },
     },
-    nodes: graph.nodes.map((n) => {
+    nodes: orderParentsFirst(graph.nodes.map((n) => {
       const node: XYFlowNode = {
         id: n.id,
         position: { x: n.x, y: n.y },
@@ -117,7 +156,7 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
       if (n.width !== undefined) node.width = n.width;
       if (n.height !== undefined) node.height = n.height;
       return node;
-    }),
+    })),
     edges: graph.edges.map((e) => {
       const edge: XYFlowEdge = {
         id: e.id,
@@ -129,6 +168,7 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
       edge.data = withMetadata(e.data, {
         edge: {
           label: e.label,
+          mode: e.mode,
           weight: e.weight,
           color: e.color,
           style: e.style,
@@ -234,6 +274,9 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
         y: (metadata?.y as number | undefined) ?? 0,
         width: (metadata?.width as number | undefined) ?? 0,
         height: (metadata?.height as number | undefined) ?? 0,
+        ...(metadata?.mode !== undefined && {
+          mode: metadata.mode as VisualGraph['mode'],
+        }),
         ...(metadata?.weight !== undefined && {
           weight: metadata.weight as number,
         }),

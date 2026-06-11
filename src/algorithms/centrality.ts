@@ -1,5 +1,6 @@
 import type { Graph } from '../types';
-import { getIndex } from '../indexing';
+import { getDegree, getInDegree, getOutDegree } from '../queries';
+import { getCSR } from './csr';
 
 export interface IterativeCentralityOptions {
   alpha?: number;
@@ -16,99 +17,49 @@ function getNodeIds(graph: Graph): string[] {
   return graph.nodes.map((node) => node.id);
 }
 
-function getNeighborIds(graph: Graph, nodeId: string): string[] {
-  const idx = getIndex(graph);
-  const neighbors: string[] = [];
-
-  for (const edgeId of idx.outEdges.get(nodeId) ?? []) {
-    const edgeIndex = idx.edgeById.get(edgeId);
-    if (edgeIndex !== undefined) {
-      neighbors.push(graph.edges[edgeIndex].targetId);
-    }
-  }
-
-  if (graph.mode !== 'directed') {
-    for (const edgeId of idx.inEdges.get(nodeId) ?? []) {
-      const edgeIndex = idx.edgeById.get(edgeId);
-      if (edgeIndex !== undefined) {
-        neighbors.push(graph.edges[edgeIndex].sourceId);
-      }
-    }
-  }
-
-  return neighbors;
-}
-
-function getIncomingIds(graph: Graph, nodeId: string): string[] {
-  const idx = getIndex(graph);
-  const incoming: string[] = [];
-
-  for (const edgeId of idx.inEdges.get(nodeId) ?? []) {
-    const edgeIndex = idx.edgeById.get(edgeId);
-    if (edgeIndex !== undefined) {
-      incoming.push(graph.edges[edgeIndex].sourceId);
-    }
-  }
-
-  if (graph.mode !== 'directed') {
-    for (const edgeId of idx.outEdges.get(nodeId) ?? []) {
-      const edgeIndex = idx.edgeById.get(edgeId);
-      if (edgeIndex !== undefined) {
-        incoming.push(graph.edges[edgeIndex].targetId);
-      }
-    }
-  }
-
-  return incoming;
-}
-
 function createEmptyScoreMap(graph: Graph): Record<string, number> {
   return Object.fromEntries(graph.nodes.map((node) => [node.id, 0]));
 }
 
-function normalizeVector(scores: Record<string, number>): Record<string, number> {
-  const magnitude = Math.sqrt(
-    Object.values(scores).reduce((sum, value) => sum + value * value, 0),
-  );
-  if (magnitude === 0) {
-    return scores;
+function normalizeTypedVector(values: Float64Array): void {
+  let sumOfSquares = 0;
+  for (let i = 0; i < values.length; i++) {
+    sumOfSquares += values[i] * values[i];
   }
-
-  for (const key of Object.keys(scores)) {
-    scores[key] /= magnitude;
+  const magnitude = Math.sqrt(sumOfSquares);
+  if (magnitude === 0) return;
+  for (let i = 0; i < values.length; i++) {
+    values[i] /= magnitude;
   }
-
-  return scores;
 }
 
-function maxDiff(
-  previous: Record<string, number>,
-  next: Record<string, number>,
+/**
+ * BFS hop distances from a start position over the CSR arc snapshot.
+ * `dist[i] === -1` means unreachable. Returns the visit count.
+ */
+function bfsDistances(
+  csr: ReturnType<typeof getCSR>,
+  start: number,
+  dist: Int32Array,
+  queue: Int32Array,
 ): number {
-  let diff = 0;
-  for (const key of Object.keys(next)) {
-    diff = Math.max(diff, Math.abs((previous[key] ?? 0) - next[key]));
-  }
-  return diff;
-}
-
-function getReachableDistances(graph: Graph, startId: string): Map<string, number> {
-  const distances = new Map<string, number>();
-  const queue: string[] = [startId];
-  distances.set(startId, 0);
-
-  while (queue.length > 0) {
-    const currentId = queue.shift()!;
-    const currentDistance = distances.get(currentId)!;
-
-    for (const neighborId of getNeighborIds(graph, currentId)) {
-      if (distances.has(neighborId)) continue;
-      distances.set(neighborId, currentDistance + 1);
-      queue.push(neighborId);
+  dist.fill(-1);
+  dist[start] = 0;
+  queue[0] = start;
+  let head = 0;
+  let tail = 1;
+  while (head < tail) {
+    const u = queue[head++];
+    const du = dist[u];
+    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+      const v = csr.outTargets[a];
+      if (dist[v] === -1) {
+        dist[v] = du + 1;
+        queue[tail++] = v;
+      }
     }
   }
-
-  return distances;
+  return tail;
 }
 
 /**
@@ -124,18 +75,10 @@ function getReachableDistances(graph: Graph, startId: string): Map<string, numbe
  */
 export function getDegreeCentrality(graph: Graph): Record<string, number> {
   const scale = graph.nodes.length > 1 ? 1 / (graph.nodes.length - 1) : 0;
-  const idx = getIndex(graph);
   const scores = createEmptyScoreMap(graph);
 
   for (const node of graph.nodes) {
-    const outDegree = idx.outEdges.get(node.id)?.length ?? 0;
-    const inDegree = idx.inEdges.get(node.id)?.length ?? 0;
-    const degree =
-      graph.mode !== 'directed'
-        ? new Set([...(idx.outEdges.get(node.id) ?? []), ...(idx.inEdges.get(node.id) ?? [])])
-            .size
-        : outDegree + inDegree;
-    scores[node.id] = degree * scale;
+    scores[node.id] = getDegree(graph, node.id) * scale;
   }
 
   return scores;
@@ -148,11 +91,10 @@ export function getDegreeCentrality(graph: Graph): Record<string, number> {
  */
 export function getInDegreeCentrality(graph: Graph): Record<string, number> {
   const scale = graph.nodes.length > 1 ? 1 / (graph.nodes.length - 1) : 0;
-  const idx = getIndex(graph);
   const scores = createEmptyScoreMap(graph);
 
   for (const node of graph.nodes) {
-    scores[node.id] = (idx.inEdges.get(node.id)?.length ?? 0) * scale;
+    scores[node.id] = getInDegree(graph, node.id) * scale;
   }
 
   return scores;
@@ -165,11 +107,10 @@ export function getInDegreeCentrality(graph: Graph): Record<string, number> {
  */
 export function getOutDegreeCentrality(graph: Graph): Record<string, number> {
   const scale = graph.nodes.length > 1 ? 1 / (graph.nodes.length - 1) : 0;
-  const idx = getIndex(graph);
   const scores = createEmptyScoreMap(graph);
 
   for (const node of graph.nodes) {
-    scores[node.id] = (idx.outEdges.get(node.id)?.length ?? 0) * scale;
+    scores[node.id] = getOutDegree(graph, node.id) * scale;
   }
 
   return scores;
@@ -183,22 +124,22 @@ export function getOutDegreeCentrality(graph: Graph): Record<string, number> {
  */
 export function getClosenessCentrality(graph: Graph): Record<string, number> {
   const scores = createEmptyScoreMap(graph);
-  const order = graph.nodes.length;
+  const csr = getCSR(graph);
+  const order = csr.ids.length;
+  const dist = new Int32Array(order);
+  const queue = new Int32Array(order);
 
-  for (const node of graph.nodes) {
-    const distances = getReachableDistances(graph, node.id);
-    distances.delete(node.id);
-    if (distances.size === 0) continue;
+  for (let s = 0; s < order; s++) {
+    const visited = bfsDistances(csr, s, dist, queue);
+    const reachable = visited - 1; // excluding the start node itself
+    if (reachable === 0) continue;
 
-    const totalDistance = [...distances.values()].reduce(
-      (sum, distance) => sum + distance,
-      0,
-    );
+    let totalDistance = 0;
+    for (let k = 0; k < visited; k++) totalDistance += dist[queue[k]];
     if (totalDistance === 0) continue;
 
-    const reachable = distances.size;
     const closeness = reachable / totalDistance;
-    scores[node.id] =
+    scores[csr.ids[s]] =
       order > 1 ? closeness * (reachable / (order - 1)) : closeness;
   }
 
@@ -212,59 +153,61 @@ export function getClosenessCentrality(graph: Graph): Record<string, number> {
  * normalized scores.
  */
 export function getBetweennessCentrality(graph: Graph): Record<string, number> {
-  const scores = createEmptyScoreMap(graph);
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const totals = new Float64Array(n);
+  const sigma = new Float64Array(n);
+  const dist = new Int32Array(n);
+  const delta = new Float64Array(n);
+  // BFS visit order doubles as the stack: accumulate in reverse visit order
+  const order_ = new Int32Array(n);
 
-  for (const source of graph.nodes) {
-    const stack: string[] = [];
-    const predecessors = new Map<string, string[]>();
-    const sigma = new Map<string, number>();
-    const distance = new Map<string, number>();
-    const queue: string[] = [source.id];
+  for (let s = 0; s < n; s++) {
+    sigma.fill(0);
+    dist.fill(-1);
+    delta.fill(0);
+    sigma[s] = 1;
+    dist[s] = 0;
+    order_[0] = s;
+    let head = 0;
+    let tail = 1;
 
-    for (const node of graph.nodes) {
-      predecessors.set(node.id, []);
-      sigma.set(node.id, 0);
-      distance.set(node.id, -1);
-    }
-
-    sigma.set(source.id, 1);
-    distance.set(source.id, 0);
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!;
-      stack.push(currentId);
-
-      for (const neighborId of getNeighborIds(graph, currentId)) {
-        if (distance.get(neighborId) === -1) {
-          queue.push(neighborId);
-          distance.set(neighborId, distance.get(currentId)! + 1);
+    while (head < tail) {
+      const u = order_[head++];
+      const du = dist[u];
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const v = csr.outTargets[a];
+        if (dist[v] === -1) {
+          dist[v] = du + 1;
+          order_[tail++] = v;
         }
-        if (distance.get(neighborId) === distance.get(currentId)! + 1) {
-          sigma.set(neighborId, sigma.get(neighborId)! + sigma.get(currentId)!);
-          predecessors.get(neighborId)!.push(currentId);
+        if (dist[v] === du + 1) {
+          sigma[v] += sigma[u];
         }
       }
     }
 
-    const delta = new Map<string, number>();
-    for (const node of graph.nodes) {
-      delta.set(node.id, 0);
-    }
-
-    while (stack.length > 0) {
-      const nodeId = stack.pop()!;
-      const sigmaNode = sigma.get(nodeId)!;
-      if (sigmaNode === 0) continue;
-      for (const predecessorId of predecessors.get(nodeId)!) {
-        const contribution =
-          (sigma.get(predecessorId)! / sigmaNode) * (1 + delta.get(nodeId)!);
-        delta.set(predecessorId, delta.get(predecessorId)! + contribution);
+    // Accumulation: predecessors of w are exactly the origins of in-arcs
+    // whose distance is dist[w] - 1, so no predecessor lists are stored.
+    for (let k = tail - 1; k >= 0; k--) {
+      const w = order_[k];
+      const sigmaW = sigma[w];
+      if (sigmaW === 0) continue;
+      const coefficient = (1 + delta[w]) / sigmaW;
+      for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
+        const v = csr.inOrigins[a];
+        if (dist[v] === dist[w] - 1) {
+          delta[v] += sigma[v] * coefficient;
+        }
       }
-      if (nodeId !== source.id) {
-        scores[nodeId] += delta.get(nodeId)!;
+      if (w !== s) {
+        totals[w] += delta[w];
       }
     }
   }
+
+  const scores = createEmptyScoreMap(graph);
+  for (let i = 0; i < n; i++) scores[csr.ids[i]] = totals[i];
 
   const order = graph.nodes.length;
   if (order <= 2) {
@@ -307,39 +250,42 @@ export function getPageRank(
     nodeIds.map((nodeId) => [nodeId, 1 / nodeIds.length]),
   ) as Record<string, number>;
 
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  let current = new Float64Array(n).fill(1 / n);
+  // Seed from `scores` so callers' shape (Record keyed by id) stays authoritative
+  for (let i = 0; i < n; i++) current[i] = scores[csr.ids[i]];
+
   for (let iteration = 0; iteration < maxIterations; iteration++) {
-    const nextScores = Object.fromEntries(
-      nodeIds.map((nodeId) => [nodeId, (1 - alpha) / nodeIds.length]),
-    ) as Record<string, number>;
+    const next = new Float64Array(n).fill((1 - alpha) / n);
 
     let danglingMass = 0;
-
-    for (const nodeId of nodeIds) {
-      const neighbors = getNeighborIds(graph, nodeId);
-      if (neighbors.length === 0) {
-        danglingMass += scores[nodeId];
+    for (let u = 0; u < n; u++) {
+      const arcCount = csr.outOffsets[u + 1] - csr.outOffsets[u];
+      if (arcCount === 0) {
+        danglingMass += current[u];
         continue;
       }
-      const share = scores[nodeId] / neighbors.length;
-      for (const neighborId of neighbors) {
-        nextScores[neighborId] += alpha * share;
+      const share = (alpha * current[u]) / arcCount;
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        next[csr.outTargets[a]] += share;
       }
     }
 
     if (danglingMass > 0) {
-      const share = (alpha * danglingMass) / nodeIds.length;
-      for (const nodeId of nodeIds) {
-        nextScores[nodeId] += share;
-      }
+      const share = (alpha * danglingMass) / n;
+      for (let i = 0; i < n; i++) next[i] += share;
     }
 
-    if (maxDiff(scores, nextScores) <= tolerance) {
-      scores = nextScores;
-      break;
+    let diff = 0;
+    for (let i = 0; i < n; i++) {
+      diff = Math.max(diff, Math.abs(current[i] - next[i]));
     }
-
-    scores = nextScores;
+    current = next;
+    if (diff <= tolerance) break;
   }
+
+  for (let i = 0; i < n; i++) scores[csr.ids[i]] = current[i];
 
   const total = Object.values(scores).reduce((sum, value) => sum + value, 0);
   if (total !== 0) {
@@ -367,40 +313,48 @@ export function getHITS(
 
   const maxIterations = options?.maxIterations ?? 100;
   const tolerance = options?.tolerance ?? 1e-6;
-  let hubs = Object.fromEntries(nodeIds.map((nodeId) => [nodeId, 1])) as Record<
-    string,
-    number
-  >;
-  let authorities = createEmptyScoreMap(graph);
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  let hubs = new Float64Array(n).fill(1);
+  let authorities = new Float64Array(n);
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
-    const nextAuthorities = createEmptyScoreMap(graph);
-    for (const nodeId of nodeIds) {
-      for (const predecessorId of getIncomingIds(graph, nodeId)) {
-        nextAuthorities[nodeId] += hubs[predecessorId];
+    const nextAuthorities = new Float64Array(n);
+    for (let w = 0; w < n; w++) {
+      for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
+        nextAuthorities[w] += hubs[csr.inOrigins[a]];
       }
     }
-    normalizeVector(nextAuthorities);
+    normalizeTypedVector(nextAuthorities);
 
-    const nextHubs = createEmptyScoreMap(graph);
-    for (const nodeId of nodeIds) {
-      for (const neighborId of getNeighborIds(graph, nodeId)) {
-        nextHubs[nodeId] += nextAuthorities[neighborId];
+    const nextHubs = new Float64Array(n);
+    for (let u = 0; u < n; u++) {
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        nextHubs[u] += nextAuthorities[csr.outTargets[a]];
       }
     }
-    normalizeVector(nextHubs);
+    normalizeTypedVector(nextHubs);
 
-    const hubDiff = maxDiff(hubs, nextHubs);
-    const authorityDiff = maxDiff(authorities, nextAuthorities);
+    let diff = 0;
+    for (let i = 0; i < n; i++) {
+      diff = Math.max(
+        diff,
+        Math.abs(hubs[i] - nextHubs[i]),
+        Math.abs(authorities[i] - nextAuthorities[i]),
+      );
+    }
     hubs = nextHubs;
     authorities = nextAuthorities;
-
-    if (Math.max(hubDiff, authorityDiff) <= tolerance) {
-      break;
-    }
+    if (diff <= tolerance) break;
   }
 
-  return { hubs, authorities };
+  const hubScores = createEmptyScoreMap(graph);
+  const authorityScores = createEmptyScoreMap(graph);
+  for (let i = 0; i < n; i++) {
+    hubScores[csr.ids[i]] = hubs[i];
+    authorityScores[csr.ids[i]] = authorities[i];
+  }
+  return { hubs: hubScores, authorities: authorityScores };
 }
 
 /**
@@ -420,27 +374,29 @@ export function getEigenvectorCentrality(
 
   const maxIterations = options?.maxIterations ?? 100;
   const tolerance = options?.tolerance ?? 1e-6;
-  let scores = Object.fromEntries(nodeIds.map((nodeId) => [nodeId, 1])) as Record<
-    string,
-    number
-  >;
-  normalizeVector(scores);
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  let current = new Float64Array(n).fill(1);
+  normalizeTypedVector(current);
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
-    const nextScores = createEmptyScoreMap(graph);
-    for (const nodeId of nodeIds) {
-      for (const predecessorId of getIncomingIds(graph, nodeId)) {
-        nextScores[nodeId] += scores[predecessorId];
+    const next = new Float64Array(n);
+    for (let w = 0; w < n; w++) {
+      for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
+        next[w] += current[csr.inOrigins[a]];
       }
     }
-    normalizeVector(nextScores);
+    normalizeTypedVector(next);
 
-    const diff = maxDiff(scores, nextScores);
-    scores = nextScores;
-    if (diff <= tolerance) {
-      break;
+    let diff = 0;
+    for (let i = 0; i < n; i++) {
+      diff = Math.max(diff, Math.abs(current[i] - next[i]));
     }
+    current = next;
+    if (diff <= tolerance) break;
   }
 
+  const scores = createEmptyScoreMap(graph);
+  for (let i = 0; i < n; i++) scores[csr.ids[i]] = current[i];
   return scores;
 }

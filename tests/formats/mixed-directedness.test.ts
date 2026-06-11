@@ -3,7 +3,13 @@ import { createGraph } from '../../src/graph';
 import { getEdgeMode } from '../../src/mode';
 import { toGraphML, fromGraphML } from '../../src/formats/graphml';
 import { toGEXF, fromGEXF } from '../../src/formats/gexf';
-import type { Graph } from '../../src/types';
+import { toCytoscapeJSON, fromCytoscapeJSON } from '../../src/formats/cytoscape';
+import { toD3Graph, fromD3Graph } from '../../src/formats/d3';
+import { toJGF, fromJGF } from '../../src/formats/jgf';
+import { toGML, fromGML } from '../../src/formats/gml';
+import { toELK, fromELK } from '../../src/formats/elk';
+import { toXYFlow, fromXYFlow } from '../../src/formats/xyflow';
+import type { Graph, VisualGraph } from '../../src/types';
 
 /** Directed graph whose individual edges override the default in every way. */
 function mixedGraph(): Graph {
@@ -62,6 +68,44 @@ describe.each([
     expect(getEdgeMode(out, e1)).toBe('undirected');
     expect(getEdgeMode(out, e2)).toBe('directed');
     expect(e2.mode).toBe('directed');
+  });
+});
+
+describe.each([
+  ['cytoscape', (g: Graph) => fromCytoscapeJSON(toCytoscapeJSON(g))],
+  ['d3', (g: Graph) => fromD3Graph(toD3Graph(g))],
+  ['jgf', (g: Graph) => fromJGF(toJGF(g))],
+  ['gml', (g: Graph) => fromGML(toGML(g))],
+  ['elk', (g: Graph) => fromELK(toELK(g as VisualGraph)) as Graph],
+  ['xyflow', (g: Graph) => fromXYFlow(toXYFlow(g as VisualGraph)) as Graph],
+] as const)('%s per-edge mode metadata', (_name, roundTrip) => {
+  it('preserves edge.mode overrides, including bidirectional', () => {
+    const g = mixedGraph();
+    const out = roundTrip(g);
+
+    const e1 = out.edges.find((e) => e.id === 'e1')!;
+    const e2 = out.edges.find((e) => e.id === 'e2')!;
+    const e3 = out.edges.find((e) => e.id === 'e3')!;
+
+    // No override on e1 — it keeps inheriting the graph default.
+    expect(e1.mode).toBeUndefined();
+    expect(e2.mode).toBe('undirected');
+    // Metadata formats can preserve bidirectional exactly.
+    expect(e3.mode).toBe('bidirectional');
+  });
+});
+
+describe.each([
+  ['jgf', (g: Graph) => fromJGF(toJGF(g))],
+  ['gml', (g: Graph) => fromGML(toGML(g))],
+] as const)('%s graph-level mode metadata', (_name, roundTrip) => {
+  it('preserves a bidirectional graph mode', () => {
+    const g = createGraph({
+      mode: 'bidirectional',
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+    });
+    expect(roundTrip(g).mode).toBe('bidirectional');
   });
 });
 

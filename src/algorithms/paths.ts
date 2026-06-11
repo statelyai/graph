@@ -12,11 +12,14 @@ import type {
 import { getIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
 import {
+  getEffectiveModeKind,
   getNeighborEdges,
   getNeighborEdgesAll,
+  getNeighborIds,
   MinPriorityQueue,
   resolveFrom,
 } from './shared';
+import { getCSR } from './csr';
 
 function computeShortestDistances<N, E>(
   graph: Graph<N, E>,
@@ -37,57 +40,91 @@ function computeShortestDistances<N, E>(
   dist.set(sourceId, 0);
   prev.set(sourceId, []);
 
+  const csr = getCSR(graph);
+  const source = csr.indexOf.get(sourceId);
+  if (source === undefined) {
+    // Unknown source id: nothing is reachable (matches pre-CSR behavior)
+    return { dist, prev };
+  }
+
+  const n = csr.ids.length;
+  const distArr = new Float64Array(n).fill(Infinity);
+  // Tie predecessors per node as (fromPos, edgeIndex) pairs
+  const prevArr: Array<number[]> = new Array(n);
+  distArr[source] = 0;
+  prevArr[source] = [];
+
   const useBFS = !getWeight && !graph.edges.some((edge) => edge.weight !== undefined);
 
   if (useBFS) {
-    const queue: string[] = [sourceId];
+    const queue = new Int32Array(n);
+    queue[0] = source;
+    let head = 0;
+    let tail = 1;
 
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const distance = dist.get(id)!;
+    while (head < tail) {
+      const u = queue[head++];
+      const nextDistance = distArr[u] + 1;
 
-      for (const { neighborId, edge } of getNeighborEdges(graph, id)) {
-        const nextDistance = distance + 1;
-        const existing = dist.get(neighborId);
-
-        if (existing === undefined) {
-          dist.set(neighborId, nextDistance);
-          prev.set(neighborId, [{ from: id, edge: edge as GraphEdge<E> }]);
-          queue.push(neighborId);
-        } else if (existing === nextDistance) {
-          prev.get(neighborId)!.push({ from: id, edge: edge as GraphEdge<E> });
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const v = csr.outTargets[a];
+        if (distArr[v] === Infinity) {
+          distArr[v] = nextDistance;
+          prevArr[v] = [u, csr.outEdgeIndex[a]];
+          queue[tail++] = v;
+        } else if (distArr[v] === nextDistance) {
+          prevArr[v].push(u, csr.outEdgeIndex[a]);
         }
       }
     }
   } else {
     const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-    const visited = new Set<string>();
-    const pq = new MinPriorityQueue<{ id: string; dist: number }>(
+    const visited = new Uint8Array(n);
+    const pq = new MinPriorityQueue<{ pos: number; dist: number }>(
       (a, b) => a.dist - b.dist,
     );
-    pq.push({ id: sourceId, dist: 0 });
+    pq.push({ pos: source, dist: 0 });
 
     while (pq.size > 0) {
-      const current = pq.pop()!;
-      const { id, dist: distance } = current;
+      const { pos: u, dist: distance } = pq.pop()!;
+      if (visited[u] || distance !== distArr[u]) continue;
+      visited[u] = 1;
 
-      if (visited.has(id) || distance !== dist.get(id)) continue;
-      visited.add(id);
-
-      for (const { neighborId, edge } of getNeighborEdges(graph, id)) {
-        const weight = effectiveWeight(edge as GraphEdge<E>);
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
+        const weight = effectiveWeight(edge);
+        if (weight < 0) {
+          throw new Error(
+            `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): Dijkstra requires non-negative weights. Use { algorithm: 'bellman-ford' } instead.`,
+          );
+        }
+        const v = csr.outTargets[a];
         const nextDistance = distance + weight;
-        const existing = dist.get(neighborId);
 
-        if (existing === undefined || nextDistance < existing) {
-          dist.set(neighborId, nextDistance);
-          prev.set(neighborId, [{ from: id, edge: edge as GraphEdge<E> }]);
-          pq.push({ id: neighborId, dist: nextDistance });
-        } else if (existing === nextDistance) {
-          prev.get(neighborId)!.push({ from: id, edge: edge as GraphEdge<E> });
+        if (nextDistance < distArr[v]) {
+          distArr[v] = nextDistance;
+          prevArr[v] = [u, csr.outEdgeIndex[a]];
+          pq.push({ pos: v, dist: nextDistance });
+        } else if (nextDistance === distArr[v] && distArr[v] !== Infinity) {
+          prevArr[v].push(u, csr.outEdgeIndex[a]);
         }
       }
     }
+  }
+
+  // Convert reached nodes back to the id-keyed shape reconstruction expects
+  for (let i = 0; i < n; i++) {
+    if (distArr[i] === Infinity) continue;
+    dist.set(csr.ids[i], distArr[i]);
+    const pairs = prevArr[i];
+    const predecessors: Array<{ from: string; edge: GraphEdge<E> }> = [];
+    for (let k = 0; k < pairs.length; k += 2) {
+      predecessors.push({
+        from: csr.ids[pairs[k]],
+        edge: graph.edges[pairs[k + 1]] as GraphEdge<E>,
+      });
+    }
+    prev.set(csr.ids[i], predecessors);
   }
 
   return { dist, prev };
@@ -180,6 +217,7 @@ function* reconstructPaths<N, E>(
   prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>,
   sourceNode: GraphNode<N>,
   targetId: string,
+  onPath: Set<string> = new Set(),
 ): Generator<GraphPath<N, E>> {
   if (targetId === sourceNode.id) {
     yield { source: sourceNode, steps: [] };
@@ -196,14 +234,20 @@ function* reconstructPaths<N, E>(
       ? graph.nodes[targetNi]
       : graph.nodes.find((node) => node.id === targetId)!;
 
+  // Track nodes on the current partial path — zero-weight cycles can make
+  // the `prev` structure cyclic via equal-distance tie predecessors, so
+  // never revisit a node already on the path being reconstructed.
+  onPath.add(targetId);
   for (const { from, edge } of predecessors) {
-    for (const prefix of reconstructPaths(graph, prev, sourceNode, from)) {
+    if (onPath.has(from)) continue;
+    for (const prefix of reconstructPaths(graph, prev, sourceNode, from, onPath)) {
       yield {
         source: sourceNode,
         steps: [...prefix.steps, { edge, node: targetNode }],
       };
     }
   }
+  onPath.delete(targetId);
 }
 
 export function* genShortestPaths<N, E>(
@@ -333,11 +377,9 @@ export function getStronglyConnectedComponents<N>(
     stack.push(id);
     onStack.add(id);
 
-    for (const eid of idx.outEdges.get(id) ?? []) {
-      const ai = idx.edgeById.get(eid);
-      if (ai === undefined) continue;
-      const neighborId = graph.edges[ai].targetId;
-
+    // getNeighborIds traverses non-directed (undirected/bidirectional) edges
+    // in both directions — such edges imply mutual reachability.
+    for (const neighborId of getNeighborIds(graph, id)) {
       if (!nodeIndex.has(neighborId)) {
         strongconnect(neighborId);
         lowlink.set(id, Math.min(lowlink.get(id)!, lowlink.get(neighborId)!));
@@ -373,7 +415,14 @@ export function getCycles<N, E>(graph: Graph<N, E>): GraphPath<N, E>[] {
 export function* genCycles<N, E>(
   graph: Graph<N, E>,
 ): Generator<GraphPath<N, E>> {
-  if (graph.mode !== 'directed') {
+  // Dispatch on the *effective* modes of the edges (per-edge overrides
+  // included), not just graph.mode. Genuinely mixed graphs use an exact
+  // simple-cycle search — correct, but potentially expensive on large dense
+  // mixed graphs.
+  const kind = getEffectiveModeKind(graph);
+  if (kind === 'mixed') {
+    yield* genCyclesMixed(graph);
+  } else if (kind === 'non-directed') {
     yield* genCyclesUndirected(graph);
   } else {
     yield* genCyclesDirected(graph);
@@ -444,22 +493,26 @@ function* genCyclesUndirected<N, E>(
     const startNode = graph.nodes[startNi];
     const found: GraphPath<N, E>[] = [];
 
-    function dfsFind(currentId: string, parentId: string | null): void {
+    function dfsFind(currentId: string, arrivalEdgeId: string | null): void {
       visited.add(currentId);
 
       for (const { neighborId, edge } of getNeighborEdgesAll(graph, currentId)) {
-        if (neighborId === parentId) {
-          parentId = null;
-          continue;
-        }
+        // An undirected edge cannot be re-traversed back the way we came;
+        // skipping by edge id (not parent node) keeps parallel edges distinct,
+        // so two parallel edges between the same pair form a genuine 2-cycle.
+        if (edge.id === arrivalEdgeId) continue;
 
-        if (neighborId === startId && steps.length >= 2) {
-          const innerIds = steps
-            .map((step) => step.node.id)
+        if (
+          neighborId === startId &&
+          (steps.length >= 1 || edge.sourceId === edge.targetId)
+        ) {
+          // Identify a cycle by its full set of traversed edge ids — distinct
+          // cycles can share the same vertex set (e.g. parallel chords).
+          const cycleEdgeIds = [...steps.map((step) => step.edge.id), edge.id]
             .sort()
             .join(',');
-          if (!seen.has(innerIds)) {
-            seen.add(innerIds);
+          if (!seen.has(cycleEdgeIds)) {
+            seen.add(cycleEdgeIds);
             found.push({
               source: startNode,
               steps: [...steps, { edge: edge as GraphEdge<E>, node: startNode }],
@@ -468,7 +521,7 @@ function* genCyclesUndirected<N, E>(
         } else if (allowed.has(neighborId) && !visited.has(neighborId)) {
           const ni = idx.nodeById.get(neighborId)!;
           steps.push({ edge: edge as GraphEdge<E>, node: graph.nodes[ni] });
-          dfsFind(neighborId, currentId);
+          dfsFind(neighborId, edge.id);
           steps.pop();
         }
       }
@@ -477,6 +530,67 @@ function* genCyclesUndirected<N, E>(
     }
 
     dfsFind(startId, null);
+    yield* found;
+  }
+}
+
+/**
+ * Exact simple-cycle enumeration for graphs mixing directed and non-directed
+ * edges. Traverses directed edges source→target only and non-directed edges
+ * both ways; a cycle may use each edge at most once, visits distinct nodes,
+ * and is identified by its set of traversed edge ids.
+ */
+function* genCyclesMixed<N, E>(
+  graph: Graph<N, E>,
+): Generator<GraphPath<N, E>> {
+  const idx = getIndex(graph);
+  const sortedIds = graph.nodes.map((node) => node.id).sort();
+  const seen = new Set<string>();
+
+  for (let startIndex = 0; startIndex < sortedIds.length; startIndex++) {
+    const startId = sortedIds[startIndex];
+    const allowed = new Set(sortedIds.slice(startIndex));
+    const visited = new Set<string>();
+    const steps: GraphStep<N, E>[] = [];
+    const pathEdgeIds = new Set<string>();
+    const startNi = idx.nodeById.get(startId)!;
+    const startNode = graph.nodes[startNi];
+    const found: GraphPath<N, E>[] = [];
+
+    function dfsFind(currentId: string): void {
+      visited.add(currentId);
+
+      for (const { neighborId, edge } of getNeighborEdges(graph, currentId)) {
+        if (pathEdgeIds.has(edge.id)) continue;
+
+        if (
+          neighborId === startId &&
+          (steps.length >= 1 || edge.sourceId === edge.targetId)
+        ) {
+          const cycleEdgeIds = [...steps.map((step) => step.edge.id), edge.id]
+            .sort()
+            .join(',');
+          if (!seen.has(cycleEdgeIds)) {
+            seen.add(cycleEdgeIds);
+            found.push({
+              source: startNode,
+              steps: [...steps, { edge: edge as GraphEdge<E>, node: startNode }],
+            });
+          }
+        } else if (allowed.has(neighborId) && !visited.has(neighborId)) {
+          const ni = idx.nodeById.get(neighborId)!;
+          steps.push({ edge: edge as GraphEdge<E>, node: graph.nodes[ni] });
+          pathEdgeIds.add(edge.id);
+          dfsFind(neighborId);
+          pathEdgeIds.delete(edge.id);
+          steps.pop();
+        }
+      }
+
+      visited.delete(currentId);
+    }
+
+    dfsFind(startId);
     yield* found;
   }
 }
@@ -586,6 +700,17 @@ function floydWarshallAllPaths<N, E>(
     }
   }
 
+  // A negative self-distance means a negative cycle: all-pairs shortest
+  // paths are undefined and reconstruction would loop forever.
+  for (let i = 0; i < nodeCount; i++) {
+    if (dist[i][i] < 0) {
+      throw new Error(
+        `Negative cycle detected through node "${nodeIds[i]}": all-pairs shortest paths are undefined. ` +
+          `Remove the negative cycle, or use getShortestPaths with { algorithm: 'bellman-ford' } per source to locate it.`,
+      );
+    }
+  }
+
   const results: GraphPath<N, E>[] = [];
   for (let i = 0; i < nodeCount; i++) {
     const sourceNi = idx.nodeById.get(nodeIds[i]);
@@ -660,49 +785,62 @@ export function getAStarPath<N, E>(
     return { source: graph.nodes[sourceNi], steps: [] };
   }
 
-  const gScore = new Map<string, number>();
-  const cameFrom = new Map<string, { from: string; edge: GraphEdge<E> }>();
-  const closedSet = new Set<string>();
-  const openSet = new MinPriorityQueue<{ id: string; f: number }>(
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const source = csr.indexOf.get(sourceId)!;
+  const target = csr.indexOf.get(targetId)!;
+
+  const gScore = new Float64Array(n).fill(Infinity);
+  // Predecessor as (fromPos, edgeIndex); -1 = none
+  const cameFromPos = new Int32Array(n).fill(-1);
+  const cameFromEdge = new Int32Array(n).fill(-1);
+  const closed = new Uint8Array(n);
+  const openSet = new MinPriorityQueue<{ pos: number; f: number }>(
     (a, b) => a.f - b.f,
   );
 
-  gScore.set(sourceId, 0);
-  openSet.push({ id: sourceId, f: heuristic(sourceId) });
+  gScore[source] = 0;
+  openSet.push({ pos: source, f: heuristic(sourceId) });
 
   while (openSet.size > 0) {
-    const { id: currentId } = openSet.pop()!;
-    if (closedSet.has(currentId)) continue;
+    const { pos: current } = openSet.pop()!;
+    if (closed[current]) continue;
 
-    if (currentId === targetId) {
+    if (current === target) {
       const steps: GraphStep<N, E>[] = [];
-      let current = targetId;
-      while (current !== sourceId) {
-        const previous = cameFrom.get(current)!;
-        const ni = idx.nodeById.get(current)!;
-        steps.unshift({ edge: previous.edge, node: graph.nodes[ni] });
-        current = previous.from;
+      let cursor = target;
+      while (cursor !== source) {
+        steps.unshift({
+          edge: graph.edges[cameFromEdge[cursor]] as GraphEdge<E>,
+          node: graph.nodes[cursor],
+        });
+        cursor = cameFromPos[cursor];
       }
       return { source: graph.nodes[sourceNi], steps };
     }
 
-    closedSet.add(currentId);
+    closed[current] = 1;
 
-    for (const { neighborId, edge } of getNeighborEdges(graph, currentId)) {
-      if (closedSet.has(neighborId)) continue;
+    for (let a = csr.outOffsets[current]; a < csr.outOffsets[current + 1]; a++) {
+      const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
+      const weight = getWeight(edge);
+      if (weight < 0) {
+        throw new Error(
+          `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): A* requires non-negative weights. Use getShortestPath with { algorithm: 'bellman-ford' } instead.`,
+        );
+      }
 
-      const tentativeScore =
-        (gScore.get(currentId) ?? Infinity) + getWeight(edge as GraphEdge<E>);
+      const neighbor = csr.outTargets[a];
+      if (closed[neighbor]) continue;
 
-      if (tentativeScore < (gScore.get(neighborId) ?? Infinity)) {
-        cameFrom.set(neighborId, {
-          from: currentId,
-          edge: edge as GraphEdge<E>,
-        });
-        gScore.set(neighborId, tentativeScore);
+      const tentativeScore = gScore[current] + weight;
+      if (tentativeScore < gScore[neighbor]) {
+        cameFromPos[neighbor] = current;
+        cameFromEdge[neighbor] = csr.outEdgeIndex[a];
+        gScore[neighbor] = tentativeScore;
         openSet.push({
-          id: neighborId,
-          f: tentativeScore + heuristic(neighborId),
+          pos: neighbor,
+          f: tentativeScore + heuristic(csr.ids[neighbor]),
         });
       }
     }

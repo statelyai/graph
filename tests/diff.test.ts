@@ -108,10 +108,34 @@ describe('invertDiff', () => {
     const diff = getDiff(makeGraphA(), makeGraphB());
     const inv = invertDiff(diff);
 
-    expect(inv.nodes.added).toBe(diff.nodes.removed);
-    expect(inv.nodes.removed).toBe(diff.nodes.added);
-    expect(inv.edges.added).toBe(diff.edges.removed);
-    expect(inv.edges.removed).toBe(diff.edges.added);
+    expect(inv.nodes.added).toEqual(diff.nodes.removed);
+    expect(inv.nodes.removed).toEqual(diff.nodes.added);
+    expect(inv.edges.added).toEqual(diff.edges.removed);
+    expect(inv.edges.removed).toEqual(diff.edges.added);
+  });
+
+  it('does not alias the input diff (mutating one does not corrupt the other)', () => {
+    const diff = getDiff(makeGraphA(), makeGraphB());
+    const inv = invertDiff(diff);
+
+    inv.nodes.added.push({ id: 'mutant' });
+    expect(diff.nodes.removed.some((n) => n.id === 'mutant')).toBe(false);
+  });
+
+  it('does not alias nested values (ports/style) of the input diff', () => {
+    const a = createGraph({ nodes: [{ id: 'n', ports: [{ name: 'p' }] }] });
+    const b = createGraph({
+      nodes: [{ id: 'n', ports: [{ name: 'p' }, { name: 'q' }] }],
+    });
+    const diff = getDiff(a, b);
+    const inv = invertDiff(diff);
+
+    (inv.nodes.updated[0].old.ports as any[]).push({ name: 'mutant' });
+    expect(
+      (diff.nodes.updated[0].new.ports as any[]).some(
+        (p) => p.name === 'mutant',
+      ),
+    ).toBe(false);
   });
 
   it('swaps old and new in updates', () => {

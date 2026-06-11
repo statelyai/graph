@@ -8,6 +8,7 @@ import { fromD3Graph, toD3Graph } from '../../src/formats/d3';
 import { fromELK, toELK } from '../../src/formats/elk';
 import { fromGEXF, toGEXF } from '../../src/formats/gexf';
 import { fromGML, toGML } from '../../src/formats/gml';
+import { fromGraphML, toGraphML } from '../../src/formats/graphml';
 import { fromJGF, toJGF } from '../../src/formats/jgf';
 import { fromXYFlow, toXYFlow } from '../../src/formats/xyflow';
 import type { Graph, VisualGraph } from '../../src/types';
@@ -50,6 +51,7 @@ const FULL_ROUND_TRIP_CHECKS = {
   elk: (graph: Graph) => fromELK(toELK(graph as VisualGraph)),
   gexf: (graph: Graph) => fromGEXF(toGEXF(graph)),
   gml: (graph: Graph) => fromGML(toGML(graph)),
+  graphml: (graph: Graph) => fromGraphML(toGraphML(graph)),
   jgf: (graph: Graph) => fromJGF(toJGF(graph)),
   xyflow: (graph: Graph) => fromXYFlow(toXYFlow(graph as VisualGraph)),
 } satisfies Record<string, (graph: Graph) => Graph>;
@@ -102,24 +104,42 @@ describe('format support matrix', () => {
     expect(dot?.notes.join('\n')).toContain('compass');
   });
 
-  it('marks Mermaid state syntax as full round-trip through data metadata', () => {
+  it('captures known Mermaid state round-trip limitations', () => {
     const state = getFormatSupportEntry('mermaid/state');
 
     expect(state).toBeDefined();
-    expect(state?.features.roundTrip).toBe('full');
+    // Isolated plain states and plain node labels are dropped on emit.
+    expect(state?.features.roundTrip).toBe('partial');
     expect(state?.notes.join('\n')).toContain('data');
+    expect(state?.notes.join('\n')).toContain('Isolated');
   });
 
   it('marks structured adapters with full port fidelity', () => {
-    for (const id of ['cytoscape', 'd3', 'gexf', 'gml', 'graphml', 'jgf']) {
+    for (const id of ['cytoscape', 'd3', 'gexf', 'gml', 'jgf']) {
       expect(getFormatSupportEntry(id)?.features.ports).toBe('full');
     }
   });
 
   it('captures structured hierarchy support accurately', () => {
-    for (const id of ['cytoscape', 'gexf', 'gml', 'graphml', 'jgf']) {
+    for (const id of ['cytoscape', 'gexf', 'gml', 'jgf']) {
       expect(getFormatSupportEntry(id)?.features.hierarchy).toBe('full');
     }
+  });
+
+  it('captures GraphML dual-dialect import support and remaining limitations', () => {
+    const graphml = getFormatSupportEntry('graphml');
+
+    expect(graphml).toBeDefined();
+    // Emit is own-dialect (<data> fields, flat structure); import handles
+    // both dialects (nested <graph>, native <port>, sourceport/targetport).
+    expect(graphml?.features.hierarchy).toBe('full');
+    expect(graphml?.features.ports).toBe('full');
+    expect(graphml?.features.roundTrip).toBe('full');
+    expect(graphml?.notes.join('\n')).toContain('both dialects');
+    expect(graphml?.notes.join('\n')).toContain('nested `<graph>`');
+    expect(graphml?.notes.join('\n')).toContain('`<port>`');
+    // Multi-graph documents import the first graph only.
+    expect(graphml?.notes.join('\n')).toContain('first `<graph>`');
   });
 
   it('marks lossless metadata adapters as full round-trip', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toELK, fromELK } from '../../src/formats/elk';
+import { getFormatSupportEntry } from '../../src/formats/support';
 import type { VisualGraph } from '../../src/types';
 import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
@@ -37,6 +38,40 @@ const compoundGraph: VisualGraph = {
   ],
   data: undefined,
 };
+
+const sharedPortNameGraph: VisualGraph = {
+  id: 'ports',
+  mode: 'directed',
+  initialNodeId: null,
+  direction: 'down',
+  nodes: [
+    {
+      type: 'node', id: 'a', parentId: null, initialNodeId: null, label: 'A', data: undefined, x: 0, y: 0, width: 100, height: 50,
+      ports: [{ name: 'p', direction: 'out', data: undefined, x: 100, y: 25, width: 8, height: 8 }],
+    },
+    {
+      type: 'node', id: 'b', parentId: null, initialNodeId: null, label: 'B', data: undefined, x: 200, y: 0, width: 100, height: 50,
+      ports: [{ name: 'p', direction: 'in', data: undefined, x: 0, y: 25, width: 8, height: 8 }],
+    },
+  ],
+  edges: [
+    { type: 'edge', id: 'e1', sourceId: 'a', targetId: 'b', sourcePort: 'p', targetPort: 'p', label: '', data: undefined, x: 0, y: 0, width: 0, height: 0 },
+  ],
+  data: undefined,
+};
+
+/** Removes all statelyai metadata blobs, simulating external ELK input. */
+function stripMetadata(elkNode: any): void {
+  if (elkNode.layoutOptions) {
+    delete elkNode.layoutOptions['statelyai.metadata'];
+    if (Object.keys(elkNode.layoutOptions).length === 0) {
+      delete elkNode.layoutOptions;
+    }
+  }
+  for (const child of elkNode.children ?? []) stripMetadata(child);
+  for (const port of elkNode.ports ?? []) stripMetadata(port);
+  for (const edge of elkNode.edges ?? []) stripMetadata(edge);
+}
 
 describe('ELK', () => {
   describe('toELK', () => {
@@ -174,6 +209,136 @@ describe('ELK', () => {
       expect(node.y).toBe(0);
       expect(node.width).toBe(0);
       expect(node.height).toBe(0);
+    });
+  });
+
+  describe('ports', () => {
+    it('emits globally-unique port ids qualified by node id', () => {
+      const elk = toELK(sharedPortNameGraph);
+      const a = elk.children!.find((n) => n.id === 'a')!;
+      const b = elk.children!.find((n) => n.id === 'b')!;
+      expect(a.ports![0].id).toBe('a__p');
+      expect(b.ports![0].id).toBe('b__p');
+      // All ids in the document are unique
+      const ids = [
+        elk.id,
+        ...elk.children!.map((n) => n.id),
+        ...elk.children!.flatMap((n) => (n.ports ?? []).map((p) => p.id)),
+        ...elk.edges!.map((e) => e.id),
+      ];
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('references qualified port ids in edge sources/targets', () => {
+      const elk = toELK(sharedPortNameGraph);
+      expect(elk.edges![0].sources).toEqual(['a__p']);
+      expect(elk.edges![0].targets).toEqual(['b__p']);
+    });
+
+    it('round-trips port names when two nodes share a port name', () => {
+      const parsed = fromELK(toELK(sharedPortNameGraph));
+      const a = parsed.nodes.find((n) => n.id === 'a')!;
+      const b = parsed.nodes.find((n) => n.id === 'b')!;
+      expect(a.ports![0].name).toBe('p');
+      expect(b.ports![0].name).toBe('p');
+      expect(parsed.edges[0]).toMatchObject({
+        sourceId: 'a',
+        targetId: 'b',
+        sourcePort: 'p',
+        targetPort: 'p',
+      });
+    });
+
+    it('resolves correct endpoints for shared port names when metadata is stripped', () => {
+      const elk = toELK(sharedPortNameGraph);
+      stripMetadata(elk);
+      const parsed = fromELK(elk);
+      expect(parsed.edges).toHaveLength(1);
+      expect(parsed.edges[0].sourceId).toBe('a');
+      expect(parsed.edges[0].targetId).toBe('b');
+      // Port references stay consistent with the parsed node port names
+      const a = parsed.nodes.find((n) => n.id === 'a')!;
+      const b = parsed.nodes.find((n) => n.id === 'b')!;
+      expect(a.ports!.map((p) => p.name)).toContain(parsed.edges[0].sourcePort);
+      expect(b.ports!.map((p) => p.name)).toContain(parsed.edges[0].targetPort);
+    });
+
+    it('resolves correct endpoints for external ELK input with ports and no metadata', () => {
+      const parsed = fromELK({
+        id: 'root',
+        children: [
+          { id: 'a', ports: [{ id: 'a_out' }] },
+          { id: 'b', ports: [{ id: 'b_in' }] },
+        ],
+        edges: [{ id: 'e1', sources: ['a_out'], targets: ['b_in'] }],
+      });
+      const a = parsed.nodes.find((n) => n.id === 'a')!;
+      expect(a.ports![0].name).toBe('a_out');
+      expect(parsed.edges[0]).toMatchObject({
+        sourceId: 'a',
+        targetId: 'b',
+        sourcePort: 'a_out',
+        targetPort: 'b_in',
+      });
+    });
+
+    it('documents document-unique port ids in the support matrix', () => {
+      const elk = getFormatSupportEntry('elk');
+      expect(elk?.features.ports).toBe('full');
+      const notes = elk?.notes.join('\n') ?? '';
+      expect(notes).toContain('document-unique');
+      expect(notes).not.toContain('mis-resolve');
+    });
+
+    it('still parses old self-produced format (bare port ids + metadata blobs)', () => {
+      // Output shape produced before port ids were node-qualified.
+      const oldFormat = {
+        id: 'old',
+        layoutOptions: {
+          'elk.direction': 'DOWN',
+          'statelyai.metadata': JSON.stringify({
+            graph: { id: 'old', mode: 'directed', initialNodeId: null, direction: 'down' },
+          }),
+        },
+        children: [
+          {
+            id: 'a',
+            x: 0, y: 0, width: 100, height: 50,
+            ports: [
+              {
+                id: 'out',
+                x: 100, y: 25, width: 8, height: 8,
+                layoutOptions: {
+                  'org.eclipse.elk.port.side': 'EAST',
+                  'statelyai.metadata': JSON.stringify({ port: {} }),
+                },
+              },
+            ],
+          },
+          { id: 'b', x: 200, y: 0, width: 100, height: 50 },
+        ],
+        edges: [
+          {
+            id: 'e1',
+            sources: ['out'],
+            targets: ['b'],
+            layoutOptions: {
+              'statelyai.metadata': JSON.stringify({
+                edge: { sourceId: 'a', targetId: 'b', sourcePort: 'out', label: '' },
+              }),
+            },
+          },
+        ],
+      };
+      const parsed = fromELK(oldFormat);
+      const a = parsed.nodes.find((n) => n.id === 'a')!;
+      expect(a.ports![0].name).toBe('out');
+      expect(parsed.edges[0]).toMatchObject({
+        sourceId: 'a',
+        targetId: 'b',
+        sourcePort: 'out',
+      });
+      expect(parsed.edges[0].targetPort).toBeUndefined();
     });
   });
 

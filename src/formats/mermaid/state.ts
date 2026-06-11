@@ -37,6 +37,26 @@ export type MermaidStateGraph = Graph<StateNodeData, StateEdgeData, StateGraphDa
 type StateNode = GraphNode<StateNodeData>;
 type StateEdge = GraphEdge<StateEdgeData>;
 
+/**
+ * Whether a node is a parallel-region marker. Region nodes are generated with
+ * the exact id `${parentId}_region_${integer}`, so a node only counts when its
+ * id matches that structure for its *actual* parent and that parent is a
+ * parallel state. User ids that merely contain `_region_` (e.g.
+ * `foo_region_bar`) are ordinary states.
+ */
+function isParallelRegionNode(
+  node: StateNode | undefined,
+  nodesById: Map<string, StateNode>,
+): boolean {
+  if (!node || !node.parentId) return false;
+  const parent = nodesById.get(node.parentId);
+  if (parent?.data?.stateType !== 'parallel') return false;
+  const prefix = `${node.parentId}_region_`;
+  return (
+    node.id.startsWith(prefix) && /^\d+$/.test(node.id.slice(prefix.length))
+  );
+}
+
 // --- Parser ---
 
 /**
@@ -71,6 +91,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
   let endCounter = 0;
 
   let graphDirection: MermaidStateGraph['direction'] | undefined;
+  let initialNodeId: string | null = null;
   const classDefs: Record<string, Record<string, string>> = {};
   const classAssignments: Record<string, string[]> = {};
 
@@ -158,6 +179,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       const stateId = compositeStateAsMatch[2];
       const node = ensureNode(stateId);
       node.data.description = description;
+      node.label = description;
       parentStack.push(stateId);
       continue;
     }
@@ -182,6 +204,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       const stateId = stateAsMatch[2];
       const node = ensureNode(stateId);
       node.data.description = description;
+      node.label = description;
       continue;
     }
 
@@ -190,7 +213,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       if (parentStack.length > 1) {
         // If we're inside a region, pop the region first
         const top = parentStack[parentStack.length - 1];
-        if (top && top.includes('_region_')) {
+        if (top && isParallelRegionNode(nodeMap.get(top), nodeMap)) {
           parentStack.pop();
         }
         parentStack.pop();
@@ -204,7 +227,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
         // Find the composite parent (skip region nodes)
         for (let s = parentStack.length - 1; s >= 0; s--) {
           const id = parentStack[s];
-          if (id && !id.includes('_region_')) return id;
+          if (id && !isParallelRegionNode(nodeMap.get(id), nodeMap)) return id;
         }
         return null;
       })();
@@ -257,7 +280,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
         } else {
           // Subsequent `--`: pop current region, create next
           const top = parentStack[parentStack.length - 1];
-          if (top && top.includes('_region_')) {
+          if (top && isParallelRegionNode(nodeMap.get(top), nodeMap)) {
             parentStack.pop();
           }
 
@@ -325,6 +348,8 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       const label = transMatch[5]?.trim() ?? '';
 
       // Handle [*]
+      const isTopLevelStart =
+        sourceId === '[*]' && parentStack[parentStack.length - 1] === null;
       if (sourceId === '[*]') {
         sourceId = resolveStarNode('source');
       } else {
@@ -342,6 +367,9 @@ export function fromMermaidState(input: string): MermaidStateGraph {
         if (targetClass) {
           if (!classAssignments[targetId]) classAssignments[targetId] = [];
           classAssignments[targetId].push(targetClass);
+        }
+        if (isTopLevelStart && initialNodeId === null) {
+          initialNodeId = targetId;
         }
       }
 
@@ -430,7 +458,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
   return {
     id: '',
     mode: 'directed',
-    initialNodeId: null,
+    initialNodeId,
     nodes: Array.from(nodeMap.values()),
     edges,
     data: {
@@ -459,6 +487,10 @@ export function toMermaidState(graph: MermaidStateGraph): string {
     if (mDir) lines.push(`    direction ${mDir}`);
   }
 
+  const nodesById = new Map<string, StateNode>(
+    graph.nodes.map((node) => [node.id, node]),
+  );
+
   // Build children map
   const childrenMap = new Map<string | null, StateNode[]>();
   for (const node of graph.nodes) {
@@ -472,6 +504,13 @@ export function toMermaidState(graph: MermaidStateGraph): string {
     if (childrenMap.has(node.id)) isParent.add(node.id);
   }
 
+  const referencedByEdge = new Set<string>();
+  for (const edge of graph.edges) {
+    referencedByEdge.add(edge.sourceId);
+    referencedByEdge.add(edge.targetId);
+  }
+  if (graph.initialNodeId) referencedByEdge.add(graph.initialNodeId);
+
   function writeNodes(parentId: string | null, indent: string) {
     const children = childrenMap.get(parentId) ?? [];
     for (const node of children) {
@@ -479,15 +518,23 @@ export function toMermaidState(graph: MermaidStateGraph): string {
       if (node.data?.isStart || node.data?.isEnd) continue;
 
       // Skip region nodes (emitted by their parallel parent)
-      if (node.id.includes('_region_')) continue;
+      if (isParallelRegionNode(node, nodesById)) continue;
 
+      // Description is authoritative; a distinct label falls back to the
+      // description form so it is not dropped on emit.
+      const description =
+        node.data?.description ??
+        (node.label && node.label !== node.id ? node.label : undefined);
+
+      let declared = false;
       if (node.data?.stateType && node.data.stateType !== 'parallel') {
         lines.push(`${indent}state ${node.id} <<${node.data.stateType}>>`);
+        declared = true;
       }
 
       if (isParent.has(node.id)) {
-        const stateDecl = node.data?.description
-          ? `state "${escapeMermaidLabel(node.data.description)}" as ${node.id} {`
+        const stateDecl = description
+          ? `state "${escapeMermaidLabel(description)}" as ${node.id} {`
           : `state ${node.id} {`;
         lines.push(`${indent}${stateDecl}`);
         if (node.data?.direction) {
@@ -496,8 +543,8 @@ export function toMermaidState(graph: MermaidStateGraph): string {
         }
         if (node.data?.stateType === 'parallel') {
           // Emit region children separated by --
-          const regions = (childrenMap.get(node.id) ?? []).filter(
-            (r) => r.id.includes('_region_'),
+          const regions = (childrenMap.get(node.id) ?? []).filter((r) =>
+            isParallelRegionNode(r, nodesById),
           );
           for (let ri = 0; ri < regions.length; ri++) {
             if (ri > 0) lines.push(`${indent}    --`);
@@ -507,10 +554,17 @@ export function toMermaidState(graph: MermaidStateGraph): string {
           writeNodes(node.id, indent + '    ');
         }
         lines.push(`${indent}}`);
-      } else if (node.data?.description) {
+        declared = true;
+      } else if (description) {
         lines.push(
-          `${indent}state "${escapeMermaidLabel(node.data.description)}" as ${node.id}`,
+          `${indent}state "${escapeMermaidLabel(description)}" as ${node.id}`,
         );
+        declared = true;
+      }
+
+      // Isolated plain states would otherwise never appear in the output
+      if (!declared && !referencedByEdge.has(node.id)) {
+        lines.push(`${indent}${node.id}`);
       }
 
       // Emit notes
@@ -533,6 +587,15 @@ export function toMermaidState(graph: MermaidStateGraph): string {
   }
 
   writeNodes(null, '    ');
+
+  // Synthesize a top-level initial transition from graph.initialNodeId,
+  // unless a top-level start pseudo-node already emits one via its edges
+  const hasTopLevelStart = graph.nodes.some(
+    (n) => n.data?.isStart && (n.parentId ?? null) === null,
+  );
+  if (graph.initialNodeId && !hasTopLevelStart) {
+    lines.push(`    [*] --> ${graph.initialNodeId}`);
+  }
 
   // Emit transitions
   for (const edge of graph.edges) {

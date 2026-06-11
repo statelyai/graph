@@ -48,6 +48,8 @@ export interface JGFGraph {
  */
 export function toJGF(graph: Graph): JGFGraph {
   const metadata: Record<string, any> = {};
+  // JGF `directed` is boolean; preserve bidirectional via metadata.
+  if (graph.mode === 'bidirectional') metadata.mode = graph.mode;
   if (graph.initialNodeId) metadata.initialNodeId = graph.initialNodeId;
   if (graph.data !== undefined) metadata.data = graph.data;
   if (graph.direction) metadata.direction = graph.direction;
@@ -79,6 +81,7 @@ export function toJGF(graph: Graph): JGFGraph {
       }),
       edges: graph.edges.map((e) => {
         const meta: Record<string, any> = {};
+        if (e.mode) meta.mode = e.mode;
         if (e.data !== undefined) meta.data = e.data;
         if (e.weight !== undefined) meta.weight = e.weight;
         if (e.x !== undefined) meta.x = e.x;
@@ -133,7 +136,8 @@ export function fromJGF(jgf: JGFGraph): Graph {
   }
   return {
     id: g.id ?? '',
-    mode: g.directed === false ? 'undirected' : 'directed',
+    mode:
+      g.metadata?.mode ?? (g.directed === false ? 'undirected' : 'directed'),
     initialNodeId: g.metadata?.initialNodeId ?? null,
     data: g.metadata?.data,
     ...(g.metadata?.direction && { direction: g.metadata.direction }),
@@ -160,6 +164,7 @@ export function fromJGF(jgf: JGFGraph): Graph {
       sourceId: e.source,
       targetId: e.target,
       label: e.label ?? '',
+      ...(e.metadata?.mode && { mode: e.metadata.mode }),
       data: e.metadata?.data,
       ...(e.metadata?.weight !== undefined && { weight: e.metadata.weight }),
       ...(e.metadata?.x !== undefined && { x: e.metadata.x }),

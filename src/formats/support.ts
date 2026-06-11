@@ -57,6 +57,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     notes: [
       'Uses Cytoscape JSON element data with graph, node, and edge metadata stored in element data.',
       'Ports round-trip through element data as `ports`, `sourcePort`, and `targetPort`.',
+      'Per-edge `mode` overrides (including bidirectional) round-trip through element data.',
     ],
   },
   {
@@ -75,6 +76,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     notes: [
       'Targets force-graph structures, but graph, node, and edge metadata can be preserved on the loose JSON shape.',
       'Ports round-trip through node/link objects.',
+      'Per-edge `mode` overrides (including bidirectional) round-trip through link objects.',
     ],
   },
   {
@@ -95,6 +97,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       'sql_table/class fields map to ports; node.field connections round-trip as sourcePort/targetPort.',
       'Per-edge connectors (->, <-, --, <->) map to edge.mode; the authored glyph is preserved in _d2.arrow.',
       'vars/classes/imports are preserved on graph data; comments attach to the following entity (best-effort).',
+      'Only flat key/value vars round-trip; nested sub-blocks inside vars are dropped.',
       'd2 has no native edge weight.',
     ],
   },
@@ -146,6 +149,8 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     },
     notes: [
       'ELK-native layout fields are preserved directly; graph, node, port, and edge metadata round-trip through reserved layout options.',
+      'Per-edge `mode` overrides (including bidirectional) round-trip through reserved layout options.',
+      'Port ids are emitted as `nodeId__portName` so they are document-unique as ELK requires; original port names round-trip through reserved layout options.',
     ],
   },
   {
@@ -183,6 +188,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     notes: [
       'GML stores graph, node, and edge metadata directly or as JSON-stringified fields.',
       'Ports round-trip through JSON-stringified node metadata and edge fields.',
+      'Per-edge `mode` overrides and graph-level bidirectional mode round-trip through a dialect `mode` key (GML `directed` is binary).',
     ],
   },
   {
@@ -196,11 +202,13 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       visual: 'partial',
       style: 'partial',
       weight: 'full',
-      roundTrip: 'partial',
+      roundTrip: 'full',
     },
     notes: [
-      'GraphML attribute fidelity is good, but not every extension is represented.',
-      'Ports round-trip through node and edge `<data>` fields.',
+      'Emit is own-dialect: a flat structure with hierarchy, ports, and metadata in `<data>` fields; the emitter does not write nested `<graph>` or native `<port>` elements.',
+      'Import handles both dialects: own-dialect `<data>` fields plus standard nested `<graph>` hierarchy, native `<port>` elements (imported as direction `inout`), and `sourceport`/`targetport` edge attributes. `<data>` fields take precedence.',
+      'Multi-graph documents import the first `<graph>` element only.',
+      'Vendor extensions (e.g. yEd visual attributes) are not represented.',
       'Per-edge directedness round-trips via the `directed` edge attribute; bidirectional maps to directed.',
     ],
   },
@@ -220,6 +228,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
     notes: [
       'JGF preserves graph, node, and edge metadata via `metadata` objects.',
       'Ports round-trip through node and edge metadata.',
+      'Per-edge `mode` overrides and graph-level bidirectional mode round-trip through `metadata` (JGF `directed` is binary).',
     ],
   },
   {
@@ -251,7 +260,7 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       roundTrip: 'full',
     },
     notes: [
-      'xyflow-native fields are preserved directly; graph, node, edge, style, weight, and port metadata round-trip through reserved data fields.',
+      'xyflow-native fields are preserved directly; graph, node, edge, style, weight, port, and per-edge `mode` metadata round-trip through reserved data fields.',
     ],
   },
   {
@@ -373,10 +382,12 @@ export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
       visual: 'partial',
       style: 'partial',
       weight: 'none',
-      roundTrip: 'full',
+      roundTrip: 'partial',
     },
     notes: [
       'State-specific syntax such as notes, classes, descriptions, directions, hierarchy, and parallel regions round-trips through node and graph data.',
+      'Isolated plain states emit as bare state lines, and node labels emit via the `state "label" as id` description form — a distinct label is lost when a description is also present.',
+      '`graph.initialNodeId` round-trips as a top-level `[*] -->` transition.',
     ],
   },
 ];

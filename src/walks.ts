@@ -1,6 +1,6 @@
-import { getOutEdges } from './queries';
+import { getOutEdges, getInEdges } from './queries';
 import { getNode } from './graph';
-import { getShortestPath } from './algorithms';
+import { getEdgeMode } from './mode';
 import type {
   Graph,
   GraphEdge,
@@ -45,10 +45,34 @@ function resolveFrom(graph: Graph, from?: string): string {
   );
 }
 
+// --- Mode-aware traversal ---
+
+/**
+ * Edges traversable from a node, with the node reached by taking each one.
+ * Out-edges always; in-edges too when their effective mode is not 'directed'.
+ */
+function getTraversableEdges<N, E>(
+  graph: Graph<N, E>,
+  nodeId: string,
+): { edge: GraphEdge<E>; nextId: string }[] {
+  const result: { edge: GraphEdge<E>; nextId: string }[] = [];
+  for (const edge of getOutEdges(graph, nodeId)) {
+    result.push({ edge, nextId: edge.targetId });
+  }
+  for (const edge of getInEdges(graph, nodeId)) {
+    // Self-loops already covered by the out-edge loop above
+    if (edge.sourceId !== edge.targetId && getEdgeMode(graph, edge) !== 'directed') {
+      result.push({ edge, nextId: edge.sourceId });
+    }
+  }
+  return result;
+}
+
 // --- Walk generators ---
 
 /**
- * Random walk. At each node, picks a uniformly random outgoing edge.
+ * Random walk. At each node, picks a uniformly random traversable edge
+ * (outgoing edges, plus non-directed edges both ways).
  * Yields steps indefinitely (may revisit nodes) until a sink node is reached.
  */
 export function* genRandomWalk<N, E>(
@@ -65,14 +89,14 @@ export function* genRandomWalk<N, E>(
   };
 
   while (true) {
-    let edges = getOutEdges(graph, currentId);
+    let traversable = getTraversableEdges(graph, currentId);
     if (options?.filter) {
-      edges = edges.filter((e) => options.filter!(e, ctx));
+      traversable = traversable.filter(({ edge }) => options.filter!(edge, ctx));
     }
-    if (edges.length === 0) return;
+    if (traversable.length === 0) return;
 
-    const edge = edges[Math.floor(rng() * edges.length)];
-    const node = getNode(graph, edge.targetId)!;
+    const { edge, nextId } = traversable[Math.floor(rng() * traversable.length)];
+    const node = getNode(graph, nextId)!;
 
     const step: GraphStep<N, E> = { edge, node };
     currentId = node.id;
@@ -104,32 +128,32 @@ export function* genWeightedRandomWalk<N, E>(
   };
 
   while (true) {
-    let edges = getOutEdges(graph, currentId);
+    let traversable = getTraversableEdges(graph, currentId);
     if (options?.filter) {
-      edges = edges.filter((e) => options.filter!(e, ctx));
+      traversable = traversable.filter(({ edge }) => options.filter!(edge, ctx));
     }
-    if (edges.length === 0) return;
+    if (traversable.length === 0) return;
 
-    const weights = edges.map((e) => Math.max(0, getWeight(e)));
+    const weights = traversable.map(({ edge }) => Math.max(0, getWeight(edge)));
     const total = weights.reduce((a, b) => a + b, 0);
     if (total === 0) return;
 
     let r = rng() * total;
-    let chosen = edges[0];
-    for (let i = 0; i < edges.length; i++) {
+    let chosen = traversable[0];
+    for (let i = 0; i < traversable.length; i++) {
       r -= weights[i];
       if (r <= 0) {
-        chosen = edges[i];
+        chosen = traversable[i];
         break;
       }
     }
 
-    const node = getNode(graph, chosen.targetId)!;
-    const step: GraphStep<N, E> = { edge: chosen, node };
+    const node = getNode(graph, chosen.nextId)!;
+    const step: GraphStep<N, E> = { edge: chosen.edge, node };
     currentId = node.id;
     ctx.currentNodeId = currentId;
     ctx.visitedNodes.add(currentId);
-    ctx.visitedEdges.add(chosen.id);
+    ctx.visitedEdges.add(chosen.edge.id);
     ctx.stepCount++;
 
     options?.onStep?.(step, ctx);
@@ -139,8 +163,9 @@ export function* genWeightedRandomWalk<N, E>(
 
 /**
  * Quick random walk targeting unvisited edges.
- * If unvisited outgoing edges exist, picks one randomly.
- * Otherwise, finds shortest path to a node with unvisited outgoing edges.
+ * If unvisited traversable edges exist at the current node, picks one randomly.
+ * Otherwise, walks the fewest-hop path (BFS, honoring `filter` and edge modes)
+ * to the nearest unvisited edge. Ends when no unvisited edge is reachable.
  */
 export function* genQuickRandomWalk<N, E>(
   graph: Graph<N, E>,
@@ -157,17 +182,22 @@ export function* genQuickRandomWalk<N, E>(
     stepCount: 0,
   };
 
-  while (visitedEdges.size < allEdgeIds.size) {
-    let edges = getOutEdges(graph, currentId);
+  const allowedEdges = (nodeId: string) => {
+    let traversable = getTraversableEdges(graph, nodeId);
     if (options?.filter) {
-      edges = edges.filter((e) => options.filter!(e, ctx));
+      traversable = traversable.filter(({ edge }) => options.filter!(edge, ctx));
     }
+    return traversable;
+  };
 
-    const unvisited = edges.filter((e) => !visitedEdges.has(e.id));
+  while (visitedEdges.size < allEdgeIds.size) {
+    const unvisited = allowedEdges(currentId).filter(
+      ({ edge }) => !visitedEdges.has(edge.id),
+    );
 
     if (unvisited.length > 0) {
-      const edge = unvisited[Math.floor(rng() * unvisited.length)];
-      const node = getNode(graph, edge.targetId)!;
+      const { edge, nextId } = unvisited[Math.floor(rng() * unvisited.length)];
+      const node = getNode(graph, nextId)!;
       const step: GraphStep<N, E> = { edge, node };
       currentId = node.id;
       ctx.currentNodeId = currentId;
@@ -177,25 +207,47 @@ export function* genQuickRandomWalk<N, E>(
       options?.onStep?.(step, ctx);
       yield step;
     } else {
-      // Find a node with unvisited outgoing edges and path to it
-      let targetNodeId: string | undefined;
-      for (const n of graph.nodes) {
-        const outEdges = getOutEdges(graph, n.id);
-        if (outEdges.some((e) => !visitedEdges.has(e.id))) {
-          targetNodeId = n.id;
-          break;
+      // BFS to the nearest unvisited (filter-allowed) edge
+      const prevStep = new Map<string, { edge: GraphEdge<E>; fromId: string }>();
+      const seen = new Set([currentId]);
+      const queue = [currentId];
+      let found:
+        | { atId: string; edge: GraphEdge<E>; nextId: string }
+        | undefined;
+      while (queue.length > 0 && !found) {
+        const id = queue.shift()!;
+        for (const t of allowedEdges(id)) {
+          if (!visitedEdges.has(t.edge.id)) {
+            found = { atId: id, edge: t.edge, nextId: t.nextId };
+            break;
+          }
+          if (!seen.has(t.nextId)) {
+            seen.add(t.nextId);
+            prevStep.set(t.nextId, { edge: t.edge, fromId: id });
+            queue.push(t.nextId);
+          }
         }
       }
-      if (!targetNodeId) return;
+      if (!found) return; // no unvisited edge reachable under the filter
 
-      const path = getShortestPath(graph, { from: currentId, to: targetNodeId });
-      if (!path || path.steps.length === 0) return;
+      // Reconstruct path currentId → found.atId, then take the unvisited edge
+      const pathSteps: { edge: GraphEdge<E>; nextId: string }[] = [
+        { edge: found.edge, nextId: found.nextId },
+      ];
+      let cursor = found.atId;
+      while (cursor !== currentId) {
+        const p = prevStep.get(cursor)!;
+        pathSteps.unshift({ edge: p.edge, nextId: cursor });
+        cursor = p.fromId;
+      }
 
-      for (const step of path.steps) {
-        currentId = step.node.id;
+      for (const { edge, nextId } of pathSteps) {
+        const node = getNode(graph, nextId)!;
+        const step: GraphStep<N, E> = { edge, node };
+        currentId = nextId;
         ctx.currentNodeId = currentId;
         ctx.visitedNodes.add(currentId);
-        visitedEdges.add(step.edge.id);
+        visitedEdges.add(edge.id);
         ctx.stepCount++;
         options?.onStep?.(step, ctx);
         yield step;
@@ -207,6 +259,8 @@ export function* genQuickRandomWalk<N, E>(
 /**
  * Walk a predefined sequence of edge IDs.
  * Validates each edge exists and connects from the current position.
+ * Edges whose effective mode is not `'directed'` may be traversed
+ * target → source as well.
  */
 export function* genPredefinedWalk<N, E>(
   graph: Graph<N, E>,
@@ -220,12 +274,20 @@ export function* genPredefinedWalk<N, E>(
     if (!edge) {
       throw new Error(`Edge "${edgeId}" not found in graph.`);
     }
-    if (edge.sourceId !== currentId) {
+    let nextId: string;
+    if (edge.sourceId === currentId) {
+      nextId = edge.targetId;
+    } else if (
+      edge.targetId === currentId &&
+      getEdgeMode(graph, edge) !== 'directed'
+    ) {
+      nextId = edge.sourceId;
+    } else {
       throw new Error(
-        `Edge "${edgeId}" starts at "${edge.sourceId}" but current position is "${currentId}".`,
+        `Edge "${edgeId}" connects "${edge.sourceId}" → "${edge.targetId}" but current position is "${currentId}".`,
       );
     }
-    const node = getNode(graph, edge.targetId)!;
+    const node = getNode(graph, nextId)!;
     currentId = node.id;
     yield { edge, node };
   }
@@ -287,6 +349,8 @@ export function* takeUntilNodeCoverage<N, E>(
   const startId = options?.from ?? graph.initialNodeId ?? graph.nodes[0]?.id;
   const visited = new Set<string>(startId ? [startId] : []);
 
+  if (visited.size >= target) return; // already covered before any step
+
   for (const step of gen) {
     visited.add(step.node.id);
     yield step;
@@ -305,6 +369,8 @@ export function* takeUntilEdgeCoverage<N, E>(
   const totalEdges = graph.edges.length;
   const target = Math.ceil(coverage * totalEdges);
   const visited = new Set<string>();
+
+  if (target <= 0) return; // nothing to cover
 
   for (const step of gen) {
     visited.add(step.edge.id);

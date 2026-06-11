@@ -4,15 +4,43 @@ import { createFormatConverter } from '../converter';
 
 // --- toDOT ---
 
+/** DOT reserved keywords — must be quoted when used as identifiers. */
+const DOT_KEYWORDS = new Set([
+  'node',
+  'edge',
+  'graph',
+  'digraph',
+  'subgraph',
+  'strict',
+]);
+
 /** Escape a DOT identifier */
 function escapeId(id: string): string {
-  if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) return id;
+  if (
+    /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id) &&
+    !DOT_KEYWORDS.has(id.toLowerCase())
+  ) {
+    return id;
+  }
   return `"${id.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 /** Escape a DOT label string */
 function escapeLabel(label: string): string {
-  return label.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return label
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    // A raw newline inside a quoted string is invalid DOT; \n is the DOT
+    // line-break escape.
+    .replace(/\n/g, '\\n');
+}
+
+/**
+ * Invert {@link escapeLabel}. dotparser unescapes `\"` itself but passes
+ * `\\` and `\n` through verbatim.
+ */
+function unescapeLabel(label: string): string {
+  return label.replace(/\\(\\|n)/g, (_, ch) => (ch === 'n' ? '\n' : '\\'));
 }
 
 function formatEndpoint(id: string, port?: string): string {
@@ -149,7 +177,7 @@ function nodeFromAttrs(
   parentId: string | null,
 ): GraphNode {
   const merged = { ...defaults, ...attrs };
-  const label = merged['label'] ?? '';
+  const label = unescapeLabel(merged['label'] ?? '');
   const rawShape = merged['shape'];
   const shape = rawShape ? (DOT_TO_SHAPE[rawShape] ?? rawShape) : undefined;
   const color = merged['fillcolor'] ?? merged['color'] ?? undefined;
@@ -328,7 +356,7 @@ export function fromDOT(dot: string): Graph {
                   id: `e${edgeIdx++}`,
                   sourceId: source.id,
                   targetId: target.id,
-                  label: mergedEdgeAttrs['label'] ?? '',
+                  label: unescapeLabel(mergedEdgeAttrs['label'] ?? ''),
                   data: undefined as any,
                   ...(source.port && { sourcePort: source.port }),
                   ...(target.port && { targetPort: target.port }),
@@ -350,7 +378,7 @@ export function fromDOT(dot: string): Graph {
           for (const child of stmt.children) {
             if (child.type === 'attr_stmt' && child.target === 'graph') {
               const ga = attrsToMap(child.attr_list);
-              if (ga['label']) subLabel = ga['label'];
+              if (ga['label']) subLabel = unescapeLabel(ga['label']);
             }
           }
           const subNode: GraphNode = {

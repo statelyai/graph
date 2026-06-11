@@ -86,6 +86,14 @@ const roots = getSources(graph); // nodes with no incoming edges
 
 Batch operations (`addEntities`, `deleteEntities`, `updateEntities`) let you apply multiple changes at once.
 
+`updateNode`/`updateEdge` accept any config field. Optional fields (position, size, `shape`, `color`, `style`, edge `weight`/`mode`/ports) can be **unset** by passing `null`; `undefined` leaves them unchanged:
+
+```ts
+updateNode(graph, 'a', { x: 100, color: 'red' }); // set
+updateEdge(graph, 'e1', { weight: 2, mode: 'undirected' });
+updateNode(graph, 'a', { color: null }); // unset
+```
+
 ## Hierarchy
 
 Nodes support parent-child relationships for compound/nested graphs. Query children, ancestors, descendants, depth, and least common ancestor. Use `flatten()` to decompose into a flat leaf-node graph.
@@ -149,7 +157,18 @@ getEdgesByPort(graph, 'render', 'input'); // [e1]
 
 <!-- validation helpers exported from src/schemas.ts -->
 
-Use the `@statelyai/graph/schemas` subpath when you want runtime validation or JSON Schema generation. `validateGraph()` combines shape checks with graph invariants such as duplicate ids, dangling edges, missing parents, missing initial nodes, duplicate ports, invalid port references, and parent cycles.
+For structural invariant checking without zod, the core export `getGraphIssues(graph)` returns machine-readable issues (duplicate ids, dangling edge endpoints, missing parents, parent cycles, missing initial nodes, duplicate or invalid port references) — the recommended gate for untrusted or imported graphs:
+
+```ts
+import { getGraphIssues } from '@statelyai/graph';
+
+const issues = getGraphIssues(importedGraph);
+if (issues.length > 0) {
+  console.error(issues.map((issue) => issue.message));
+}
+```
+
+Use the `@statelyai/graph/schemas` subpath when you want full runtime shape validation or JSON Schema generation. `validateGraph()` combines zod shape checks with the same graph invariants.
 
 ```ts
 import { GraphSchema, isGraph, validateGraph } from '@statelyai/graph/schemas';
@@ -169,7 +188,9 @@ const parsed = GraphSchema.parse(unknownValue);
 
 <!-- algorithm functions exported from src/algorithms.ts -->
 
-Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (label propagation, Girvan-Newman, greedy modularity, modularity scoring), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow (max-flow/min-cut), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+
+Hot algorithm loops (centrality, components) run on an internal compressed-sparse-row snapshot — cached and invalidated transparently like the rest of the index — so they stay fast on large graphs without changing the plain-JSON model. Algorithm results are differential-tested against graphology on seeded random graphs.
 
 ```ts
 import {
@@ -183,9 +204,13 @@ import {
   getConnectedComponents,
   getMinimumSpanningTree,
   getPageRank,
+  getLouvainCommunities,
   getLabelPropagationCommunities,
   genGirvanNewmanCommunities,
   getBridges,
+  getMaxFlow,
+  getDominatorTree,
+  getTransitiveReduction,
   isIsomorphic,
 } from '@statelyai/graph';
 
@@ -201,11 +226,15 @@ isAcyclic(graph); // cycle check
 getShortestPath(graph, { from: 'a', to: 'c' }); // single shortest path
 getTopologicalSort(graph); // topological order (or null)
 getConnectedComponents(graph); // connected components
-getMinimumSpanningTree(graph, { weight: (e) => e.data?.weight ?? 1 }); // MST
+getMinimumSpanningTree(graph, { getWeight: (e) => e.weight ?? 1 }); // MST
 getPageRank(graph); // link analysis scores
+getLouvainCommunities(graph); // community detection (Louvain)
 getLabelPropagationCommunities(graph); // community detection
 [...genGirvanNewmanCommunities(graph)]; // lazy community splits
 getBridges(graph); // bridge edges
+getMaxFlow(graph, { from: 'a', to: 'c' }); // max flow + min cut
+getDominatorTree(graph, { from: 'a' }); // immediate dominators
+getTransitiveReduction(graph); // minimal equivalent DAG
 isIsomorphic(graph, otherGraph); // structural equivalence
 ```
 
@@ -272,29 +301,29 @@ source information instead of preserving it as metadata.
 
 <!-- format support matrix derived from src/formats/support.ts -->
 
-| Format              | Hierarchy | Ports   | Visual  | Round-trip | Notes                                                                      |
-| ------------------- | --------- | ------- | ------- | ---------- | -------------------------------------------------------------------------- |
-| `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                  |
-| `cytoscape`         | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through element data.            |
-| `d3`                | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through the loose JSON shape.    |
-| `d2`                | full      | full    | full    | full       | D2 syntax, hierarchy, ports, styles, and connector modes round-trip.       |
-| `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete. |
-| `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                            |
-| `elk`               | full      | full    | full    | full       | Metadata round-trips through reserved layout options.                      |
-| `gexf`              | full      | full    | full    | full       | Custom attributes preserve metadata beyond the standard viz module.        |
-| `gml`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through direct and JSON fields.  |
-| `graphml`           | full      | full    | partial | partial    | Ports round-trip through `<data>` fields.                                  |
-| `jgf`               | full      | full    | full    | full       | Graph, node, and edge metadata round-trip through `metadata` objects.      |
-| `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                               |
-| `xyflow`            | full      | full    | full    | full       | Metadata round-trips through reserved data fields.                         |
-| `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                             |
-| `mermaid/class`     | none      | none    | none    | partial    | Class syntax is stored conservatively.                                     |
-| `mermaid/er`        | none      | none    | none    | partial    | Focuses on entities and cardinality.                                       |
-| `mermaid/flowchart` | partial   | none    | partial | partial    | `linkStyle` indices are fragile.                                           |
-| `mermaid/ishikawa`  | full      | none    | none    | partial    | Preserves hierarchy, not fishbone layout.                                  |
-| `mermaid/mindmap`   | full      | none    | partial | partial    | Icon syntax is not fully re-emitted.                                       |
-| `mermaid/sequence`  | partial   | none    | none    | partial    | Actor links and menu syntax are incomplete.                                |
-| `mermaid/state`     | full      | none    | partial | full       | State syntax round-trips through graph and node data.                      |
+| Format              | Hierarchy | Ports   | Visual  | Round-trip | Notes                                                                                                                                        |
+| ------------------- | --------- | ------- | ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adjacency-list`    | none      | none    | none    | partial    | Connectivity only; edge metadata is lost.                                                                                                    |
+| `cytoscape`         | full      | full    | full    | full       | Graph/node/edge metadata (incl. per-edge `mode`) round-trips through element data.                                                           |
+| `d3`                | full      | full    | full    | full       | Graph/node/edge metadata (incl. per-edge `mode`) round-trips through the loose JSON shape.                                                   |
+| `d2`                | full      | full    | full    | full       | Hierarchy, ports, styles, and connector modes round-trip; nested `vars` sub-blocks are dropped.                                              |
+| `dot`               | partial   | partial | partial | partial    | Edge port ids round-trip, but `:port:compass` mapping is still incomplete.                                                                   |
+| `edge-list`         | none      | none    | none    | partial    | Endpoints only.                                                                                                                              |
+| `elk`               | full      | full    | full    | full       | Metadata round-trips through reserved layout options; port ids are emitted as `nodeId__portName` (document-unique, as ELK requires).         |
+| `gexf`              | full      | full    | full    | full       | Custom attributes preserve metadata; `bidirectional` maps to directed.                                                                       |
+| `gml`               | full      | full    | full    | full       | Metadata round-trips through direct and JSON fields; per-edge/graph `mode` via a dialect key.                                                |
+| `graphml`           | full      | full    | partial | full       | Emit is own-dialect (`<data>` fields, flat); import handles both dialects incl. standard nested `<graph>`, native `<port>` elements, and `sourceport`/`targetport` attributes. Multi-graph files import the first graph. |
+| `jgf`               | full      | full    | full    | full       | Metadata (incl. per-edge/graph `mode`) round-trips through `metadata` objects.                                                               |
+| `tgf`               | none      | none    | none    | partial    | Minimal ids and labels only.                                                                                                                 |
+| `xyflow`            | full      | full    | full    | full       | Metadata (incl. weight, ports, per-edge `mode`) round-trips through reserved data fields; parents are ordered before children for React Flow. |
+| `mermaid/block`     | partial   | none    | partial | partial    | Syntax-driven, not port-aware.                                                                                                               |
+| `mermaid/class`     | none      | none    | none    | partial    | Class syntax is stored conservatively.                                                                                                       |
+| `mermaid/er`        | none      | none    | none    | partial    | Focuses on entities and cardinality.                                                                                                         |
+| `mermaid/flowchart` | partial   | none    | partial | partial    | `linkStyle` indices are fragile.                                                                                                             |
+| `mermaid/ishikawa`  | full      | none    | none    | partial    | Preserves hierarchy, not fishbone layout.                                                                                                    |
+| `mermaid/mindmap`   | full      | none    | partial | partial    | Icon syntax is not fully re-emitted.                                                                                                         |
+| `mermaid/sequence`  | partial   | none    | none    | partial    | Actor links and menu syntax are incomplete.                                                                                                  |
+| `mermaid/state`     | full      | none    | partial | partial    | Isolated states and labels now emit (labels via the description form); `initialNodeId` round-trips as `[*] -->`.                             |
 
 Some formats have optional peer dependencies: `fast-xml-parser` (GEXF, GraphML) and `dotparser` (DOT). All other formats are dependency-free.
 

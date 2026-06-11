@@ -4,6 +4,8 @@ import type {
   GraphEdge,
   NodeConfig,
   EdgeConfig,
+  NodeUpdate,
+  EdgeUpdate,
   GraphDiff,
   GraphPatch,
 } from './types';
@@ -15,41 +17,9 @@ import {
   updateNode,
   updateEdge,
 } from './graph';
+import { toNodeConfig, toEdgeConfig } from './config';
 
 // Internal helpers
-
-function nodeToConfig<N>(node: GraphNode<N>): NodeConfig<N> {
-  const config: NodeConfig<N> = { id: node.id };
-  if (node.parentId) config.parentId = node.parentId;
-  if (node.initialNodeId) config.initialNodeId = node.initialNodeId;
-  if (node.label !== '') config.label = node.label;
-  if (node.data !== undefined) config.data = node.data;
-  if (node.x !== undefined) config.x = node.x;
-  if (node.y !== undefined) config.y = node.y;
-  if (node.width !== undefined) config.width = node.width;
-  if (node.height !== undefined) config.height = node.height;
-  if (node.shape !== undefined) config.shape = node.shape;
-  if (node.color !== undefined) config.color = node.color;
-  if (node.style !== undefined) config.style = node.style;
-  return config;
-}
-
-function edgeToConfig<E>(edge: GraphEdge<E>): EdgeConfig<E> {
-  const config: EdgeConfig<E> = {
-    id: edge.id,
-    sourceId: edge.sourceId,
-    targetId: edge.targetId,
-  };
-  if (edge.label !== '') config.label = edge.label;
-  if (edge.data !== undefined) config.data = edge.data;
-  if (edge.x !== undefined) config.x = edge.x;
-  if (edge.y !== undefined) config.y = edge.y;
-  if (edge.width !== undefined) config.width = edge.width;
-  if (edge.height !== undefined) config.height = edge.height;
-  if (edge.color !== undefined) config.color = edge.color;
-  if (edge.style !== undefined) config.style = edge.style;
-  return config;
-}
 
 /** Shallow-compare two values, returning true if they differ. */
 function differs(a: unknown, b: unknown): boolean {
@@ -66,6 +36,7 @@ const NODE_COMPARE_KEYS = [
   'initialNodeId',
   'label',
   'data',
+  'ports',
   'x',
   'y',
   'width',
@@ -80,6 +51,10 @@ const EDGE_COMPARE_KEYS = [
   'targetId',
   'label',
   'data',
+  'weight',
+  'mode',
+  'sourcePort',
+  'targetPort',
   'x',
   'y',
   'width',
@@ -120,14 +95,18 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   for (const [id, nodeB] of bNodeMap) {
     const nodeA = aNodeMap.get(id);
     if (!nodeA) {
-      diff.nodes.added.push(nodeToConfig(nodeB));
+      diff.nodes.added.push(toNodeConfig(nodeB));
     } else {
       const oldPartial: Partial<GraphNode<N>> = {};
       const newPartial: Partial<GraphNode<N>> = {};
       for (const key of NODE_COMPARE_KEYS) {
-        if (differs((nodeA as any)[key], (nodeB as any)[key])) {
-          (oldPartial as any)[key] = (nodeA as any)[key];
-          (newPartial as any)[key] = (nodeB as any)[key];
+        // Normalize absent → null so diffs stay JSON-serializable and a
+        // removed optional field round-trips through patches (null unsets).
+        const oldValue = (nodeA as any)[key] ?? null;
+        const newValue = (nodeB as any)[key] ?? null;
+        if (differs(oldValue, newValue)) {
+          (oldPartial as any)[key] = oldValue;
+          (newPartial as any)[key] = newValue;
         }
       }
       if (Object.keys(oldPartial).length > 0) {
@@ -137,7 +116,7 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   }
   for (const [id, nodeA] of aNodeMap) {
     if (!bNodeMap.has(id)) {
-      diff.nodes.removed.push(nodeToConfig(nodeA));
+      diff.nodes.removed.push(toNodeConfig(nodeA));
     }
   }
 
@@ -145,14 +124,17 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   for (const [id, edgeB] of bEdgeMap) {
     const edgeA = aEdgeMap.get(id);
     if (!edgeA) {
-      diff.edges.added.push(edgeToConfig(edgeB));
+      diff.edges.added.push(toEdgeConfig(edgeB));
     } else {
       const oldPartial: Partial<GraphEdge<E>> = {};
       const newPartial: Partial<GraphEdge<E>> = {};
       for (const key of EDGE_COMPARE_KEYS) {
-        if (differs((edgeA as any)[key], (edgeB as any)[key])) {
-          (oldPartial as any)[key] = (edgeA as any)[key];
-          (newPartial as any)[key] = (edgeB as any)[key];
+        // Normalize absent → null (see node comparison above)
+        const oldValue = (edgeA as any)[key] ?? null;
+        const newValue = (edgeB as any)[key] ?? null;
+        if (differs(oldValue, newValue)) {
+          (oldPartial as any)[key] = oldValue;
+          (newPartial as any)[key] = newValue;
         }
       }
       if (Object.keys(oldPartial).length > 0) {
@@ -162,7 +144,7 @@ export function getDiff<N, E>(a: Graph<N, E>, b: Graph<N, E>): GraphDiff<N, E> {
   }
   for (const [id, edgeA] of aEdgeMap) {
     if (!bEdgeMap.has(id)) {
-      diff.edges.removed.push(edgeToConfig(edgeA));
+      diff.edges.removed.push(toEdgeConfig(edgeA));
     }
   }
 
@@ -209,23 +191,25 @@ export function isEmptyDiff(diff: GraphDiff): boolean {
  * ```
  */
 export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
+  // Deep copy (graphs are JSON-serializable by contract) so nested values
+  // (ports, style, data) are not shared between the input and the inverse.
   return {
     nodes: {
-      added: diff.nodes.removed,
-      removed: diff.nodes.added,
+      added: diff.nodes.removed.map((c) => structuredClone(c)),
+      removed: diff.nodes.added.map((c) => structuredClone(c)),
       updated: diff.nodes.updated.map((c) => ({
         id: c.id,
-        old: c.new,
-        new: c.old,
+        old: structuredClone(c.new),
+        new: structuredClone(c.old),
       })),
     },
     edges: {
-      added: diff.edges.removed,
-      removed: diff.edges.added,
+      added: diff.edges.removed.map((c) => structuredClone(c)),
+      removed: diff.edges.added.map((c) => structuredClone(c)),
       updated: diff.edges.updated.map((c) => ({
         id: c.id,
-        old: c.new,
-        new: c.old,
+        old: structuredClone(c.new),
+        new: structuredClone(c.old),
       })),
     },
   };
@@ -235,7 +219,8 @@ export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
 
 /**
  * Compute an ordered patch list from graph `a` to graph `b`.
- * Order: delete edges → delete nodes → add nodes → add edges → update nodes → update edges.
+ * Order (see {@link toPatches}): add nodes → update edges → delete edges →
+ * delete nodes → add edges → update nodes.
  *
  * @example
  * ```ts
@@ -331,9 +316,11 @@ export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
 
   // 2. Update edges (move endpoints away from deleted nodes before they cascade)
   for (const change of diff.edges.updated) {
-    const data: Partial<Omit<EdgeConfig<E>, 'id'>> = {};
+    const data: EdgeUpdate<E> = {};
     for (const [key, value] of Object.entries(change.new)) {
-      (data as any)[key] = value;
+      // Absent fields appear as undefined when a diff was hand-built;
+      // map to null so the update unsets the field (JSON-safe).
+      (data as any)[key] = value ?? null;
     }
     patches.push({ op: 'updateEdge', id: change.id, data });
   }
@@ -355,9 +342,11 @@ export function toPatches<N, E>(diff: GraphDiff<N, E>): GraphPatch<N, E>[] {
 
   // 6. Update nodes
   for (const change of diff.nodes.updated) {
-    const data: Partial<Omit<NodeConfig<N>, 'id'>> = {};
+    const data: NodeUpdate<N> = {};
     for (const [key, value] of Object.entries(change.new)) {
-      (data as any)[key] = value;
+      // Absent fields appear as undefined when a diff was hand-built;
+      // map to null so the update unsets the field (JSON-safe).
+      (data as any)[key] = value ?? null;
     }
     patches.push({ op: 'updateNode', id: change.id, data });
   }

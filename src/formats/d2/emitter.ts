@@ -12,6 +12,19 @@ import {
 
 const STRUCTURED_SHAPES = new Set(['sql_table', 'class']);
 
+/**
+ * Parser-shaped node data, tolerating graphs not produced by `fromD2` whose
+ * `data` may be `undefined`, `null`, or an arbitrary user object.
+ */
+function nodeData(node: GraphNode<D2NodeData, D2PortData>): Partial<D2NodeData> {
+  return node.data ?? {};
+}
+
+/** Parser-shaped edge data; see {@link nodeData}. */
+function edgeData(edge: GraphEdge<D2EdgeData>): Partial<D2EdgeData> {
+  return edge.data ?? {};
+}
+
 function splitId(id: string): string[] {
   // Split on dots that are not inside quotes.
   const out: string[] = [];
@@ -77,7 +90,7 @@ function nodeAttrLines(
   ind: number,
 ): string[] {
   const lines: string[] = [];
-  const d = node.data;
+  const d = nodeData(node);
   if (node.shape) lines.push(`${indent(ind)}shape: ${escapeD2Label(node.shape)}`);
   if (d.near) lines.push(`${indent(ind)}near: ${escapeD2Label(d.near)}`);
   if (d.icon) lines.push(`${indent(ind)}icon: ${d.icon}`);
@@ -124,8 +137,9 @@ function portLines(node: GraphNode<D2NodeData, D2PortData>, ind: number): string
 
 function labelHeader(node: GraphNode<D2NodeData, D2PortData>): string {
   if (node.label == null || node.label === '') return '';
-  if (node.data.labelBlock) {
-    return emitLabelBlock(node.label, node.data.labelBlock);
+  const labelBlock = nodeData(node).labelBlock;
+  if (labelBlock) {
+    return emitLabelBlock(node.label, labelBlock);
   }
   return escapeD2Label(node.label);
 }
@@ -150,7 +164,7 @@ function isPurePrefix(
 ): boolean {
   const children = ctx.childrenOf.get(node.id) ?? [];
   return (
-    node.data.declarationForm !== 'block' &&
+    nodeData(node).declarationForm !== 'block' &&
     children.length > 0 &&
     !hasOwnContent(node)
   );
@@ -171,7 +185,7 @@ function emitScope(
 ): void {
   const children = ctx.childrenOf.get(containerId) ?? [];
   const ownedEdges = container ? (ctx.edgesByOwner.get(container.id) ?? []) : [];
-  const order = container?.data.order;
+  const order = container ? nodeData(container).order : undefined;
 
   if (order) {
     const childById = new Map(children.map((c) => [c.id, c]));
@@ -214,7 +228,7 @@ function emitItem(
     return;
   }
 
-  emitComments(node.data.commentsBefore, ind, lines);
+  emitComments(nodeData(node).commentsBefore, ind, lines);
   const label = labelHeader(node);
   const structured = node.shape && STRUCTURED_SHAPES.has(node.shape);
   const attrLines = nodeAttrLines(node, ind + 1);
@@ -257,9 +271,10 @@ function emitEdge(
   scoped: boolean,
 ): void {
   ctx.emittedEdges.add(edge.id);
-  emitComments(edge.data.commentsBefore, ind, lines);
+  const d = edgeData(edge);
+  emitComments(d.commentsBefore, ind, lines);
 
-  const arrow: D2Arrow = edge.data.arrow ?? modeToArrow(edge);
+  const arrow: D2Arrow = d.arrow ?? modeToArrow(edge);
   const owner = scoped ? ctx.ownerOfEdge.get(edge.id) : undefined;
   const scopeSegs = owner ? splitId(owner) : [];
 
@@ -277,8 +292,8 @@ function emitEdge(
   const right = endpointRef(tId, tPort, scopeSegs);
   let line = `${indent(ind)}${left} ${arrow} ${right}`;
   if (edge.label != null && edge.label !== '') {
-    const lbl = edge.data.labelBlock
-      ? emitLabelBlock(edge.label, edge.data.labelBlock)
+    const lbl = d.labelBlock
+      ? emitLabelBlock(edge.label, d.labelBlock)
       : escapeD2Label(edge.label);
     line += `: ${lbl}`;
   }
@@ -300,11 +315,12 @@ function edgeBlockLines(edge: GraphEdge<D2EdgeData>): string[] {
       out.push(`style.${k}: ${styleValueToD2(v)}`);
     }
   }
-  const { sourceArrowhead, targetArrowhead } = edge.data;
+  const d = edgeData(edge);
+  const { sourceArrowhead, targetArrowhead } = d;
   if (sourceArrowhead?.shape) out.push(`source-arrowhead.shape: ${sourceArrowhead.shape}`);
   if (targetArrowhead?.shape) out.push(`target-arrowhead.shape: ${targetArrowhead.shape}`);
-  if (edge.data.reserved) {
-    for (const [k, v] of Object.entries(edge.data.reserved)) {
+  if (d.reserved) {
+    for (const [k, v] of Object.entries(d.reserved)) {
       out.push(`${k}: ${styleValueToD2(v)}`);
     }
   }
@@ -336,7 +352,7 @@ function buildEdgeOwnership(graph: D2Graph): {
   const ownerOfEdge = new Map<string, string>();
   const edgeById = new Map(graph.edges.map((e) => [e.id, e]));
   for (const node of graph.nodes) {
-    const order = node.data.order;
+    const order = nodeData(node).order;
     if (!order) continue;
     for (const refId of order) {
       const edge = edgeById.get(refId);
