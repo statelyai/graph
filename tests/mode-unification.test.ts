@@ -59,6 +59,70 @@ describe('isAcyclic with per-edge mode overrides', () => {
     expect(cycles[0].steps).toHaveLength(3);
   });
 
+  it('resolves large acyclic mixed graphs in polynomial time', () => {
+    // 30 chained diamonds = 2^30 simple paths. Before the SCC-restricted
+    // fast path, mixed isAcyclic enumerated paths from every start node and
+    // effectively hung on this shape; now it resolves via the SCC singleton
+    // check plus one trivial 2-node SCC.
+    const nodes = [{ id: 'n0' }];
+    const edges: { id: string; sourceId: string; targetId: string; mode?: 'undirected' }[] = [];
+    for (let i = 0; i < 30; i++) {
+      const from = `n${i}`;
+      const to = `n${i + 1}`;
+      nodes.push({ id: `${from}_t` }, { id: `${from}_b` }, { id: to });
+      edges.push(
+        { id: `${from}-t`, sourceId: from, targetId: `${from}_t` },
+        { id: `${from}-b`, sourceId: from, targetId: `${from}_b` },
+        { id: `t-${to}`, sourceId: `${from}_t`, targetId: to },
+        { id: `b-${to}`, sourceId: `${from}_b`, targetId: to },
+      );
+    }
+    // One undirected edge to a fresh leaf makes the graph genuinely mixed
+    nodes.push({ id: 'leaf' });
+    edges.push({ id: 'u', sourceId: 'n30', targetId: 'leaf', mode: 'undirected' });
+    const g = createGraph({ nodes, edges });
+
+    const start = performance.now();
+    expect(isAcyclic(g)).toBe(true);
+    expect(performance.now() - start).toBeLessThan(1_000);
+  });
+
+  it('fast path catches cycles among directed edges only', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b' },
+        { id: 'e2', sourceId: 'b', targetId: 'a' },
+        { id: 'e3', sourceId: 'a', targetId: 'c', mode: 'undirected' },
+      ],
+    });
+    expect(isAcyclic(g)).toBe(false);
+  });
+
+  it('fast path catches cycles among non-directed edges only', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b', mode: 'undirected' },
+        { id: 'e2', sourceId: 'b', targetId: 'c', mode: 'undirected' },
+        { id: 'e3', sourceId: 'c', targetId: 'a', mode: 'undirected' },
+        { id: 'e4', sourceId: 'a', targetId: 'd' },
+      ],
+    });
+    expect(isAcyclic(g)).toBe(false);
+  });
+
+  it('fast path catches non-directed self-loops in mixed graphs', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [
+        { id: 'loop', sourceId: 'a', targetId: 'a', mode: 'undirected' },
+        { id: 'e', sourceId: 'a', targetId: 'b' },
+      ],
+    });
+    expect(isAcyclic(g)).toBe(false);
+  });
+
   it('acyclic mixed graph stays acyclic', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],

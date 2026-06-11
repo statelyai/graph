@@ -6,8 +6,9 @@ import {
   getSuccessorIds,
 } from './shared';
 import { getEdgeMode } from '../mode';
-import { genCycles } from './paths';
+import { genCycles, getStronglyConnectedComponents } from './paths';
 import { getCSR } from './csr';
+import { getSubgraph } from '../transforms';
 
 export function* bfs<N>(
   graph: Graph<N>,
@@ -60,12 +61,9 @@ export function* dfs<N>(
 
 export function isAcyclic(graph: Graph): boolean {
   // Dispatch on *effective* edge modes (per-edge overrides included).
-  // Genuinely mixed graphs use exact simple-cycle search with early exit —
-  // correct, but potentially expensive on large dense mixed graphs.
   const kind = getEffectiveModeKind(graph);
   if (kind === 'mixed') {
-    for (const _cycle of genCycles(graph)) return false;
-    return true;
+    return isAcyclicMixed(graph);
   }
   if (kind === 'non-directed') {
     return isAcyclicUndirected(graph);
@@ -89,6 +87,81 @@ export function isAcyclic(graph: Graph): boolean {
 
   for (const node of graph.nodes) {
     if (color.get(node.id) === WHITE && hasCycle(node.id)) return false;
+  }
+  return true;
+}
+
+/**
+ * Acyclicity for graphs mixing directed and non-directed edges.
+ *
+ * Polynomial fast paths first: a cycle among directed edges alone, a cycle
+ * among non-directed edges alone (union-find), or all-singleton reachability
+ * SCCs (then no mixed cycle can exist either). Only ambiguous multi-node
+ * SCCs fall back to exact simple-cycle enumeration, restricted to that SCC.
+ */
+function isAcyclicMixed(graph: Graph): boolean {
+  const idx = getIndex(graph);
+
+  // (1) Cycle using only effective-directed edges
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>();
+  for (const node of graph.nodes) color.set(node.id, WHITE);
+  const hasDirectedCycle = (id: string): boolean => {
+    color.set(id, GRAY);
+    for (const eid of idx.outEdges.get(id) ?? []) {
+      const edge = graph.edges[idx.edgeById.get(eid)!];
+      if (getEdgeMode(graph, edge) !== 'directed') continue;
+      const current = color.get(edge.targetId);
+      if (current === GRAY) return true;
+      if (current === WHITE && hasDirectedCycle(edge.targetId)) return true;
+    }
+    color.set(id, BLACK);
+    return false;
+  };
+  for (const node of graph.nodes) {
+    if (color.get(node.id) === WHITE && hasDirectedCycle(node.id)) return false;
+  }
+
+  // (2) Cycle using only non-directed edges (union-find: a non-directed edge
+  // joining an already-connected pair, or a non-directed self-loop)
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    let root = id;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    let cursor = id;
+    while (parent.get(cursor) !== root) {
+      const next = parent.get(cursor)!;
+      parent.set(cursor, root);
+      cursor = next;
+    }
+    return root;
+  };
+  for (const node of graph.nodes) parent.set(node.id, node.id);
+  for (const edge of graph.edges) {
+    if (getEdgeMode(graph, edge) === 'directed') continue;
+    if (edge.sourceId === edge.targetId) return false;
+    const rootA = find(edge.sourceId);
+    const rootB = find(edge.targetId);
+    if (rootA === rootB) return false;
+    parent.set(rootA, rootB);
+  }
+
+  // (3) Every simple cycle lies within one mutual-reachability SCC; if all
+  // SCCs are singletons (self-loops were caught above), the graph is acyclic
+  const multiNodeSccs = getStronglyConnectedComponents(graph).filter(
+    (component) => component.length > 1,
+  );
+  if (multiNodeSccs.length === 0) return true;
+
+  // (4) Exact enumeration, restricted to each ambiguous SCC
+  for (const component of multiNodeSccs) {
+    const subgraph = getSubgraph(
+      graph,
+      component.map((node) => node.id),
+    );
+    for (const _cycle of genCycles(subgraph)) return false;
   }
   return true;
 }

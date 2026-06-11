@@ -19,6 +19,7 @@ import {
   MinPriorityQueue,
   resolveFrom,
 } from './shared';
+import { getCSR } from './csr';
 
 function computeShortestDistances<N, E>(
   graph: Graph<N, E>,
@@ -39,62 +40,91 @@ function computeShortestDistances<N, E>(
   dist.set(sourceId, 0);
   prev.set(sourceId, []);
 
+  const csr = getCSR(graph);
+  const source = csr.indexOf.get(sourceId);
+  if (source === undefined) {
+    // Unknown source id: nothing is reachable (matches pre-CSR behavior)
+    return { dist, prev };
+  }
+
+  const n = csr.ids.length;
+  const distArr = new Float64Array(n).fill(Infinity);
+  // Tie predecessors per node as (fromPos, edgeIndex) pairs
+  const prevArr: Array<number[]> = new Array(n);
+  distArr[source] = 0;
+  prevArr[source] = [];
+
   const useBFS = !getWeight && !graph.edges.some((edge) => edge.weight !== undefined);
 
   if (useBFS) {
-    const queue: string[] = [sourceId];
+    const queue = new Int32Array(n);
+    queue[0] = source;
+    let head = 0;
+    let tail = 1;
 
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const distance = dist.get(id)!;
+    while (head < tail) {
+      const u = queue[head++];
+      const nextDistance = distArr[u] + 1;
 
-      for (const { neighborId, edge } of getNeighborEdges(graph, id)) {
-        const nextDistance = distance + 1;
-        const existing = dist.get(neighborId);
-
-        if (existing === undefined) {
-          dist.set(neighborId, nextDistance);
-          prev.set(neighborId, [{ from: id, edge: edge as GraphEdge<E> }]);
-          queue.push(neighborId);
-        } else if (existing === nextDistance) {
-          prev.get(neighborId)!.push({ from: id, edge: edge as GraphEdge<E> });
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const v = csr.outTargets[a];
+        if (distArr[v] === Infinity) {
+          distArr[v] = nextDistance;
+          prevArr[v] = [u, csr.outEdgeIndex[a]];
+          queue[tail++] = v;
+        } else if (distArr[v] === nextDistance) {
+          prevArr[v].push(u, csr.outEdgeIndex[a]);
         }
       }
     }
   } else {
     const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-    const visited = new Set<string>();
-    const pq = new MinPriorityQueue<{ id: string; dist: number }>(
+    const visited = new Uint8Array(n);
+    const pq = new MinPriorityQueue<{ pos: number; dist: number }>(
       (a, b) => a.dist - b.dist,
     );
-    pq.push({ id: sourceId, dist: 0 });
+    pq.push({ pos: source, dist: 0 });
 
     while (pq.size > 0) {
-      const current = pq.pop()!;
-      const { id, dist: distance } = current;
+      const { pos: u, dist: distance } = pq.pop()!;
+      if (visited[u] || distance !== distArr[u]) continue;
+      visited[u] = 1;
 
-      if (visited.has(id) || distance !== dist.get(id)) continue;
-      visited.add(id);
-
-      for (const { neighborId, edge } of getNeighborEdges(graph, id)) {
-        const weight = effectiveWeight(edge as GraphEdge<E>);
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
+        const weight = effectiveWeight(edge);
         if (weight < 0) {
           throw new Error(
             `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): Dijkstra requires non-negative weights. Use { algorithm: 'bellman-ford' } instead.`,
           );
         }
+        const v = csr.outTargets[a];
         const nextDistance = distance + weight;
-        const existing = dist.get(neighborId);
 
-        if (existing === undefined || nextDistance < existing) {
-          dist.set(neighborId, nextDistance);
-          prev.set(neighborId, [{ from: id, edge: edge as GraphEdge<E> }]);
-          pq.push({ id: neighborId, dist: nextDistance });
-        } else if (existing === nextDistance) {
-          prev.get(neighborId)!.push({ from: id, edge: edge as GraphEdge<E> });
+        if (nextDistance < distArr[v]) {
+          distArr[v] = nextDistance;
+          prevArr[v] = [u, csr.outEdgeIndex[a]];
+          pq.push({ pos: v, dist: nextDistance });
+        } else if (nextDistance === distArr[v] && distArr[v] !== Infinity) {
+          prevArr[v].push(u, csr.outEdgeIndex[a]);
         }
       }
     }
+  }
+
+  // Convert reached nodes back to the id-keyed shape reconstruction expects
+  for (let i = 0; i < n; i++) {
+    if (distArr[i] === Infinity) continue;
+    dist.set(csr.ids[i], distArr[i]);
+    const pairs = prevArr[i];
+    const predecessors: Array<{ from: string; edge: GraphEdge<E> }> = [];
+    for (let k = 0; k < pairs.length; k += 2) {
+      predecessors.push({
+        from: csr.ids[pairs[k]],
+        edge: graph.edges[pairs[k + 1]] as GraphEdge<E>,
+      });
+    }
+    prev.set(csr.ids[i], predecessors);
   }
 
   return { dist, prev };
@@ -755,55 +785,62 @@ export function getAStarPath<N, E>(
     return { source: graph.nodes[sourceNi], steps: [] };
   }
 
-  const gScore = new Map<string, number>();
-  const cameFrom = new Map<string, { from: string; edge: GraphEdge<E> }>();
-  const closedSet = new Set<string>();
-  const openSet = new MinPriorityQueue<{ id: string; f: number }>(
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const source = csr.indexOf.get(sourceId)!;
+  const target = csr.indexOf.get(targetId)!;
+
+  const gScore = new Float64Array(n).fill(Infinity);
+  // Predecessor as (fromPos, edgeIndex); -1 = none
+  const cameFromPos = new Int32Array(n).fill(-1);
+  const cameFromEdge = new Int32Array(n).fill(-1);
+  const closed = new Uint8Array(n);
+  const openSet = new MinPriorityQueue<{ pos: number; f: number }>(
     (a, b) => a.f - b.f,
   );
 
-  gScore.set(sourceId, 0);
-  openSet.push({ id: sourceId, f: heuristic(sourceId) });
+  gScore[source] = 0;
+  openSet.push({ pos: source, f: heuristic(sourceId) });
 
   while (openSet.size > 0) {
-    const { id: currentId } = openSet.pop()!;
-    if (closedSet.has(currentId)) continue;
+    const { pos: current } = openSet.pop()!;
+    if (closed[current]) continue;
 
-    if (currentId === targetId) {
+    if (current === target) {
       const steps: GraphStep<N, E>[] = [];
-      let current = targetId;
-      while (current !== sourceId) {
-        const previous = cameFrom.get(current)!;
-        const ni = idx.nodeById.get(current)!;
-        steps.unshift({ edge: previous.edge, node: graph.nodes[ni] });
-        current = previous.from;
+      let cursor = target;
+      while (cursor !== source) {
+        steps.unshift({
+          edge: graph.edges[cameFromEdge[cursor]] as GraphEdge<E>,
+          node: graph.nodes[cursor],
+        });
+        cursor = cameFromPos[cursor];
       }
       return { source: graph.nodes[sourceNi], steps };
     }
 
-    closedSet.add(currentId);
+    closed[current] = 1;
 
-    for (const { neighborId, edge } of getNeighborEdges(graph, currentId)) {
-      const weight = getWeight(edge as GraphEdge<E>);
+    for (let a = csr.outOffsets[current]; a < csr.outOffsets[current + 1]; a++) {
+      const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
+      const weight = getWeight(edge);
       if (weight < 0) {
         throw new Error(
           `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): A* requires non-negative weights. Use getShortestPath with { algorithm: 'bellman-ford' } instead.`,
         );
       }
 
-      if (closedSet.has(neighborId)) continue;
+      const neighbor = csr.outTargets[a];
+      if (closed[neighbor]) continue;
 
-      const tentativeScore = (gScore.get(currentId) ?? Infinity) + weight;
-
-      if (tentativeScore < (gScore.get(neighborId) ?? Infinity)) {
-        cameFrom.set(neighborId, {
-          from: currentId,
-          edge: edge as GraphEdge<E>,
-        });
-        gScore.set(neighborId, tentativeScore);
+      const tentativeScore = gScore[current] + weight;
+      if (tentativeScore < gScore[neighbor]) {
+        cameFromPos[neighbor] = current;
+        cameFromEdge[neighbor] = csr.outEdgeIndex[a];
+        gScore[neighbor] = tentativeScore;
         openSet.push({
-          id: neighborId,
-          f: tentativeScore + heuristic(neighborId),
+          pos: neighbor,
+          f: tentativeScore + heuristic(csr.ids[neighbor]),
         });
       }
     }
