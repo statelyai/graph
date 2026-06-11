@@ -26,6 +26,7 @@ import {
   indexAddEdge,
   indexReparentNode,
   indexUpdateEdgeEndpoints,
+  touchIndex,
 } from './indexing';
 
 /**
@@ -767,6 +768,11 @@ export function updateEdge<N, E>(
   }
   applyOptionalUpdates(updated, update, EDGE_OPTIONAL_KEYS);
   graph.edges[arrayIdx] = updated;
+
+  // Per-edge mode changes alter derived traversal caches (CSR arcs)
+  if (update.mode !== undefined) {
+    touchIndex(idx);
+  }
 
   // Update adjacency index if endpoints changed
   if (updated.sourceId !== oldSourceId || updated.targetId !== oldTargetId) {

@@ -7,6 +7,7 @@ import {
 } from './shared';
 import { getEdgeMode } from '../mode';
 import { genCycles } from './paths';
+import { getCSR } from './csr';
 
 export function* bfs<N>(
   graph: Graph<N>,
@@ -131,38 +132,38 @@ function isAcyclicUndirected(graph: Graph): boolean {
 }
 
 export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
-  const idx = getIndex(graph);
-  const visited = new Set<string>();
+  // Weakly-connected components: every edge connects regardless of mode, so
+  // walk the CSR arcs in both directions (out arcs + in-arc origins).
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const visited = new Uint8Array(n);
+  const queue = new Int32Array(n);
   const components: GraphNode<N>[][] = [];
 
-  for (const node of graph.nodes) {
-    if (visited.has(node.id)) continue;
+  for (let s = 0; s < n; s++) {
+    if (visited[s]) continue;
     const component: GraphNode<N>[] = [];
-    const queue: string[] = [node.id];
-    visited.add(node.id);
+    visited[s] = 1;
+    queue[0] = s;
+    let head = 0;
+    let tail = 1;
 
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const ni = idx.nodeById.get(id);
-      if (ni !== undefined) component.push(graph.nodes[ni]);
+    while (head < tail) {
+      const u = queue[head++];
+      component.push(graph.nodes[u]);
 
-      for (const eid of idx.outEdges.get(id) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const neighborId = graph.edges[ai].targetId;
-        if (!visited.has(neighborId)) {
-          visited.add(neighborId);
-          queue.push(neighborId);
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const v = csr.outTargets[a];
+        if (!visited[v]) {
+          visited[v] = 1;
+          queue[tail++] = v;
         }
       }
-
-      for (const eid of idx.inEdges.get(id) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const neighborId = graph.edges[ai].sourceId;
-        if (!visited.has(neighborId)) {
-          visited.add(neighborId);
-          queue.push(neighborId);
+      for (let a = csr.inOffsets[u]; a < csr.inOffsets[u + 1]; a++) {
+        const v = csr.inOrigins[a];
+        if (!visited[v]) {
+          visited[v] = 1;
+          queue[tail++] = v;
         }
       }
     }

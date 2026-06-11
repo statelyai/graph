@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGraph, getNode, getSuccessors } from '../src';
+import { getBetweennessCentrality } from '../src/algorithms';
 
 /**
  * Guards the O(1)-per-read index contract (see src/indexing.ts).
@@ -28,6 +29,26 @@ describe('index read-path performance', () => {
 
     const start = performance.now();
     for (const node of g.nodes) getSuccessors(g, node.id);
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(2_000);
+  });
+
+  it('betweenness centrality runs on the CSR snapshot, not Map-based adjacency', () => {
+    // Pre-CSR cost on this shape was ~4,600 ms; CSR cost is ~170 ms.
+    // 2,000 ms keeps slow CI safe while failing on a return to Map loops.
+    const g = createGraph({
+      nodes: Array.from({ length: 2_000 }, (_, i) => ({ id: `n${i}` })),
+      edges: Array.from({ length: 6_000 }, (_, i) => ({
+        id: `e${i}`,
+        sourceId: `n${(i * 13) % 2_000}`,
+        targetId: `n${(i * 7 + 1) % 2_000}`,
+      })),
+    });
+    getBetweennessCentrality(g); // warm
+
+    const start = performance.now();
+    getBetweennessCentrality(g);
     const elapsed = performance.now() - start;
 
     expect(elapsed).toBeLessThan(2_000);

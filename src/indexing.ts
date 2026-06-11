@@ -18,6 +18,12 @@ export interface GraphIndex {
   edgeCount: number;
   nodesRef: Graph['nodes'];
   edgesRef: Graph['edges'];
+  /**
+   * Bumped on every structural change applied through the mutation API.
+   * Derived caches (e.g. the CSR snapshot in `algorithms/csr.ts`) key on the
+   * index object identity + this version to revalidate in O(1).
+   */
+  version: number;
 }
 
 // WeakMap cache
@@ -125,6 +131,7 @@ function buildIndex(graph: Graph): GraphIndex {
     edgeCount: graph.edges.length,
     nodesRef: graph.nodes,
     edgesRef: graph.edges,
+    version: 0,
   };
 }
 
@@ -144,6 +151,7 @@ export function indexAddNode(
   idx.childNodes.get(parent)!.push(node.id);
 
   idx.nodeCount++;
+  idx.version++;
 }
 
 export function indexAddEdge(
@@ -155,6 +163,7 @@ export function indexAddEdge(
   idx.outEdges.get(edge.sourceId)?.push(edge.id);
   idx.inEdges.get(edge.targetId)?.push(edge.id);
   idx.edgeCount++;
+  idx.version++;
 }
 
 /** Update childNodes index when a node's parentId changes. */
@@ -174,6 +183,16 @@ export function indexReparentNode(
   const np = newParentId ?? null;
   if (!idx.childNodes.has(np)) idx.childNodes.set(np, []);
   idx.childNodes.get(np)!.push(nodeId);
+  idx.version++;
+}
+
+/**
+ * Bump the index version without touching adjacency. Used by mutations that
+ * change fields derived caches depend on (e.g. per-edge `mode` affects the
+ * CSR arc structure but not the id-based adjacency lists).
+ */
+export function touchIndex(idx: GraphIndex): void {
+  idx.version++;
 }
 
 /** Update adjacency lists when an edge's sourceId/targetId changes. */
@@ -201,4 +220,5 @@ export function indexUpdateEdgeEndpoints(
     }
     idx.inEdges.get(newTargetId)?.push(edgeId);
   }
+  idx.version++;
 }
