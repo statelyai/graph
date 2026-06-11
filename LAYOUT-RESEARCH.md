@@ -40,15 +40,23 @@ with `routing: 'splines'` (document the convention). Wire through: types, `creat
 `toNodeConfig`/`toEdgeConfig` (compile-time guard forces completeness — the structural guard
 pays off here), diff `EDGE_COMPARE_KEYS`, `LAYOUT_KEYS.edge`, ELK/xyflow adapters, schemas.
 
-### G2 — Label geometry is dropped (model gap)
-ELK and Graphviz compute positions for edge labels, node labels, and port labels; we emit label
-*text* to ELK but ignore returned label coordinates. Without them, edge labels overlap in every
-nontrivial diagram.
-**Fix:** additive `labelPosition?: { x; y; width?; height? }` on `VisualEdge` (and optionally
-`VisualNode`/`VisualPort` for external labels). Same wiring list as G1.
+### G2 — Label geometry is dropped (model gap) — **DECIDED: no new field**
+ELK and Graphviz compute edge-label positions; we ignore them. **Owner decision (2026-06-11):
+edge `x/y/width/height` IS canonically the edge-label rect.** No new field needed:
+- Verified conflict-free: every adapter today round-trips edge `x/y` as opaque metadata; nothing
+  assigns engine semantics. The fields were previously undefined in meaning.
+- This is literally dagre's own convention (`edge.x/y` = label center) and Graphviz's `plain`
+  output puts `label xl yl` in the edge line; ELK returns edge label objects with x/y.
+- Symmetry bonus: `width/height` doubles as the **input** label measurement (dagre
+  `setEdge({width,height})`, ELK label dimensions) and `x/y` as the **output** position.
+- Convention detail to document: store **top-left** (consistent with node x/y across xyflow/ELK);
+  adapters convert engines' center-based label coordinates (dagre, graphviz) via `cx − width/2`.
+- Wiring: JSDoc on `GraphEdge`/`VisualEdge` x/y/width/height defining the semantics; adapters map
+  label positions in/out. Node/port external labels: deferred (rare; ports have their own rects).
 
-### G3 — No layout function contract (API gap, the core ask)
-Nothing defines what "a layout" is. Proposed, fitting the existing prefix conventions:
+### G3 — No layout function contract (API gap, the core ask) — **contract shape AGREED**
+Nothing defines what "a layout" is. Agreed design (owner, 2026-06-11), fitting the existing
+prefix conventions:
 
 ```ts
 // '@statelyai/graph/layout' — zero-dependency core
@@ -112,6 +120,26 @@ into `VisualGraph` (needs G1 for splines). This unlocks **eight engines through 
 ### G10 — Workers (explicitly deferred)
 elkjs accepts a worker factory; ForceAtlas2 ships a worker variant. Adapters should pass engine
 options through untouched and stay worker-agnostic. Not our layer.
+
+## 2b. `points` verification across engines (researched 2026-06-11)
+
+Question: does `points?: {x,y}[]` + a `routing` hint represent every common engine's edge
+geometry? **Yes** — verified against each engine's documented output format:
+
+| Engine | Native edge geometry | Fits `points`? | Native edge-label position → edge `x/y`? |
+|---|---|---|---|
+| ELK (layered/orthogonal) | exactly **one section** per regular edge: `startPoint` + `bendPoints[]` + `endPoint` (multiple sections exist only for hyperedges, which our model cannot express — one `sourceId`/`targetId` per edge) | ✅ flatten to polyline | ✅ label objects with x/y |
+| ELK with `edgeRouting: SPLINES` | bezier control points reusing `bendPoints` (kieler/elkjs#23) | ✅ with `routing: 'splines'` | ✅ |
+| Graphviz (all 8 engines, `plain`/`json` output) | B-spline control points, 3n+1 chained cubic béziers, tail→head | ✅ with `routing: 'splines'` (or downsample to polyline) | ✅ `label xl yl` directly in the plain edge line |
+| dagre | `edge.points` = `{x,y}[]` polyline (bend centers + node intersections) | ✅ verbatim | ✅ `edge.x/y` = label center — **dagre's convention is exactly ours** |
+| d3-force / ForceAtlas2 / cola (physics) | no edge routing — straight lines | ✅ `points` simply absent | n/a (renderer places at midpoint) |
+| cytoscape layout ecosystem | layouts position nodes only; curves are a render-time concern | ✅ absent | n/a |
+| WebCola (with power-graph routing) | route points polyline | ✅ | n/a |
+
+Two conventions to lock in at implementation time: `points` includes endpoints (tail→head order),
+and `routing: 'polyline' \| 'orthogonal' \| 'splines'` tells renderers how to interpret them
+(`splines` = bezier control points, Graphviz 3n+1 semantics). Curvature-style models
+(sigma/graphology's single curvature scalar) don't produce point lists and stay in `style`/`data`.
 
 ## 3. Engine survey
 
