@@ -1,5 +1,71 @@
 # @statelyai/graph
 
+## 2.0.0
+
+### Major Changes
+
+- [#22](https://github.com/statelyai/graph/pull/22) [`6bead2c`](https://github.com/statelyai/graph/commit/6bead2cadd9913911f02dd34f673aca227b4770d) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Correctness, performance, and API-honesty overhaul.
+
+  **Migration notes (the two changes most likely to require action):**
+
+  1. **In-place field mutation is no longer auto-detected.** `edge.sourceId = 'x'` / `node.parentId = 'y'` now require `invalidateIndex(graph)` afterwards (or use `updateEdge`/`updateNode`, or immutable-style array replacement — both auto-detected). Code relying on the old per-read deep scan gets stale query results. This trade bought O(1) reads: a 10k-node query sweep dropped from 17.3 s to 14 ms.
+  2. **Errors instead of silently wrong results:** Dijkstra/A\* throw on negative weights (use `{ algorithm: 'bellman-ford' }`); Floyd-Warshall throws on negative cycles; GraphML/GEXF/GML importers throw on non-numeric numeric fields; `updateNode`/`updateEdge` reject orphaned port references and hierarchy-cycle-creating reparents.
+
+  Full changes:
+
+  - **`updateNode`/`updateEdge` now apply every declared field.** Previously `x`/`y`/`width`/`height`/`shape`/`color`/`style` (and edge `mode`/`weight`) were silently dropped. New `NodeUpdate`/`EdgeUpdate` types; optional fields accept `null` to unset (JSON-safe), making diff → patch → apply converge.
+  - **Mode-aware queries.** `getSuccessors`, `getPredecessors`, `getDegree`, `getInDegree`, `getOutDegree`, `getSources`, `getSinks` now honor effective edge directedness (graph `mode` + per-edge overrides). `getInEdges`/`getOutEdges` remain structural (authored direction) and are documented as such.
+  - **Indexing is now O(1) per read** (was O(nodes+edges) on every query — a 10k-node `getSuccessors` sweep dropped from 17.3 s to 14 ms). The index auto-rebuilds when `graph.nodes`/`graph.edges` are replaced or change length; in-place _field_ mutations now require `invalidateIndex()` (previously auto-detected at the cost above). Also fixes stale-index results after immutable-style array replacement.
+  - **Algorithm fixes:** zero-weight-cycle stack overflow in shortest paths/`hasPath` (now BFS-based); Dijkstra/A\* throw on negative weights instead of silently returning wrong paths; `isTree` edge-count check; undirected cycle dedup no longer drops distinct cycles; biconnected components split correctly at DFS-root articulation points; SCC honors undirected/bidirectional edges; `getTopologicalSort` returns `null` for non-directed edges; `isIsomorphic` compares self-loop edges; Prim returns a spanning forest on disconnected graphs (matching Kruskal); undirected self-loops are reported by `getCycles`.
+  - **Mutation safety:** `updateEdge` validates port references when endpoints change; `updateNode` rejects port removals that would orphan edge port refs and parent changes that would create hierarchy cycles.
+  - **Diff:** `getDiff` now covers `ports`, `weight`, `mode`, `sourcePort`, `targetPort`; `invertDiff` no longer aliases its input.
+  - **Transforms:** `reverseGraph` swaps `sourcePort`/`targetPort` and preserves edge `mode` and node ports; `getSubgraph` preserves ports/per-edge mode and strips dangling `initialNodeId`; `flatten` preserves authored leaf self-loops, edge `weight`/`mode`, node fields, and resolves the graph `initialNodeId`.
+  - **Walks:** mode-aware traversal (undirected edges walk both ways); `genQuickRandomWalk` detours honor `filter` and no longer depend on shortest-path reconstruction; `takeUntil*Coverage` yield nothing when the target is already met.
+  - **Formats:** `toD2` no longer crashes on graphs not produced by `fromD2`; xyflow round-trips `data: undefined` without leaking metadata; per-edge `mode` round-trips in cytoscape/d3/jgf/gml/elk/xyflow; GraphML no longer mutates numeric-looking labels or trims whitespace and synthesizes collision-safe edge ids; GEXF preserves empty labels; DOT escapes newlines and quotes reserved keywords; mermaid escapes `|` in labels; `fromAdjacencyList` materializes referenced nodes; the format support matrix now matches actual converter behavior.
+
+### Minor Changes
+
+- [#22](https://github.com/statelyai/graph/pull/22) [`e48bbda`](https://github.com/statelyai/graph/commit/e48bbdad25e4e55ca4c4c7d9b95b33731c0dd73b) Thanks [@davidkpiano](https://github.com/davidkpiano)! - CSR pathfinding, polynomial mixed-graph acyclicity, and malformed-input hardening:
+
+  - **Pathfinding on the CSR core.** Dijkstra/BFS shortest paths and A\* now run on the compressed-sparse-row snapshot. Measured on 50k nodes / 200k edges: single-target `getShortestPath` 329 → 58 ms (5.7×), `getAStarPath` 27 → 7 ms (3.8×), all-targets `getShortestPaths` 514 → 342 ms (reconstruction-bound). Results unchanged (validated by the differential Dijkstra oracle).
+  - **`isAcyclic` on mixed graphs is now polynomial in practice**: cycles among directed edges alone, cycles among non-directed edges alone (union-find), and the all-singleton-SCC case resolve without enumeration; only ambiguous multi-node SCCs fall back to exact simple-cycle search, restricted to that SCC. A 30-diamond acyclic mixed graph (2^30 simple paths) that previously hung now resolves instantly.
+  - **New `getGraphIssues(graph)`** (core export, zod-free): structural invariant checking — duplicate ids, dangling edge endpoints, missing parents, parent cycles (reported once per cycle), missing initial nodes, duplicate port names, invalid port references — with entity-naming messages and machine-readable codes. The recommended gate for untrusted/imported graphs; `@statelyai/graph/schemas`' `validateGraph` now delegates its invariant portion to it.
+  - **Hierarchy queries terminate on malformed parent cycles**: `getAncestors`, `getDescendants`, `getDepth`, and `getLCA` previously hung forever on authored `parentId` cycles; each now stops at the first repeated node (documented convention).
+  - **mermaid/state:** user nodes whose ids merely contain `_region_` (e.g. `foo_region_bar`) are no longer mistaken for parallel-region markers and dropped — region detection now requires the exact structural pattern under a parallel parent.
+
+- [#22](https://github.com/statelyai/graph/pull/22) [`6bead2c`](https://github.com/statelyai/graph/commit/6bead2cadd9913911f02dd34f673aca227b4770d) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Mode unification, standard-GraphML import, and follow-up fixes:
+
+  - **Per-edge `mode` overrides now work everywhere.** `isAcyclic`/`getCycles` dispatch on effective edge modes — genuinely mixed graphs (directed + non-directed edges) use an exact simple-cycle search (correct, may be expensive on large dense mixed graphs); centrality (degree/in/out, closeness, PageRank, HITS, eigenvector), Prim MST, and `isIsomorphic` all honor per-edge modes. `isIsomorphic` no longer requires equal graph-level `mode` (effective edge modes are what's structural). Two parallel undirected edges are now correctly reported as a 2-cycle by `getCycles` (consistent with `isAcyclic`).
+  - **MST output preserves entity fields** (node ports/shape/visual props; edge `mode`/ports/color) instead of stripping them.
+  - **Floyd-Warshall detects negative cycles** and throws a descriptive error instead of crashing during path reconstruction.
+  - **Standard-GraphML import:** nested `<graph>` elements → `parentId` hierarchy, native `<port>` elements → ports, `sourceport`/`targetport` attributes → edge port refs; multi-graph documents import the first graph. The format-support matrix is legitimately back to full hierarchy/ports for GraphML. Numeric `<data>` values that aren't numbers now throw a descriptive error (also in GEXF/GML) instead of silently poisoning the graph with NaN.
+  - **ELK port ids are document-unique** (`nodeId__portName`) as ELK requires; original port names round-trip via metadata; external ELK input with ports resolves to correct endpoints.
+  - **mermaid/state emit:** isolated plain states are emitted; node labels emit via `state "label" as id` (and parse back into `label`); `graph.initialNodeId` round-trips as a top-level `[*] -->` transition.
+  - **xyflow:** parents are ordered before children in `toXYFlow` output, as React Flow requires.
+  - Fixes from re-auditing the previous release: `updateNode` no longer hangs when reparenting onto a graph with a pre-existing authored parent cycle; `invertDiff` deep-copies nested values (ports/style/data) instead of sharing them with the input.
+  - New perf regression test guards the O(1) index read path.
+
+- [#22](https://github.com/statelyai/graph/pull/22) [`c482fcd`](https://github.com/statelyai/graph/commit/c482fcdc672b93b3cbda4b0c74a4e1d70bf3cb40) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Performance core, new algorithms, and a differential-testing correctness moat:
+
+  - **CSR algorithm core.** Hot algorithm loops now run on an internal compressed-sparse-row snapshot (`Int32Array` arcs, integer node indices — no string hashing in inner loops), cached per index and invalidated by the same transparent contract as the index (API mutations, array replacement, length changes; `invalidateIndex()` for in-place field mutation). Measured on a 2k-node/6k-edge graph: closeness 2,575 → 73 ms (35×), betweenness 4,597 → 169 ms (27×), HITS 202 → 4 ms (50×), PageRank 26 → 2 ms (13×); connected components on 100k nodes/100k edges 379 → 7 ms (54×). Head-to-head on identical graphs this is now faster than graphology for betweenness (1.7×), PageRank (1.3×), and components (2×). Public API and results are unchanged (validated by the new differential suite); a thresholded perf regression test guards the CSR path in CI.
+  - **New algorithms:** `getLouvainCommunities` (deterministic Louvain modularity optimization), `getMaxFlow` (Edmonds–Karp max-flow with min-cut edges, capacities from `weight`), `getDominatorTree` (Cooper–Harvey–Kennedy immediate dominators — for statecharts: which states every path from the initial state must pass through), `getTransitiveReduction` (minimal equivalent DAG; throws descriptively on cycles or non-directed edges). All mode-aware where applicable, with known-answer tests (CLRS flow network, dominator-paper examples).
+  - **Differential test suite** (`tests/differential/`): seeded random graphs run through both this library and graphology as an oracle — connected components, Dijkstra distances, PageRank, degrees, and betweenness must agree (158 tests; zero discrepancies found). Plus randomized self-properties: override-equivalence, `reverseGraph` involution, diff→patch convergence under random mutations, `hasPath` ⇔ `getShortestPath`, Prim ≡ Kruskal.
+  - **Structural fix:** one shared, compile-time-guarded `toNodeConfig`/`toEdgeConfig` (adding a field to `GraphNode`/`GraphEdge` now fails compilation until every config producer handles it) adopted by diff, transforms, and MST output — closing the recurring silent-field-drop bug class. MST output no longer shares port objects with the source graph.
+
+### Patch Changes
+
+- [#24](https://github.com/statelyai/graph/pull/24) [`9eca989`](https://github.com/statelyai/graph/commit/9eca9891bb8c918761c87840531124934834bd02) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Bidirectional Dijkstra for single-pair queries + airtight negative-weight enforcement:
+
+  - **`getShortestPath` now runs bidirectional Dijkstra** (forward on traversable arcs, backward on reverse arcs, Pohl termination). On a 50k-node/200k-edge random graph a point query dropped 58 ms → 0.8 ms; in the cross-library harness this is now 2.2× faster than graphology's bidirectional implementation (previously 60× slower). Same results — one shortest path, ties broken arbitrarily as before; `{ algorithm: 'bellman-ford' }` keeps the full search for negative weights.
+  - **Negative-weight detection is now up-front for sublinear searches** (single-pair, early-exit, A*): O(1) via a flag cached on the CSR build for default weights, one O(edges) sweep for custom `getWeight`. Previously a sublinear search could terminate without scanning a reachable negative edge and silently return a wrong path. Corner-case behavior change: these queries now throw even when the negative edge is *unreachable\* from the source — deterministic failure instead of result-dependent behavior.
+
+- [#24](https://github.com/statelyai/graph/pull/24) [`634f618`](https://github.com/statelyai/graph/commit/634f618b47145fcf9653669d0aa7b62e4441810e) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Benchmark-driven pathfinding/traversal performance:
+
+  - `bfs`/`dfs` generators run on the CSR snapshot — a full BFS sweep over a 100k-node/300k-edge graph dropped from 623 ms to 4.4 ms, now the fastest of the five libraries measured (graphology, ngraph, graphlib, cytoscape) instead of the slowest.
+  - Single-target `getShortestPath`/`getShortestPaths({ to })` early-exit the Dijkstra/BFS search once everything at the target's distance is settled (all equal-cost tie paths, including through zero-weight edges, are preserved — tested). Random-graph single-pair queries dropped ~2× on top of the earlier CSR gains.
+
+  Also adds `pnpm bench:compare` — a reproducible cross-library benchmark harness (seeded identical graphs across 4 shapes × 3 sizes, idiomatic public APIs, median-of-runs, markdown/JSON reports in `bench/compare/results/`).
+
 ## 1.0.0
 
 ### Major Changes
