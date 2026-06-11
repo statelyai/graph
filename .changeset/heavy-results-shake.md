@@ -1,8 +1,15 @@
 ---
-'@statelyai/graph': minor
+'@statelyai/graph': major
 ---
 
-Correctness, performance, and API-honesty overhaul:
+Correctness, performance, and API-honesty overhaul.
+
+**Migration notes (the two changes most likely to require action):**
+
+1. **In-place field mutation is no longer auto-detected.** `edge.sourceId = 'x'` / `node.parentId = 'y'` now require `invalidateIndex(graph)` afterwards (or use `updateEdge`/`updateNode`, or immutable-style array replacement — both auto-detected). Code relying on the old per-read deep scan gets stale query results. This trade bought O(1) reads: a 10k-node query sweep dropped from 17.3 s to 14 ms.
+2. **Errors instead of silently wrong results:** Dijkstra/A* throw on negative weights (use `{ algorithm: 'bellman-ford' }`); Floyd-Warshall throws on negative cycles; GraphML/GEXF/GML importers throw on non-numeric numeric fields; `updateNode`/`updateEdge` reject orphaned port references and hierarchy-cycle-creating reparents.
+
+Full changes:
 
 - **`updateNode`/`updateEdge` now apply every declared field.** Previously `x`/`y`/`width`/`height`/`shape`/`color`/`style` (and edge `mode`/`weight`) were silently dropped. New `NodeUpdate`/`EdgeUpdate` types; optional fields accept `null` to unset (JSON-safe), making diff → patch → apply converge.
 - **Mode-aware queries.** `getSuccessors`, `getPredecessors`, `getDegree`, `getInDegree`, `getOutDegree`, `getSources`, `getSinks` now honor effective edge directedness (graph `mode` + per-edge overrides). `getInEdges`/`getOutEdges` remain structural (authored direction) and are documented as such.
