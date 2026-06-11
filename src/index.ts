@@ -1,6 +1,8 @@
 // Types
 export type {
   EntityRect,
+  Point,
+  EdgeRouting,
   GraphMode,
   GraphEntity,
   VisualGraphEntity,

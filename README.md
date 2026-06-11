@@ -238,6 +238,30 @@ getTransitiveReduction(graph); // minimal equivalent DAG
 isIsomorphic(graph, otherGraph); // structural equivalence
 ```
 
+## Layout
+
+Plug-and-play layout over external engines — pure functions in, positioned `VisualGraph` out (node positions, routed edge `points`, computed edge-label rects). No layout algorithms of our own; each adapter is a subpath with an optional peer dependency.
+
+```ts
+import { getElkLayout } from '@statelyai/graph/layout/elk'; // elkjs
+import { getDagreLayout } from '@statelyai/graph/layout/dagre'; // @dagrejs/dagre
+import { getGraphvizLayout } from '@statelyai/graph/layout/graphviz'; // @hpcc-js/wasm-graphviz
+import { genForceLayout } from '@statelyai/graph/layout/d3-force'; // d3-force
+import { applyLayoutFrame, getLayoutBounds } from '@statelyai/graph/layout';
+
+const laidOut = await getElkLayout(graph, {
+  measure: (node) => measureText(node.label), // text measurement stays yours
+});
+
+// Physics layouts are generators — one tick per frame, cancel by stopping
+for (const frame of genForceLayout(graph, { seed: 42 })) {
+  applyLayoutFrame(graph, frame);
+  render(graph);
+}
+```
+
+Edge `x`/`y`/`width`/`height` are canonically the edge-label rect; routes live in `edge.points` (`routing` says how to interpret them). Layouts are plain JSON — diff them with `getPatches` to animate transitions between engines.
+
 ## Diff & Walks
 
 Beyond classic graph algorithms, the library also includes utilities for evolving and exploring graph state:

@@ -23,6 +23,12 @@ export default defineConfig({
     'src/formats/elk/index.ts',
     'src/formats/xyflow/index.ts',
     'src/formats/mermaid/index.ts',
+    // Layout — contract + per-engine adapters (optional peers)
+    'src/layout/index.ts',
+    'src/layout/elk.ts',
+    'src/layout/dagre.ts',
+    'src/layout/d3-force.ts',
+    'src/layout/graphviz.ts',
   ],
   exports: {
     customExports(exports) {

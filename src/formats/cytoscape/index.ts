@@ -81,6 +81,8 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
         if (e.mode) data.mode = e.mode;
         if (e.data !== undefined) data.edgeData = e.data;
         if (e.weight !== undefined) data.weight = e.weight;
+        if (e.points !== undefined) data.points = e.points;
+        if (e.routing !== undefined) data.routing = e.routing;
         if (e.x !== undefined) data.x = e.x;
         if (e.y !== undefined) data.y = e.y;
         if (e.width !== undefined) data.width = e.width;
@@ -154,6 +156,8 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
       ...(e.data.mode && { mode: e.data.mode }),
       data: e.data.edgeData,
       ...(e.data.weight !== undefined && { weight: e.data.weight }),
+      ...(e.data.points !== undefined && { points: e.data.points }),
+      ...(e.data.routing !== undefined && { routing: e.data.routing }),
       ...(e.data.x !== undefined && { x: e.data.x }),
       ...(e.data.y !== undefined && { y: e.data.y }),
       ...(e.data.width !== undefined && { width: e.data.width }),

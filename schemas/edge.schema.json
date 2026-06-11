@@ -42,6 +42,33 @@
         "bidirectional"
       ]
     },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "routing": {
+      "type": "string",
+      "enum": [
+        "polyline",
+        "orthogonal",
+        "splines"
+      ]
+    },
     "data": {},
     "x": {
       "type": "number"

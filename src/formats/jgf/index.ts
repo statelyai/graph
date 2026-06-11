@@ -84,6 +84,8 @@ export function toJGF(graph: Graph): JGFGraph {
         if (e.mode) meta.mode = e.mode;
         if (e.data !== undefined) meta.data = e.data;
         if (e.weight !== undefined) meta.weight = e.weight;
+        if (e.points !== undefined) meta.points = e.points;
+        if (e.routing !== undefined) meta.routing = e.routing;
         if (e.x !== undefined) meta.x = e.x;
         if (e.y !== undefined) meta.y = e.y;
         if (e.width !== undefined) meta.width = e.width;
@@ -167,6 +169,8 @@ export function fromJGF(jgf: JGFGraph): Graph {
       ...(e.metadata?.mode && { mode: e.metadata.mode }),
       data: e.metadata?.data,
       ...(e.metadata?.weight !== undefined && { weight: e.metadata.weight }),
+      ...(e.metadata?.points !== undefined && { points: e.metadata.points }),
+      ...(e.metadata?.routing !== undefined && { routing: e.metadata.routing }),
       ...(e.metadata?.x !== undefined && { x: e.metadata.x }),
       ...(e.metadata?.y !== undefined && { y: e.metadata.y }),
       ...(e.metadata?.width !== undefined && { width: e.metadata.width }),

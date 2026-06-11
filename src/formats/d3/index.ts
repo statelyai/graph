@@ -79,6 +79,8 @@ export function toD3Graph(graph: Graph): D3Graph {
       if (e.mode) link.mode = e.mode;
       if (e.data !== undefined) link.data = e.data;
       if (e.weight !== undefined) link.weight = e.weight;
+      if (e.points !== undefined) link.points = e.points;
+      if (e.routing !== undefined) link.routing = e.routing;
       if (e.x !== undefined) link.x = e.x;
       if (e.y !== undefined) link.y = e.y;
       if (e.width !== undefined) link.width = e.width;
@@ -147,6 +149,8 @@ export function fromD3Graph(d3: D3Graph): Graph {
       ...(l.mode && { mode: l.mode }),
       data: l.data,
       ...(l.weight !== undefined && { weight: l.weight }),
+      ...(l.points !== undefined && { points: l.points }),
+      ...(l.routing !== undefined && { routing: l.routing }),
       ...(l.x !== undefined && { x: l.x }),
       ...(l.y !== undefined && { y: l.y }),
       ...(l.width !== undefined && { width: l.width }),
