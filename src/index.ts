@@ -49,6 +49,10 @@ export type {
   GirvanNewmanOptions,
   LabelPropagationOptions,
   IsomorphismOptions,
+  LouvainOptions,
+  MaxFlowOptions,
+  MaxFlowResult,
+  DominatorTreeOptions,
 } from './algorithms';
 
 // Factory & helpers
@@ -165,6 +169,10 @@ export {
   getArticulationPoints,
   getBiconnectedComponents,
   isIsomorphic,
+  getLouvainCommunities,
+  getMaxFlow,
+  getDominatorTree,
+  getTransitiveReduction,
 } from './algorithms';
 
 // Equivalence

@@ -70,3 +70,14 @@ export {
 
 export { isIsomorphic } from './algorithms/isomorphism';
 export type { IsomorphismOptions } from './algorithms/isomorphism';
+
+export { getLouvainCommunities } from './algorithms/louvain';
+export type { LouvainOptions } from './algorithms/louvain';
+
+export { getMaxFlow } from './algorithms/flow';
+export type { MaxFlowOptions, MaxFlowResult } from './algorithms/flow';
+
+export { getDominatorTree } from './algorithms/dominators';
+export type { DominatorTreeOptions } from './algorithms/dominators';
+
+export { getTransitiveReduction } from './algorithms/reduction';
