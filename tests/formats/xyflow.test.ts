@@ -81,8 +81,47 @@ describe('xyflow', () => {
 
     expect(flow.edges[0].source).toBe('a');
     expect(flow.edges[0].target).toBe('b');
-    // EdgeBase has no label field; label is stored in data
-    expect((flow.edges[0].data as any)?.label).toBe('link');
+    // Top-level label — what React Flow / Svelte Flow render for edges
+    expect(flow.edges[0].label).toBe('link');
+  });
+
+  it('lifts labels to the spots the renderers read (edge.label, node data.label)', () => {
+    const flow = toXYFlow({
+      ...sampleGraph,
+      nodes: [
+        { ...sampleGraph.nodes[0], id: 'a', label: 'Node A' },
+        {
+          ...sampleGraph.nodes[1],
+          id: 'b',
+          label: '',
+          data: { label: 'user label' },
+        },
+      ],
+      edges: [
+        {
+          ...sampleGraph.edges[0],
+          id: 'e1',
+          sourceId: 'a',
+          targetId: 'b',
+          label: 'go',
+        },
+      ],
+    });
+    expect(flow.nodes[0].data.label).toBe('Node A');
+    // Untouched user data.label passes through when the node has no label
+    expect(flow.nodes[1].data.label).toBe('user label');
+    expect(flow.edges[0].label).toBe('go');
+
+    // External React Flow input (no metadata): both spots are read back
+    const parsed = fromXYFlow({
+      nodes: [
+        { id: 'x', position: { x: 0, y: 0 }, data: { label: 'X' } },
+        { id: 'y', position: { x: 10, y: 0 }, data: {} },
+      ],
+      edges: [{ id: 'e', source: 'x', target: 'y', label: 'edge label' }],
+    });
+    expect(parsed.nodes[0].label).toBe('X');
+    expect(parsed.edges[0].label).toBe('edge label');
   });
 
   it('fromXYFlow() parses nodes and edges', () => {

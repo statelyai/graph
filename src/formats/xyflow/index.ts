@@ -8,10 +8,14 @@ export type XYFlowNode<
   TNodeData extends Record<string, unknown> = Record<string, unknown>,
 > = NodeBase<TNodeData>;
 
-/** xyflow Edge — re-exported from `@xyflow/system`. */
+/**
+ * xyflow Edge — `EdgeBase` from `@xyflow/system` plus the top-level `label`
+ * that React Flow / Svelte Flow actually render (it's a renderer prop, so
+ * `EdgeBase` itself doesn't declare it).
+ */
 export type XYFlowEdge<
   TEdgeData extends Record<string, unknown> = Record<string, unknown>,
-> = EdgeBase<TEdgeData>;
+> = EdgeBase<TEdgeData> & { label?: string };
 
 export interface XYFlow<
   TNodeData extends Record<string, unknown> = Record<string, unknown>,
@@ -152,6 +156,8 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
         }),
       };
       if (n.parentId) node.parentId = n.parentId;
+      // React Flow's built-in nodes render `data.label`
+      if (n.label) node.data.label = n.label;
       if (n.shape) node.type = n.shape;
       if (n.width !== undefined) node.width = n.width;
       if (n.height !== undefined) node.height = n.height;
@@ -180,7 +186,9 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
           height: e.height,
         },
       });
-      if (e.label) edge.data.label = e.label;
+      // Top-level `label` is what React Flow / Svelte Flow render for edges
+      // (their built-in edge components ignore `data.label`)
+      if (e.label) edge.label = e.label;
       return edge;
     }),
   };
@@ -241,7 +249,8 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
         label:
           metadata && 'label' in metadata
             ? (metadata.label as string | null)
-            : '',
+            : ((n.data as Record<string, unknown> | undefined)?.label?.toString() ??
+              ''),
         data: readUserData(n.data),
         x: n.position.x,
         y: n.position.y,
@@ -267,7 +276,8 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
         label:
           metadata && 'label' in metadata
             ? (metadata.label as string | null)
-            : ((e.data as Record<string, unknown> | undefined)?.label?.toString() ??
+            : (e.label ??
+              (e.data as Record<string, unknown> | undefined)?.label?.toString() ??
               ''),
         ...(e.sourceHandle && { sourcePort: e.sourceHandle }),
         ...(e.targetHandle && { targetPort: e.targetHandle }),

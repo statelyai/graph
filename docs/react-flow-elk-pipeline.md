@@ -75,9 +75,10 @@ express natively (label, color, ports, weight, …) rides along under a reserved
 
 Two render-side notes:
 
-- React Flow renders the *top-level* `edge.label`, but `toXYFlow` stores the
-  label at `edge.data.label`. Lift it if you want built-in edge labels:
-  `flow.edges.map((e) => ({ ...e, label: (e.data as any)?.label }))`.
+- Labels land where the renderers read them: edge labels on the *top-level*
+  `edge.label` (what React Flow's built-in edges render) and node labels on
+  `data.label` (what the default node renders). `fromXYFlow` reads both spots
+  back, so external React Flow objects import cleanly too.
 - `node.shape` becomes React Flow's `type`. Only set `shape` to values you've
   registered in `nodeTypes`, or React Flow falls back to the default node.
 
