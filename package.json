@@ -42,10 +42,14 @@
     "./tgf": "./dist/formats/tgf/index.mjs",
     "./xyflow": "./dist/formats/xyflow/index.mjs",
     "./layout": "./dist/layout/index.mjs",
+    "./layout/cytoscape": "./dist/layout/cytoscape.mjs",
     "./layout/d3-force": "./dist/layout/d3-force.mjs",
+    "./layout/d3-hierarchy": "./dist/layout/d3-hierarchy.mjs",
     "./layout/dagre": "./dist/layout/dagre.mjs",
     "./layout/elk": "./dist/layout/elk.mjs",
+    "./layout/forceatlas2": "./dist/layout/forceatlas2.mjs",
     "./layout/graphviz": "./dist/layout/graphviz.mjs",
+    "./layout/webcola": "./dist/layout/webcola.mjs",
     "./queries": "./dist/queries.mjs",
     "./schemas": "./dist/schemas.mjs",
     "./package.json": "./package.json"
@@ -82,18 +86,21 @@
     "@hpcc-js/wasm-graphviz": "^1.22.0",
     "@types/d3-array": "^3.2.2",
     "@types/d3-force": "^3.0.10",
+    "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "^25.0.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@xyflow/system": "^0.0.75",
     "bumpp": "^10.3.2",
-    "cytoscape": "^3.33.1",
+    "cytoscape": "^3.34.0",
     "d3-array": "^3.2.4",
     "d3-force": "^3.0.0",
+    "d3-hierarchy": "^3.1.2",
     "dotparser": "^1.1.1",
     "elkjs": "^0.11.1",
     "fast-xml-parser": "^5.3.4",
     "graphology": "^0.26.0",
     "graphology-components": "^1.5.4",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "graphology-metrics": "^2.4.0",
     "graphology-shortest-path": "^2.1.0",
     "graphology-types": "^0.24.8",
@@ -104,24 +111,38 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
+    "webcola": "^3.4.0",
     "xstate": "^5.28.0",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "@dagrejs/dagre": "^4.0.0",
+    "@dagrejs/dagre": "^3.0.0 || ^4.0.0",
     "@hpcc-js/wasm-graphviz": "^1.0.0",
     "cytoscape": "^3.0.0",
     "d3-force": "^3.0.0",
+    "d3-hierarchy": "^3.0.0",
     "dotparser": "^1.0.0",
     "elkjs": "^0.9.0 || ^0.10.0 || ^0.11.0",
     "fast-xml-parser": "^5.0.0",
+    "graphology": "^0.26.0",
+    "graphology-layout-forceatlas2": "^0.10.0",
+    "webcola": "^3.4.0",
     "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
+    "@dagrejs/dagre": {
+      "optional": true
+    },
+    "@hpcc-js/wasm-graphviz": {
+      "optional": true
+    },
     "cytoscape": {
       "optional": true
     },
     "d3-force": {
+      "optional": true
+    },
+    "d3-hierarchy": {
       "optional": true
     },
     "dotparser": {
@@ -133,13 +154,16 @@
     "fast-xml-parser": {
       "optional": true
     },
+    "graphology": {
+      "optional": true
+    },
+    "graphology-layout-forceatlas2": {
+      "optional": true
+    },
+    "webcola": {
+      "optional": true
+    },
     "zod": {
-      "optional": true
-    },
-    "@dagrejs/dagre": {
-      "optional": true
-    },
-    "@hpcc-js/wasm-graphviz": {
       "optional": true
     }
   }

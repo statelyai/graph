@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGraph } from '../src/graph';
-import { getMaxFlow } from '../src/algorithms';
+import { getMaxFlow, getMinCut } from '../src/algorithms';
 
 // Classic CLRS network (Introduction to Algorithms, Fig. 26.1).
 // Known answer: max flow s→t = 23; min cut = ({s,v1,v2,v4},{v3,t})
@@ -168,6 +168,91 @@ describe('getMaxFlow', () => {
 
     expect(() => getMaxFlow(graph, { from: 's', to: 't' })).toThrow(
       /edge "bad" has negative capacity -2/,
+    );
+  });
+});
+
+describe('getMinCut', () => {
+  it('returns the known min cut of the CLRS network', () => {
+    const graph = makeClrsNetwork();
+    const { value, cutEdges, partition } = getMinCut(graph, {
+      source: 's',
+      sink: 't',
+    });
+
+    // Hand-verified (CLRS Fig. 26.1): cut ({s,v1,v2,v4},{v3,t}) of capacity
+    // 12 + 7 + 4 = 23.
+    expect(value).toBe(23);
+    expect([...cutEdges].sort()).toEqual(['v1v3', 'v4t', 'v4v3']);
+    expect(partition.source).toEqual(['s', 'v1', 'v2', 'v4']);
+    expect(partition.sink).toEqual(['v3', 't']);
+  });
+
+  it('matches the max-flow value and the cut capacity', () => {
+    const graph = makeClrsNetwork();
+    const cut = getMinCut(graph, { source: 's', sink: 't' });
+    const flow = getMaxFlow(graph, { from: 's', to: 't' });
+
+    expect(cut.value).toBe(flow.value);
+    const cutCapacity = cut.cutEdges.reduce(
+      (sum, edgeId) =>
+        sum + (graph.edges.find((edge) => edge.id === edgeId)!.weight ?? 1),
+      0,
+    );
+    expect(cutCapacity).toBe(cut.value);
+  });
+
+  it('partitions every node exactly once', () => {
+    const graph = makeClrsNetwork();
+    const { partition } = getMinCut(graph, { source: 's', sink: 't' });
+
+    expect(
+      [...partition.source, ...partition.sink].sort(),
+    ).toEqual(graph.nodes.map((node) => node.id).sort());
+  });
+
+  it('returns an empty cut when source cannot reach sink', () => {
+    const graph = createGraph({
+      nodes: [{ id: 's' }, { id: 't' }, { id: 'x' }],
+      edges: [{ id: 'xt', sourceId: 'x', targetId: 't', weight: 5 }],
+    });
+
+    const { value, cutEdges, partition } = getMinCut(graph, {
+      source: 's',
+      sink: 't',
+    });
+    expect(value).toBe(0);
+    expect(cutEdges).toEqual([]);
+    expect(partition.source).toEqual(['s']);
+    expect(partition.sink).toEqual(['t', 'x']);
+  });
+
+  it('supports a custom getCapacity accessor', () => {
+    const graph = createGraph<any, { cap: number }>({
+      nodes: [{ id: 's' }, { id: 't' }],
+      edges: [{ id: 'st', sourceId: 's', targetId: 't', data: { cap: 9 } }],
+    });
+
+    const { value, cutEdges } = getMinCut(graph, {
+      source: 's',
+      sink: 't',
+      getCapacity: (edge) => edge.data.cap,
+    });
+    expect(value).toBe(9);
+    expect(cutEdges).toEqual(['st']);
+  });
+
+  it('throws with getMinCut-specific messages on invalid options', () => {
+    const graph = createGraph({ nodes: [{ id: 's' }, { id: 't' }] });
+
+    expect(() => getMinCut(graph, { source: 'nope', sink: 't' })).toThrow(
+      /getMinCut: source node "nope" not found in graph — pass an existing node id as options\.source/,
+    );
+    expect(() => getMinCut(graph, { source: 's', sink: 'nope' })).toThrow(
+      /getMinCut: sink node "nope" not found .* options\.sink/,
+    );
+    expect(() => getMinCut(graph, { source: 's', sink: 's' })).toThrow(
+      /must be different nodes/,
     );
   });
 });

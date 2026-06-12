@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { createGraph, getNode, getSuccessors } from '../src';
+import {
+  createGraph,
+  genShortestPaths,
+  getNode,
+  getShortestPaths,
+  getSuccessors,
+} from '../src';
 import { getBetweennessCentrality } from '../src/algorithms';
 
 /**
@@ -66,5 +72,75 @@ describe('index read-path performance', () => {
     // 2,000 lookups in 500 ms = 250 µs/lookup budget; the old linear scan
     // cost ~1,700 µs/lookup and fails this by ~7×.
     expect(elapsed).toBeLessThan(500);
+  });
+});
+
+/**
+ * Guards the lazy-materialization contract of genShortestPaths: the search
+ * keeps its result as typed arrays (distances + parent pointers) and each
+ * path is reconstructed only when the iterator yields it. An abandoned
+ * iterator must not pay for paths (or per-target predecessor objects) it
+ * never yielded.
+ *
+ * All assertions count element reads via proxies — fully deterministic, no
+ * timing.
+ */
+describe('genShortestPaths lazy path materialization', () => {
+  const N = 1_000;
+
+  /** Directed chain n0 -> n1 -> ... with counting proxies on nodes/edges. */
+  const makeCountingChain = () => {
+    const g = createGraph({
+      nodes: Array.from({ length: N }, (_, i) => ({ id: `n${i}` })),
+      edges: Array.from({ length: N - 1 }, (_, i) => ({
+        id: `e${i}`,
+        sourceId: `n${i}`,
+        targetId: `n${i + 1}`,
+      })),
+    });
+    const counts = { nodeReads: 0, edgeReads: 0 };
+    const countingProxy = <T extends object[]>(
+      arr: T,
+      key: 'nodeReads' | 'edgeReads',
+    ): T =>
+      new Proxy(arr, {
+        get(target, prop, receiver) {
+          if (typeof prop === 'string' && /^\d+$/.test(prop)) counts[key]++;
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    g.nodes = countingProxy(g.nodes, 'nodeReads');
+    g.edges = countingProxy(g.edges, 'edgeReads');
+    // Warm the index + CSR (their builds sweep both arrays once)
+    getShortestPaths(g, { from: 'n0', to: 'n1' });
+    counts.nodeReads = 0;
+    counts.edgeReads = 0;
+    return { g, counts };
+  };
+
+  it('an iterator abandoned after the first yield does not materialize other paths', () => {
+    const { g, counts } = makeCountingChain();
+
+    for (const path of genShortestPaths(g, { from: 'n0' })) {
+      expect(path.steps.length).toBe(1);
+      break;
+    }
+
+    // Only the source node and the first target node may be touched. Full
+    // (eager) materialization reads ≥ N node elements.
+    expect(counts.nodeReads).toBeLessThan(10);
+    // The unweighted-search check sweeps edges once (N-1 reads) and the one
+    // yielded path reads its single edge. The old eager implementation also
+    // converted every node's predecessor list to objects up front (~2x).
+    expect(counts.edgeReads).toBeLessThan(N + 100);
+  });
+
+  it('full consumption still materializes every path (sanity check)', () => {
+    const { g, counts } = makeCountingChain();
+
+    const paths = getShortestPaths(g, { from: 'n0' });
+
+    expect(paths.length).toBe(N - 1);
+    expect(counts.nodeReads).toBeGreaterThanOrEqual(N - 1);
   });
 });

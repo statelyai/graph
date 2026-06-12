@@ -113,6 +113,37 @@ describe('community detection', () => {
     ]);
   });
 
+  it('getLabelPropagationCommunities with a seed is deterministic per seed', () => {
+    const graph = makeDisconnectedTriangles();
+
+    const first = getLabelPropagationCommunities(graph, { seed: 42 });
+    const second = getLabelPropagationCommunities(graph, { seed: 42 });
+
+    expect(toIdGroups(first)).toEqual(toIdGroups(second));
+  });
+
+  it('seeded label propagation separates disconnected cliques', () => {
+    const graph = makeDisconnectedTriangles();
+
+    for (const seed of [1, 2, 3, 99]) {
+      const communities = getLabelPropagationCommunities(graph, { seed });
+      expect(toIdGroups(communities)).toEqual([
+        ['a', 'b', 'c'],
+        ['d', 'e', 'f'],
+      ]);
+    }
+  });
+
+  it('seeded label propagation returns a partition covering every node once', () => {
+    const graph = makeTrianglesWithBridge();
+    const communities = getLabelPropagationCommunities(graph, { seed: 7 });
+
+    const allIds = communities.flatMap((community) =>
+      community.map((node) => node.id),
+    );
+    expect([...allIds].sort()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+  });
+
   it('returns empty community collections for an empty graph', () => {
     const graph = createGraph();
 

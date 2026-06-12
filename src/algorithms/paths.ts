@@ -16,10 +16,105 @@ import {
   getNeighborEdges,
   getNeighborEdgesAll,
   getNeighborIds,
-  MinPriorityQueue,
   resolveFrom,
 } from './shared';
 import { getCSR } from './csr';
+
+/**
+ * Flat binary min-heap of `(distance, node position)` entries in parallel
+ * typed arrays. The Dijkstra/A* hot loops push one entry per relaxation, so
+ * avoiding a `{ pos, dist }` wrapper object per push (allocation + property
+ * loads in the sift comparisons) is a measurable win on 10k+ node graphs.
+ * Sifts move "holes" instead of swapping, halving array writes.
+ */
+class TypedMinHeap {
+  private keys: Float64Array;
+  private vals: Int32Array;
+  size = 0;
+
+  constructor(capacity: number) {
+    const cap = Math.max(capacity, 16);
+    this.keys = new Float64Array(cap);
+    this.vals = new Int32Array(cap);
+  }
+
+  push(key: number, val: number): void {
+    if (this.size === this.keys.length) {
+      const keys = new Float64Array(this.keys.length * 2);
+      const vals = new Int32Array(this.vals.length * 2);
+      keys.set(this.keys);
+      vals.set(this.vals);
+      this.keys = keys;
+      this.vals = vals;
+    }
+    const { keys, vals } = this;
+    let hole = this.size++;
+    while (hole > 0) {
+      const parent = (hole - 1) >> 1;
+      if (keys[parent] <= key) break;
+      keys[hole] = keys[parent];
+      vals[hole] = vals[parent];
+      hole = parent;
+    }
+    keys[hole] = key;
+    vals[hole] = val;
+  }
+
+  /** Key of the minimum entry; garbage when empty (check `size` first). */
+  peekKey(): number {
+    return this.keys[0];
+  }
+
+  /** Value of the minimum entry; garbage when empty (check `size` first). */
+  peekVal(): number {
+    return this.vals[0];
+  }
+
+  /** Remove the minimum entry (no-op shape: read via peek* first). */
+  pop(): void {
+    const { keys, vals } = this;
+    const last = --this.size;
+    if (last === 0) return;
+    const key = keys[last];
+    const val = vals[last];
+    let hole = 0;
+    for (;;) {
+      let child = hole * 2 + 1;
+      if (child >= last) break;
+      const right = child + 1;
+      if (right < last && keys[right] < keys[child]) child = right;
+      if (keys[child] >= key) break;
+      keys[hole] = keys[child];
+      vals[hole] = vals[child];
+      hole = child;
+    }
+    keys[hole] = key;
+    vals[hole] = val;
+  }
+}
+
+/**
+ * Result of a single-source shortest-distance search, kept in typed-array
+ * form keyed by CSR node position. Paths are *not* materialized here —
+ * {@link reconstructPathsAt} walks `prevArr` on demand, so abandoning a
+ * `genShortestPaths` iterator early never pays for paths it didn't yield.
+ */
+interface ShortestDistancesResult {
+  /** CSR position of the source, or -1 if the source id is unknown. */
+  source: number;
+  /** Distance per node position; `Infinity` = unreached. */
+  distArr: Float64Array;
+  /**
+   * Tie predecessors per node position as flat `(fromPos, edgeIndex)` pairs;
+   * `undefined` = unreached. Entries for nodes with distance beyond
+   * `stopDistance` are tentative (unsettled) — callers must filter targets
+   * by `stopDistance`; predecessors of any valid target are always settled
+   * (their distance is ≤ the target's).
+   */
+  prevArr: Array<number[] | undefined>;
+  /** Settled horizon after an early exit; `Infinity` for a full search. */
+  stopDistance: number;
+}
 
 function computeShortestDistances<N, E>(
   graph: Graph<N, E>,
@@ -33,31 +128,27 @@ function computeShortestDistances<N, E>(
    * the target survive). Bellman-Ford ignores this (it must relax globally).
    */
   stopAtId?: string,
-): {
-  dist: Map<string, number>;
-  prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>;
-} {
+): ShortestDistancesResult {
   if (algorithm === 'bellman-ford') {
-    return bellmanFord(graph, sourceId, getWeight);
+    return bellmanFordTyped(graph, sourceId, getWeight);
   }
 
-  const dist = new Map<string, number>();
-  const prev = new Map<string, Array<{ from: string; edge: GraphEdge<E> }>>();
-
-  dist.set(sourceId, 0);
-  prev.set(sourceId, []);
-
   const csr = getCSR(graph);
+  const n = csr.ids.length;
   const source = csr.indexOf.get(sourceId);
   if (source === undefined) {
     // Unknown source id: nothing is reachable (matches pre-CSR behavior)
-    return { dist, prev };
+    return {
+      source: -1,
+      distArr: new Float64Array(0),
+      prevArr: [],
+      stopDistance: Infinity,
+    };
   }
 
-  const n = csr.ids.length;
   const distArr = new Float64Array(n).fill(Infinity);
   // Tie predecessors per node as (fromPos, edgeIndex) pairs
-  const prevArr: Array<number[]> = new Array(n);
+  const prevArr: Array<number[] | undefined> = new Array(n);
   distArr[source] = 0;
   prevArr[source] = [];
 
@@ -99,20 +190,20 @@ function computeShortestDistances<N, E>(
           prevArr[v] = [u, csr.outEdgeIndex[a]];
           queue[tail++] = v;
         } else if (distArr[v] === nextDistance) {
-          prevArr[v].push(u, csr.outEdgeIndex[a]);
+          prevArr[v]!.push(u, csr.outEdgeIndex[a]);
         }
       }
     }
   } else {
     const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
     const visited = new Uint8Array(n);
-    const pq = new MinPriorityQueue<{ pos: number; dist: number }>(
-      (a, b) => a.dist - b.dist,
-    );
-    pq.push({ pos: source, dist: 0 });
+    const pq = new TypedMinHeap(n);
+    pq.push(0, source);
 
     while (pq.size > 0) {
-      const { pos: u, dist: distance } = pq.pop()!;
+      const distance = pq.peekKey();
+      const u = pq.peekVal();
+      pq.pop();
       if (visited[u] || distance !== distArr[u]) continue;
       // Early exit: all nodes at distance ≤ dist(target) are settled
       if (distance > stopDistance) break;
@@ -133,33 +224,54 @@ function computeShortestDistances<N, E>(
         if (nextDistance < distArr[v]) {
           distArr[v] = nextDistance;
           prevArr[v] = [u, csr.outEdgeIndex[a]];
-          pq.push({ pos: v, dist: nextDistance });
+          pq.push(nextDistance, v);
         } else if (nextDistance === distArr[v] && distArr[v] !== Infinity) {
-          prevArr[v].push(u, csr.outEdgeIndex[a]);
+          prevArr[v]!.push(u, csr.outEdgeIndex[a]);
         }
       }
     }
   }
 
-  // Convert reached nodes back to the id-keyed shape reconstruction expects.
-  // After an early exit, nodes beyond the stop distance hold tentative
-  // (unsettled) values — exclude them; they cannot lie on any shortest path
-  // to the target.
-  for (let i = 0; i < n; i++) {
-    if (distArr[i] === Infinity || distArr[i] > stopDistance) continue;
-    dist.set(csr.ids[i], distArr[i]);
-    const pairs = prevArr[i];
-    const predecessors: Array<{ from: string; edge: GraphEdge<E> }> = [];
-    for (let k = 0; k < pairs.length; k += 2) {
-      predecessors.push({
-        from: csr.ids[pairs[k]],
-        edge: graph.edges[pairs[k + 1]] as GraphEdge<E>,
-      });
+  return { source, distArr, prevArr, stopDistance };
+}
+
+/**
+ * Bellman-Ford adapted to the typed-array result shape. The O(VE) relaxation
+ * dominates, so the id→position conversion here is noise — and it keeps a
+ * single reconstruction path for both algorithms.
+ */
+function bellmanFordTyped<N, E>(
+  graph: Graph<N, E>,
+  sourceId: string,
+  getWeight?: (edge: GraphEdge<E>) => number,
+): ShortestDistancesResult {
+  const { dist, prev } = bellmanFord(graph, sourceId, getWeight);
+  const csr = getCSR(graph);
+  const idx = getIndex(graph);
+  const n = csr.ids.length;
+  const distArr = new Float64Array(n).fill(Infinity);
+  const prevArr: Array<number[] | undefined> = new Array(n);
+
+  for (const [id, distance] of dist) {
+    const pos = csr.indexOf.get(id);
+    if (pos === undefined) continue;
+    distArr[pos] = distance;
+    const pairs: number[] = [];
+    for (const { from, edge } of prev.get(id) ?? []) {
+      const fromPos = csr.indexOf.get(from);
+      const edgeIndex = idx.edgeById.get(edge.id);
+      if (fromPos === undefined || edgeIndex === undefined) continue;
+      pairs.push(fromPos, edgeIndex);
     }
-    prev.set(csr.ids[i], predecessors);
+    prevArr[pos] = pairs;
   }
 
-  return { dist, prev };
+  return {
+    source: csr.indexOf.get(sourceId) ?? -1,
+    distArr,
+    prevArr,
+    stopDistance: Infinity,
+  };
 }
 
 function bellmanFord<N, E>(
@@ -244,51 +356,56 @@ function bellmanFord<N, E>(
   return { dist, prev };
 }
 
-function* reconstructPaths<N, E>(
+function* reconstructPathsAt<N, E>(
   graph: Graph<N, E>,
-  prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>,
+  prevArr: Array<number[] | undefined>,
   sourceNode: GraphNode<N>,
-  targetId: string,
-  onPath: Set<string> = new Set(),
+  sourcePos: number,
+  targetPos: number,
+  onPath: Set<number> = new Set(),
 ): Generator<GraphPath<N, E>> {
-  if (targetId === sourceNode.id) {
+  if (targetPos === sourcePos) {
     yield { source: sourceNode, steps: [] };
     return;
   }
 
-  const predecessors = prev.get(targetId);
-  if (!predecessors || predecessors.length === 0) return;
+  const pairs = prevArr[targetPos];
+  if (!pairs || pairs.length === 0) return;
 
-  const idx = getIndex(graph);
-  const targetNi = idx.nodeById.get(targetId);
-  const targetNode =
-    targetNi !== undefined
-      ? graph.nodes[targetNi]
-      : graph.nodes.find((node) => node.id === targetId)!;
+  // CSR positions are `graph.nodes` positions, so no id lookup is needed.
+  const targetNode = graph.nodes[targetPos] as GraphNode<N>;
 
   // Track nodes on the current partial path — zero-weight cycles can make
-  // the `prev` structure cyclic via equal-distance tie predecessors, so
-  // never revisit a node already on the path being reconstructed.
-  onPath.add(targetId);
-  for (const { from, edge } of predecessors) {
-    if (onPath.has(from)) continue;
-    for (const prefix of reconstructPaths(graph, prev, sourceNode, from, onPath)) {
+  // the predecessor structure cyclic via equal-distance tie predecessors,
+  // so never revisit a node already on the path being reconstructed.
+  onPath.add(targetPos);
+  for (let k = 0; k < pairs.length; k += 2) {
+    const fromPos = pairs[k];
+    if (onPath.has(fromPos)) continue;
+    const edge = graph.edges[pairs[k + 1]] as GraphEdge<E>;
+    for (const prefix of reconstructPathsAt(
+      graph,
+      prevArr,
+      sourceNode,
+      sourcePos,
+      fromPos,
+      onPath,
+    )) {
       yield {
         source: sourceNode,
         steps: [...prefix.steps, { edge, node: targetNode }],
       };
     }
   }
-  onPath.delete(targetId);
+  onPath.delete(targetPos);
 }
 
 export function* genShortestPaths<N, E>(
   graph: Graph<N, E>,
   opts?: PathOptions<E>,
 ): Generator<GraphPath<N, E>> {
-  const idx = getIndex(graph);
   const sourceId = resolveFrom(graph, opts);
-  const { dist, prev } = computeShortestDistances(
+  const { source, distArr, prevArr, stopDistance } = computeShortestDistances(
     graph,
     sourceId,
     opts?.getWeight,
@@ -296,18 +413,44 @@ export function* genShortestPaths<N, E>(
     opts?.to, // single-target queries early-exit the search
   );
 
-  const targets = opts?.to
-    ? [opts.to].filter((id) => dist.has(id))
-    : [...dist.keys()].filter((id) => id !== sourceId);
-
-  const sourceNi = idx.nodeById.get(sourceId);
   const sourceNode =
-    sourceNi !== undefined
-      ? graph.nodes[sourceNi]
+    source !== -1
+      ? (graph.nodes[source] as GraphNode<N>)
       : graph.nodes.find((node) => node.id === sourceId)!;
 
-  for (const targetId of targets) {
-    yield* reconstructPaths(graph, prev, sourceNode, targetId);
+  if (source === -1) {
+    // Unknown source id: nothing is reachable; only the trivial self-path
+    // when it is explicitly requested.
+    if (opts?.to === sourceId) yield { source: sourceNode, steps: [] };
+    return;
+  }
+
+  const csr = getCSR(graph);
+
+  if (opts?.to) {
+    const target = csr.indexOf.get(opts.to);
+    // After an early exit, distances beyond the settled horizon are
+    // tentative — such nodes are not valid targets.
+    if (
+      target === undefined ||
+      distArr[target] === Infinity ||
+      distArr[target] > stopDistance
+    ) {
+      return;
+    }
+    yield* reconstructPathsAt(graph, prevArr, sourceNode, source, target);
+    return;
+  }
+
+  for (let target = 0; target < distArr.length; target++) {
+    if (
+      target === source ||
+      distArr[target] === Infinity ||
+      distArr[target] > stopDistance
+    ) {
+      continue;
+    }
+    yield* reconstructPathsAt(graph, prevArr, sourceNode, source, target);
   }
 }
 
@@ -411,37 +554,39 @@ function bidirectionalShortestPath<N, E>(
   const predBEdge = new Int32Array(n).fill(-1);
   const settledF = new Uint8Array(n);
   const settledB = new Uint8Array(n);
-  const compare = (a: { dist: number }, b: { dist: number }) => a.dist - b.dist;
-  const pqF = new MinPriorityQueue<{ pos: number; dist: number }>(compare);
-  const pqB = new MinPriorityQueue<{ pos: number; dist: number }>(compare);
+  const pqF = new TypedMinHeap(n);
+  const pqB = new TypedMinHeap(n);
 
   distF[source] = 0;
   distB[target] = 0;
-  pqF.push({ pos: source, dist: 0 });
-  pqB.push({ pos: target, dist: 0 });
+  pqF.push(0, source);
+  pqB.push(0, target);
 
   let mu = Infinity;
   let meet = -1;
 
   /** Discard stale/settled heap entries; return the next valid key. */
   const validTop = (
-    pq: MinPriorityQueue<{ pos: number; dist: number }>,
+    pq: TypedMinHeap,
     dist: Float64Array,
     settled: Uint8Array,
   ): number | undefined => {
-    for (;;) {
-      const top = pq.peek();
-      if (top === undefined) return undefined;
-      if (settled[top.pos] || top.dist !== dist[top.pos]) {
+    while (pq.size > 0) {
+      const key = pq.peekKey();
+      const pos = pq.peekVal();
+      if (settled[pos] || key !== dist[pos]) {
         pq.pop();
         continue;
       }
-      return top.dist;
+      return key;
     }
+    return undefined;
   };
 
   const scanForward = () => {
-    const { pos: u, dist: d } = pqF.pop()!;
+    const d = pqF.peekKey();
+    const u = pqF.peekVal();
+    pqF.pop();
     settledF[u] = 1;
     for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
       const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
@@ -452,7 +597,7 @@ function bidirectionalShortestPath<N, E>(
         distF[v] = next;
         predF[v] = u;
         predFEdge[v] = csr.outEdgeIndex[a];
-        pqF.push({ pos: v, dist: next });
+        pqF.push(next, v);
       }
       // distB[v] is the cost of a real backward path (tentative or settled),
       // so next + distB[v] is the cost of a real s→t path
@@ -464,7 +609,9 @@ function bidirectionalShortestPath<N, E>(
   };
 
   const scanBackward = () => {
-    const { pos: u, dist: d } = pqB.pop()!;
+    const d = pqB.peekKey();
+    const u = pqB.peekVal();
+    pqB.pop();
     settledB[u] = 1;
     for (let a = csr.inOffsets[u]; a < csr.inOffsets[u + 1]; a++) {
       const edge = graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>;
@@ -475,7 +622,7 @@ function bidirectionalShortestPath<N, E>(
         distB[v] = next;
         predB[v] = u;
         predBEdge[v] = csr.inEdgeIndex[a];
-        pqB.push({ pos: v, dist: next });
+        pqB.push(next, v);
       }
       if (distF[v] !== Infinity && next + distF[v] < mu) {
         mu = next + distF[v];
@@ -1017,9 +1164,8 @@ export function getAStarPath<N, E>(
   const cameFromPos = new Int32Array(n).fill(-1);
   const cameFromEdge = new Int32Array(n).fill(-1);
   const closed = new Uint8Array(n);
-  const openSet = new MinPriorityQueue<{ pos: number; f: number }>(
-    (a, b) => a.f - b.f,
-  );
+  // Heap key is the f-score (g + heuristic)
+  const openSet = new TypedMinHeap(n);
 
   // A* with a heuristic may finish without scanning a reachable negative
   // edge — enforce the throw-on-negative contract up front
@@ -1032,10 +1178,11 @@ export function getAStarPath<N, E>(
   );
 
   gScore[source] = 0;
-  openSet.push({ pos: source, f: heuristic(sourceId) });
+  openSet.push(heuristic(sourceId), source);
 
   while (openSet.size > 0) {
-    const { pos: current } = openSet.pop()!;
+    const current = openSet.peekVal();
+    openSet.pop();
     if (closed[current]) continue;
 
     if (current === target) {
@@ -1064,10 +1211,7 @@ export function getAStarPath<N, E>(
         cameFromPos[neighbor] = current;
         cameFromEdge[neighbor] = csr.outEdgeIndex[a];
         gScore[neighbor] = tentativeScore;
-        openSet.push({
-          pos: neighbor,
-          f: tentativeScore + heuristic(csr.ids[neighbor]),
-        });
+        openSet.push(tentativeScore + heuristic(csr.ids[neighbor]), neighbor);
       }
     }
   }

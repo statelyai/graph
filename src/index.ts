@@ -47,6 +47,8 @@ export type {
 } from './types';
 export type {
   IterativeCentralityOptions,
+  EigenvectorCentralityOptions,
+  KatzCentralityOptions,
   HITSResult,
   GirvanNewmanOptions,
   LabelPropagationOptions,
@@ -54,6 +56,9 @@ export type {
   LouvainOptions,
   MaxFlowOptions,
   MaxFlowResult,
+  MinCutOptions,
+  MinCutResult,
+  BipartiteMatch,
   DominatorTreeOptions,
 } from './algorithms';
 
@@ -166,6 +171,11 @@ export {
   getPageRank,
   getHITS,
   getEigenvectorCentrality,
+  getKatzCentrality,
+  getCoreNumbers,
+  getKCore,
+  isBipartite,
+  getMaximumBipartiteMatching,
   getLabelPropagationCommunities,
   genGirvanNewmanCommunities,
   getGirvanNewmanCommunities,
@@ -177,9 +187,17 @@ export {
   isIsomorphic,
   getLouvainCommunities,
   getMaxFlow,
+  getMinCut,
   getDominatorTree,
   getTransitiveReduction,
 } from './algorithms';
+
+// Generators
+export {
+  createCompleteGraph,
+  createGridGraph,
+  createRandomGraph,
+} from './generators';
 
 // Equivalence
 export {

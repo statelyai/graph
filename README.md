@@ -14,14 +14,19 @@ Optional peers are only needed for specific adapters:
 
 <!-- optional peer dependencies derived from package.json#peerDependencies -->
 
-| Package           | Needed for                                          |
-| ----------------- | --------------------------------------------------- |
-| `fast-xml-parser` | `@statelyai/graph/gexf`, `@statelyai/graph/graphml` |
-| `dotparser`       | `@statelyai/graph/dot` parsing                      |
-| `cytoscape`       | Cytoscape integration tests and consumer typing     |
-| `d3-force`        | D3 force integration tests and consumer typing      |
-| `elkjs`           | `@statelyai/graph/elk`                              |
-| `zod`             | `@statelyai/graph/schemas`                          |
+| Package                                     | Needed for                                          |
+| ------------------------------------------- | --------------------------------------------------- |
+| `fast-xml-parser`                           | `@statelyai/graph/gexf`, `@statelyai/graph/graphml` |
+| `dotparser`                                 | `@statelyai/graph/dot` parsing                      |
+| `zod`                                       | `@statelyai/graph/schemas`                          |
+| `elkjs`                                     | `@statelyai/graph/elk`, `@statelyai/graph/layout/elk` |
+| `@dagrejs/dagre`                            | `@statelyai/graph/layout/dagre`                     |
+| `@hpcc-js/wasm-graphviz`                    | `@statelyai/graph/layout/graphviz`                  |
+| `d3-force`                                  | `@statelyai/graph/layout/d3-force`                  |
+| `graphology`, `graphology-layout-forceatlas2` | `@statelyai/graph/layout/forceatlas2`             |
+| `d3-hierarchy`                              | `@statelyai/graph/layout/d3-hierarchy`              |
+| `webcola`                                   | `@statelyai/graph/layout/webcola`                   |
+| `cytoscape`                                 | `@statelyai/graph/layout/cytoscape`, Cytoscape format typing |
 
 ## Highlights
 
@@ -29,7 +34,8 @@ Optional peers are only needed for specific adapters:
 - Standalone functions with a consistent `get*`/`gen*`/`is*`/`add*` naming model
 - Directed, undirected, hierarchical, and visual graph support
 - Ports for node-editor and dataflow-style graphs
-- Algorithms for traversal, paths, centrality, communities, connectivity, isomorphism, ordering, MST, and walks
+- Algorithms for traversal, paths, centrality, communities, connectivity, flow/cuts, matching, cores, isomorphism, ordering, MST, and walks
+- Pluggable layout over eight external engines (ELK, Graphviz, dagre, d3-force, ForceAtlas2, tidy tree, WebCola, cytoscape) — pure functions, optional peers
 - Diff/patch utilities for graph state changes
 - Multi-format conversion via package subpaths, with fidelity claims tested against fixtures
 - Small, fast test suite with broad format coverage
@@ -188,7 +194,7 @@ const parsed = GraphSchema.parse(unknownValue);
 
 <!-- algorithm functions exported from src/algorithms.ts -->
 
-Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow (max-flow/min-cut), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and more. Many algorithms have lazy generator variants (`gen*`) for early exit.
+Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
 
 Hot algorithm loops (centrality, components) run on an internal compressed-sparse-row snapshot — cached and invalidated transparently like the rest of the index — so they stay fast on large graphs without changing the plain-JSON model. Algorithm results are differential-tested against graphology on seeded random graphs.
 
@@ -240,17 +246,24 @@ isIsomorphic(graph, otherGraph); // structural equivalence
 
 ## Layout
 
-Plug-and-play layout over external engines — pure functions in, positioned `VisualGraph` out (node positions, routed edge `points`, computed edge-label rects). No layout algorithms of our own; each adapter is a subpath with an optional peer dependency.
+<!-- layout adapters under src/layout/*.ts and helpers exported from src/layout/index.ts -->
+
+Plug-and-play layout over external engines — pure functions in, positioned `VisualGraph` out. No layout algorithms of our own; each adapter is a subpath with an optional peer dependency. The hierarchical engines (ELK, dagre, Graphviz) also produce routed edge `points` and computed edge-label rects; the physics/tree/cytoscape engines position nodes only.
 
 ```ts
 import { getElkLayout } from '@statelyai/graph/layout/elk'; // elkjs
 import { getDagreLayout } from '@statelyai/graph/layout/dagre'; // @dagrejs/dagre
-import { getGraphvizLayout } from '@statelyai/graph/layout/graphviz'; // @hpcc-js/wasm-graphviz
+import { getGraphvizLayout } from '@statelyai/graph/layout/graphviz'; // @hpcc-js/wasm-graphviz (8 engines)
 import { genForceLayout } from '@statelyai/graph/layout/d3-force'; // d3-force
-import { applyLayoutFrame, getLayoutBounds } from '@statelyai/graph/layout';
+import { getForceAtlas2Layout } from '@statelyai/graph/layout/forceatlas2'; // graphology FA2
+import { getTidyTreeLayout } from '@statelyai/graph/layout/d3-hierarchy'; // d3-hierarchy
+import { getColaLayout } from '@statelyai/graph/layout/webcola'; // webcola (constraints)
+import { getCytoscapeLayout } from '@statelyai/graph/layout/cytoscape'; // cytoscape ecosystem
+import { applyLayoutFrame, getLayoutBounds, centerGraph } from '@statelyai/graph/layout';
 
 const laidOut = await getElkLayout(graph, {
   measure: (node) => measureText(node.label), // text measurement stays yours
+  constraints: { layer: (node) => node.data?.tier }, // portable layer constraint
 });
 
 // Physics layouts are generators — one tick per frame, cancel by stopping
@@ -260,7 +273,7 @@ for (const frame of genForceLayout(graph, { seed: 42 })) {
 }
 ```
 
-Edge `x`/`y`/`width`/`height` are canonically the edge-label rect; routes live in `edge.points` (`routing` says how to interpret them). Layouts are plain JSON — diff them with `getPatches` to animate transitions between engines.
+Edge `x`/`y`/`width`/`height` are canonically the edge-label rect; routes live in `edge.points` (`routing` says how to interpret them). Layouts are plain JSON — tween between engines with `genLayoutTransition`, or diff them with `getPatches`. See [docs/layout.md](./docs/layout.md) and [docs/layout-transitions.md](./docs/layout-transitions.md).
 
 ## Diff & Walks
 
@@ -370,6 +383,17 @@ Format-specific docs live alongside the source:
 - [TGF](./src/formats/tgf/README.md)
 - [xyflow](./src/formats/xyflow/README.md)
 - [Converter helpers](./src/formats/converter/README.md)
+
+## Guides
+
+<!-- guide documents under docs/*.md -->
+
+- [Layout guide](./docs/layout.md) — the adapter contract, all eight engines, constraints, sizing, web workers
+- [Layout transitions](./docs/layout-transitions.md) — tween between engines; layouts are just data
+- [Algorithms reference](./docs/algorithms.md) — every algorithm with complexity and semantics notes
+- [Benchmarks](./docs/benchmarks.md) — measured against graphology, ngraph, graphlib, and cytoscape
+- [Migrating from graphlib](./docs/migrating-from-graphlib.md)
+- [React Flow + ELK pipeline](./docs/react-flow-elk-pipeline.md) — measured nodes, worker layout, live re-layout
 
 ## Examples
 

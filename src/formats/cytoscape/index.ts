@@ -28,7 +28,7 @@ export interface CytoscapeJSON {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { toCytoscapeJSON } from '@statelyai/graph/formats/cytoscape';
+ * import { toCytoscapeJSON } from '@statelyai/graph/cytoscape';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
@@ -102,7 +102,7 @@ export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
  *
  * @example
  * ```ts
- * import { fromCytoscapeJSON } from '@statelyai/graph/formats/cytoscape';
+ * import { fromCytoscapeJSON } from '@statelyai/graph/cytoscape';
  *
  * const graph = fromCytoscapeJSON({
  *   elements: {
@@ -176,7 +176,7 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { cytoscapeConverter } from '@statelyai/graph/formats/cytoscape';
+ * import { cytoscapeConverter } from '@statelyai/graph/cytoscape';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],

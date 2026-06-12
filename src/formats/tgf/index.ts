@@ -9,7 +9,7 @@ import { createFormatConverter } from '../converter';
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { toTGF } from '@statelyai/graph/formats/tgf';
+ * import { toTGF } from '@statelyai/graph/tgf';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
@@ -43,7 +43,7 @@ export function toTGF(graph: Graph): string {
  *
  * @example
  * ```ts
- * import { fromTGF } from '@statelyai/graph/formats/tgf';
+ * import { fromTGF } from '@statelyai/graph/tgf';
  *
  * const graph = fromTGF('a A\nb B\n#\na b go');
  * // graph.nodes = [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]
@@ -109,7 +109,7 @@ export function fromTGF(tgf: string): Graph {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { tgfConverter } from '@statelyai/graph/formats/tgf';
+ * import { tgfConverter } from '@statelyai/graph/tgf';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],

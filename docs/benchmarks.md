@@ -1,0 +1,182 @@
+# Benchmarks
+
+Cross-library comparison of `@statelyai/graph` against [graphology](https://graphology.github.io/), [ngraph](https://github.com/anvaka/ngraph.graph), [@dagrejs/graphlib](https://github.com/dagrejs/graphlib), and [cytoscape](https://js.cytoscape.org/) (headless) on seven workloads: graph construction, BFS reachability, single-pair shortest path, PageRank, connected components, betweenness centrality, and a full degree sweep.
+
+- **Measured:** 2026-06-12 on an Apple M1 Max (10 cores), Node v25.9.0 (darwin/arm64). Library versions: graphology 0.26, ngraph.graph 20.1 / ngraph.path 1.6, @dagrejs/graphlib 4.0, cytoscape 3.34.
+- **Numbers are medians** (milliseconds) of ≥5 runs after warmup, within a 1.5 s sampling budget per cell.
+- Machine specifics matter. Reproduce on your own hardware with:
+
+  ```bash
+  pnpm bench:compare           # 1k / 10k / 100k nodes
+  pnpm bench:compare -- --quick  # 1k / 10k only
+  ```
+
+Cell legend: **bold** = fastest for that row; `(n.n×)` = multiple of the fastest; `—` = the library has no equivalent API; `>10s` = skipped after a prior run exceeded 10 s; `crash` = the library threw (the error is recorded in the JSON results).
+
+> **Sub-millisecond caveat:** cells under ~0.1 ms (notably scaleFree traversals, which reach few nodes from the start node) are dominated by call overhead. Treat their ratios as noise, in either direction.
+
+## Build
+
+Construct the graph from an identical node/edge list.
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | **1.3** | 5.7 (4.4×) | 2.2 (1.7×) | 16.4 (12.9×) | 40.2 (31.7×) |
+| scaleFree 1,000 | **1.0** | 3.3 (3.3×) | 1.6 (1.6×) | 12.6 (12.5×) | 27.7 (27.7×) |
+| grid 1,000 | **0.88** | 2.0 (2.2×) | 1.3 (1.5×) | 9.0 (10.2×) | 23.4 (26.7×) |
+| layeredDag 1,000 | **0.82** | 2.8 (3.5×) | 1.8 (2.2×) | 11.6 (14.2×) | 21.6 (26.4×) |
+| random 10,000 | **9.2** | 41.8 (4.6×) | 16.0 (1.7×) | 122 (13.3×) | 328 (35.8×) |
+| scaleFree 10,000 | **13.4** | 53.0 (4.0×) | 21.9 (1.6×) | 151 (11.2×) | 308 (22.9×) |
+| grid 10,000 | **4.8** | 23.7 (4.9×) | 8.9 (1.9×) | 57.9 (12.0×) | 235 (48.9×) |
+| layeredDag 10,000 | **5.4** | 45.6 (8.5×) | 11.0 (2.0×) | 87.6 (16.2×) | 319 (59.2×) |
+| random 100,000 | **63.4** | 935 (14.7×) | 362 (5.7×) | 1943 (30.6×) | 4629 (73.0×) |
+| scaleFree 100,000 | **48.3** | 732 (15.2×) | 288 (6.0×) | 1348 (27.9×) | 3469 (71.8×) |
+| grid 100,000 | **38.8** | 349 (9.0×) | 114 (2.9×) | 840 (21.7×) | 2954 (76.2×) |
+| layeredDag 100,000 | **56.6** | 527 (9.3×) | 201 (3.5×) | 1233 (21.8×) | 4908 (86.7×) |
+
+## BFS
+
+Full directed reachability sweep from node 0. Libraries without a built-in traversal get a minimal queue loop over their neighbor API.
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | **0.04** | 0.23 (5.7×) | 0.31 (7.7×) | 0.26 (6.5×) | 17.2 (425.1×) |
+| scaleFree 1,000 | 0.00 (7.7×) | 0.00 (1.7×) | 0.01 (70.7×) | **0.00** | 1.0 (8235.7×) |
+| grid 1,000 | **0.03** | 0.17 (6.5×) | 0.18 (7.0×) | 0.08 (3.1×) | 9.8 (381.0×) |
+| layeredDag 1,000 | **0.02** | 0.16 (6.9×) | 0.25 (10.6×) | 0.09 (3.6×) | 12.3 (523.0×) |
+| random 10,000 | **0.41** | 5.6 (13.7×) | 3.8 (9.1×) | 2.0 (4.8×) | 228 (552.7×) |
+| scaleFree 10,000 | 0.01 (88.3×) | 0.00 (1.5×) | 0.05 (542.2×) | **0.00** | 28.3 (336376.0×) |
+| grid 10,000 | **0.21** | 2.1 (9.7×) | 1.8 (8.3×) | 1.5 (7.0×) | 125 (591.7×) |
+| layeredDag 10,000 | **0.33** | 2.8 (8.6×) | 2.5 (7.6×) | 1.4 (4.2×) | 163 (498.3×) |
+| random 100,000 | **5.2** | 251 (48.7×) | 119 (23.0×) | 75.7 (14.7×) | 7197 (1395.9×) |
+| scaleFree 100,000 | 0.05 (546.2×) | 0.00 (1.5×) | 0.06 (684.2×) | **0.00** | 306 (3683618.8×) |
+| grid 100,000 | **2.2** | 67.2 (30.3×) | 30.1 (13.6×) | 61.4 (27.7×) | 1747 (788.8×) |
+| layeredDag 100,000 | **3.6** | 63.5 (17.5×) | 41.1 (11.4×) | 57.2 (15.8×) | 2342 (647.6×) |
+
+The scaleFree rows are sub-millisecond for everyone (few nodes are reachable from node 0); their ratios are noise.
+
+## Single-pair shortest path (sssp)
+
+Weighted shortest path from node 0 to node n−1. `@statelyai/graph` uses `getShortestPath` (bidirectional Dijkstra); graphology uses `dijkstra.bidirectional`; ngraph uses `ngraph.path` A\*. graphlib's only shortest-path API is full single-source Dijkstra, so its cell pays the all-targets cost — that is the cost a graphlib user pays for one query.
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | **0.04** | 0.11 (3.1×) | 0.36 (10.2×) | 2.8 (79.3×) | 25.8 (727.7×) |
+| scaleFree 1,000 | 0.01 (7.6×) | **0.00** | 0.01 (8.2×) | 1.5 (1255.9×) | 4.2 (3563.8×) |
+| grid 1,000 | **0.21** | 0.96 (4.6×) | 0.33 (1.6×) | 2.5 (11.7×) | 15.0 (71.9×) |
+| layeredDag 1,000 | **0.14** | 0.62 (4.4×) | 0.39 (2.8×) | 2.5 (17.8×) | 20.6 (145.6×) |
+| random 10,000 | **0.17** | 0.30 (1.8×) | 3.7 (22.6×) | 23.7 (143.3×) | 333 (2015.8×) |
+| scaleFree 10,000 | 0.07 (74.7×) | **0.00** | 0.01 (12.7×) | 6.5 (6827.4×) | 49.2 (51393.4×) |
+| grid 10,000 | **0.71** | 15.6 (21.9×) | 3.2 (4.5×) | 18.5 (26.0×) | 206 (289.4×) |
+| layeredDag 10,000 | **1.6** | 15.1 (9.2×) | 4.9 (3.0×) | 22.6 (13.8×) | 291 (177.1×) |
+| random 100,000 | **0.93** | 4.6 (5.0×) | 272 (292.4×) | 501 (538.0×) | 6531 (7008.8×) |
+| scaleFree 100,000 | 0.63 (652.7×) | **0.00** | 0.03 (33.9×) | 69.1 (72137.9×) | 650 (678045.5×) |
+| grid 100,000 | **20.2** | 422 (20.9×) | 57.0 (2.8×) | 335 (16.6×) | 4163 (205.8×) |
+| layeredDag 100,000 | **23.5** | 369 (15.7×) | 85.3 (3.6×) | 383 (16.3×) | 5162 (220.0×) |
+
+graphology wins the scaleFree rows; on those graphs node n−1 is typically unreachable from node 0 and the search terminates almost immediately, so the cells are sub-millisecond for both bidirectional implementations.
+
+## PageRank
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | **0.72** | 1.6 (2.2×) | — | — | 20.1 (28.0×) |
+| scaleFree 1,000 | **0.83** | 1.0 (1.2×) | — | — | 28.3 (33.9×) |
+| grid 1,000 | **0.54** | 0.80 (1.5×) | — | — | 31.0 (57.2×) |
+| layeredDag 1,000 | **0.54** | 0.93 (1.7×) | — | — | 35.1 (64.5×) |
+| random 10,000 | **4.9** | 10.7 (2.2×) | — | — | 7682 (1572.2×) |
+| scaleFree 10,000 | **5.9** | 10.1 (1.7×) | — | — | 11694 (1978.6×) |
+| grid 10,000 | 5.5 (1.0×) | **5.3** | — | — | 6531 (1236.0×) |
+| layeredDag 10,000 | **7.0** | 8.0 (1.2×) | — | — | 7775 (1117.2×) |
+| random 100,000 | **64.2** | 249 (3.9×) | — | — | crash |
+| scaleFree 100,000 | **86.4** | 164 (1.9×) | — | — | >10s |
+| grid 100,000 | **58.0** | 115 (2.0×) | — | — | crash |
+| layeredDag 100,000 | **71.7** | 141 (2.0×) | — | — | crash |
+
+ngraph and graphlib have no PageRank. cytoscape's PageRank threw `Invalid array length` on three of the four 100k graphs.
+
+## Connected components
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | **0.06** | 0.47 (7.4×) | — | 1.1 (16.7×) | 38.2 (605.0×) |
+| scaleFree 1,000 | **0.02** | 0.50 (22.5×) | — | 0.48 (21.3×) | 37.8 (1683.9×) |
+| grid 1,000 | **0.01** | 0.24 (21.7×) | — | 0.29 (26.4×) | 25.0 (2274.5×) |
+| layeredDag 1,000 | **0.02** | 0.44 (26.2×) | — | 0.31 (18.5×) | 37.3 (2239.2×) |
+| random 10,000 | **0.35** | 10.0 (28.3×) | — | crash | 647 (1839.8×) |
+| scaleFree 10,000 | **0.24** | 12.3 (52.3×) | — | 11.7 (49.7×) | 523 (2222.7×) |
+| grid 10,000 | **0.10** | 3.1 (30.5×) | — | crash | 340 (3337.8×) |
+| layeredDag 10,000 | **0.34** | 7.5 (22.3×) | — | crash | 498 (1483.6×) |
+| random 100,000 | **5.0** | 275 (54.6×) | — | >10s | 14647 (2901.5×) |
+| scaleFree 100,000 | **3.5** | 297 (84.9×) | — | crash | 18134 (5182.5×) |
+| grid 100,000 | **2.1** | 79.5 (37.8×) | — | >10s | 4378 (2081.9×) |
+| layeredDag 100,000 | **4.5** | 149 (33.3×) | — | >10s | 8267 (1847.2×) |
+
+graphlib's `alg.components` uses recursive DFS and overflowed the call stack (`Maximum call stack size exceeded`) at 10,000 nodes on the random, grid, and layeredDag graphs, and at 100,000 on scaleFree. Where it survived, it was 17–50× slower; the remaining 100k cells were skipped after exceeding 10 s.
+
+## Betweenness centrality
+
+Run only at n=1,000 — Brandes is O(V·E) for every library, so larger sizes are capped for everyone.
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | **44.2** | 97.1 (2.2×) | — | — | 864 (19.5×) |
+| scaleFree 1,000 | **2.7** | 4.2 (1.5×) | — | — | 156 (57.3×) |
+| grid 1,000 | **3.7** | 19.0 (5.1×) | — | — | 300 (80.6×) |
+| layeredDag 1,000 | **16.1** | 36.3 (2.3×) | — | — | 443 (27.4×) |
+
+## Degree sweep
+
+Sum the degree of every node via each library's degree API.
+
+| graph | @statelyai/graph | graphology | ngraph | @dagrejs/graphlib | cytoscape (headless) |
+|---|---|---|---|---|---|
+| random 1,000 | 0.07 (2.1×) | 0.03 (1.0×) | **0.03** | 0.96 (29.2×) | 3.5 (104.8×) |
+| scaleFree 1,000 | 0.06 (1.3×) | **0.05** | 0.10 (2.1×) | 1.1 (22.6×) | 3.1 (62.8×) |
+| grid 1,000 | 0.06 (1.8×) | 0.05 (1.7×) | **0.03** | 0.25 (8.1×) | 2.1 (68.3×) |
+| layeredDag 1,000 | 0.05 (1.1×) | **0.04** | 0.09 (2.0×) | 0.83 (18.9×) | 3.3 (75.5×) |
+| random 10,000 | 0.47 (1.3×) | 0.42 (1.2×) | **0.36** | 19.7 (55.0×) | 63.1 (176.3×) |
+| scaleFree 10,000 | 0.54 (1.1×) | **0.50** | 0.64 (1.3×) | 53.6 (106.9×) | 57.4 (114.4×) |
+| grid 10,000 | 0.47 (1.4×) | 0.42 (1.3×) | **0.33** | 11.2 (33.8×) | 29.2 (88.6×) |
+| layeredDag 10,000 | 0.54 (1.5×) | 0.42 (1.2×) | **0.36** | 16.7 (45.9×) | 42.7 (117.3×) |
+| random 100,000 | 8.9 (1.4×) | **6.5** | 8.4 (1.3×) | 431 (65.7×) | 866 (132.3×) |
+| scaleFree 100,000 | 10.8 (2.3×) | 11.4 (2.4×) | **4.7** | 525 (112.0×) | 780 (166.5×) |
+| grid 100,000 | 9.3 (2.3×) | 9.5 (2.3×) | **4.1** | 206 (50.9×) | 389 (95.8×) |
+| layeredDag 100,000 | 8.6 (1.2×) | 10.5 (1.5×) | **7.2** | 311 (43.4×) | 501 (69.7×) |
+
+## Reading the numbers
+
+Where `@statelyai/graph` is fastest:
+
+- **Build** — fastest in every cell, 1.5–87× ahead. Plain-object graphs with lazy WeakMap indexing have very little construction overhead.
+- **BFS** — fastest on every non-degenerate row, 4–15× ahead of the next library at 10k–100k.
+- **Connected components** — fastest in every cell, 7–85× ahead of graphology (the next-fastest with the API).
+- **Single-pair shortest path** — fastest on every row where the search does real work; bidirectional Dijkstra is why `random 100,000` completes in 0.93 ms while full single-source Dijkstra (graphlib) takes 501 ms.
+- **PageRank and betweenness** — fastest in most cells, but only by 1.2–3.9× over graphology on PageRank (1.5–5.1× on betweenness), and graphology wins `grid` PageRank at 10,000 (5.3 vs 5.5 ms — effectively a tie). PageRank is at rough parity with graphology at small sizes, pulling ahead 2–4× at 100,000.
+
+Where it is not fastest:
+
+- **Degree sweep** — now at parity rather than a blowout: with `getDegree` made O(1), every cell lands within 1.1–2.3× of the fastest, where the previous run was 4–23× behind. ngraph is still the fastest library in 11 of the 12 degree cells (graphology takes `random 100,000`); `@statelyai/graph` wins no cell outright, though it now edges out graphology in three of the four 100k cells (scaleFree, grid, layeredDag). If per-node degree queries in a tight loop dominate your workload, ngraph remains the fastest choice — but the gap is now small.
+- **scaleFree traversal/sssp cells** — graphlib posts the fastest BFS times and graphology the fastest sssp times on the scaleFree rows. These cells terminate after touching a handful of nodes and are mostly call overhead, but the raw numbers are what they are.
+
+Other findings worth knowing regardless of which library you pick:
+
+- graphlib's recursive-DFS `components` overflows the Node call stack at 10,000 nodes on three of the four graph shapes.
+- cytoscape's PageRank throws `Invalid array length` at 100,000 nodes on three of the four shapes; headless cytoscape is generally 2–4 orders of magnitude slower across the board, which is unsurprising — it is a visualization toolkit, not an algorithms library.
+- ngraph has no built-in PageRank, components, or betweenness; graphlib has no PageRank or betweenness.
+
+## Methodology
+
+Source: [`bench/compare/run.ts`](../bench/compare/run.ts), [`bench/compare/generate.ts`](../bench/compare/generate.ts), [`bench/compare/adapters.ts`](../bench/compare/adapters.ts). Raw output: [`bench/compare/results/2026-06-12.md`](../bench/compare/results/2026-06-12.md) and [`2026-06-12.json`](../bench/compare/results/2026-06-12.json).
+
+- **Identical inputs.** Seeded generators emit a neutral edge list (integer endpoints, weights); every library builds from the same list. Simple directed graphs only (no parallel edges or self-loops) — the lowest common denominator across libraries.
+- **Four shapes × three sizes** (1,000 / 10,000 / 100,000 nodes):
+  - `random` — uniform random, ~3 edges/node, with a spanning chain so traversals reach most of the graph
+  - `scaleFree` — preferential attachment (k=3); hub-heavy, with most nodes unreachable from node 0
+  - `grid` — square lattice with right/down directed edges
+  - `layeredDag` — layered DAG with local fanout and occasional skip edges (statechart/workflow-like)
+- **Idiomatic usage.** Each library runs through a thin adapter calling its public API the way a user would — no hand-tuned ports. Libraries lacking a built-in BFS get a minimal queue loop over their neighbor API. `—` means no equivalent API exists.
+- **Timing.** One warmup run, then samples until ≥5 runs or a 1.5 s budget; the table reports the median.
+- **`crash`** means the library threw during the workload (e.g. stack overflow, `Invalid array length`); the error message is recorded in the JSON. A crash is treated as a result, not a harness failure.
+- **`>10s`** means a single run exceeded 10 s, so the workload was skipped for that library at that and larger sizes.
+- **Fairness notes.** graphlib's only shortest-path API is full single-source Dijkstra, so its `sssp` cells pay the all-targets cost. Betweenness is capped at n=1,000 for every library because Brandes is O(V·E).
