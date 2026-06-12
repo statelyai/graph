@@ -41,6 +41,11 @@
     "./mermaid": "./dist/formats/mermaid/index.mjs",
     "./tgf": "./dist/formats/tgf/index.mjs",
     "./xyflow": "./dist/formats/xyflow/index.mjs",
+    "./layout": "./dist/layout/index.mjs",
+    "./layout/d3-force": "./dist/layout/d3-force.mjs",
+    "./layout/dagre": "./dist/layout/dagre.mjs",
+    "./layout/elk": "./dist/layout/elk.mjs",
+    "./layout/graphviz": "./dist/layout/graphviz.mjs",
     "./queries": "./dist/queries.mjs",
     "./schemas": "./dist/schemas.mjs",
     "./package.json": "./package.json"
@@ -72,7 +77,9 @@
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",
     "@changesets/cli": "^2.29.8",
+    "@dagrejs/dagre": "^3.0.0",
     "@dagrejs/graphlib": "^4.0.1",
+    "@hpcc-js/wasm-graphviz": "^1.22.0",
     "@types/d3-array": "^3.2.2",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^25.0.3",
@@ -101,6 +108,8 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
+    "@dagrejs/dagre": "^4.0.0",
+    "@hpcc-js/wasm-graphviz": "^1.0.0",
     "cytoscape": "^3.0.0",
     "d3-force": "^3.0.0",
     "dotparser": "^1.0.0",
@@ -125,6 +134,12 @@
       "optional": true
     },
     "zod": {
+      "optional": true
+    },
+    "@dagrejs/dagre": {
+      "optional": true
+    },
+    "@hpcc-js/wasm-graphviz": {
       "optional": true
     }
   }

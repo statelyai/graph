@@ -5,6 +5,7 @@ import type {
   ElkPort,
 } from 'elkjs/lib/elk-api';
 import type {
+  EdgeRouting,
   Graph,
   VisualGraph,
   VisualNode,
@@ -93,7 +94,15 @@ function convertEdge(edge: VisualEdge): ElkExtendedEdge {
     ],
   };
   if (edge.label) {
-    elkEdge.labels = [{ text: edge.label }];
+    // Edge width/height are canonically the label rect — pass them to ELK as
+    // label dimensions so the engine can place the label
+    elkEdge.labels = [
+      {
+        text: edge.label,
+        ...(edge.width > 0 && { width: edge.width }),
+        ...(edge.height > 0 && { height: edge.height }),
+      },
+    ];
   }
   return addMetadata(elkEdge, {
     edge: {
@@ -111,6 +120,8 @@ function convertEdge(edge: VisualEdge): ElkExtendedEdge {
       y: edge.y,
       width: edge.width,
       height: edge.height,
+      points: edge.points,
+      routing: edge.routing,
     },
   });
 }
@@ -274,6 +285,7 @@ function flattenElkNodes(
   edges: VisualEdge[],
   edgeIdx: { value: number },
   portOwner: Map<string, { nodeId: string; portName: string }>,
+  edgeRouting: EdgeRouting,
 ): void {
   if (elkNode.children) {
     for (const child of elkNode.children) {
@@ -332,7 +344,7 @@ function flattenElkNodes(
         });
       }
       nodes.push(node);
-      flattenElkNodes(child, child.id, nodes, edges, edgeIdx, portOwner);
+      flattenElkNodes(child, child.id, nodes, edges, edgeIdx, portOwner, edgeRouting);
     }
   }
 
@@ -344,6 +356,12 @@ function flattenElkNodes(
           const metadata = readMetadata(elkEdge)?.edge;
           const sourceOwner = portOwner.get(source);
           const targetOwner = portOwner.get(target);
+          // Fresh layout output (computed label geometry, routed sections)
+          // takes precedence over round-tripped metadata
+          const elkLabel = (elkEdge.labels as ElkLabel[] | undefined)?.[0];
+          const hasComputedLabel =
+            elkLabel?.x !== undefined && elkLabel?.y !== undefined;
+          const section = elkEdge.sections?.[0];
           const edge: VisualEdge = {
             type: 'edge',
             id: elkEdge.id ?? `e${edgeIdx.value++}`,
@@ -352,20 +370,36 @@ function flattenElkNodes(
             label:
               metadata && 'label' in metadata
                 ? (metadata.label as string | null)
-                : ((elkEdge.labels as ElkLabel[] | undefined)?.[0]?.text ?? ''),
+                : (elkLabel?.text ?? ''),
             data:
               metadata && 'data' in metadata
                 ? metadata.data
                 : (undefined as any),
-            x: metadata?.x ?? 0,
-            y: metadata?.y ?? 0,
-            width: metadata?.width ?? 0,
-            height: metadata?.height ?? 0,
+            // Edge x/y/width/height are canonically the label rect
+            x: hasComputedLabel ? elkLabel.x! : (metadata?.x ?? 0),
+            y: hasComputedLabel ? elkLabel.y! : (metadata?.y ?? 0),
+            width: hasComputedLabel
+              ? (elkLabel.width ?? metadata?.width ?? 0)
+              : (metadata?.width ?? 0),
+            height: hasComputedLabel
+              ? (elkLabel.height ?? metadata?.height ?? 0)
+              : (metadata?.height ?? 0),
             ...(metadata?.mode !== undefined && { mode: metadata.mode }),
             ...(metadata?.weight !== undefined && { weight: metadata.weight }),
             ...(metadata?.color !== undefined && { color: metadata.color }),
             ...(metadata?.style !== undefined && { style: metadata.style }),
           };
+          if (section?.startPoint && section.endPoint) {
+            edge.points = [
+              { x: section.startPoint.x, y: section.startPoint.y },
+              ...(section.bendPoints ?? []).map((p) => ({ x: p.x, y: p.y })),
+              { x: section.endPoint.x, y: section.endPoint.y },
+            ];
+            edge.routing = edgeRouting;
+          } else if (metadata?.points !== undefined) {
+            edge.points = metadata.points;
+            if (metadata.routing !== undefined) edge.routing = metadata.routing;
+          }
           if (metadata && 'sourcePort' in metadata) {
             edge.sourcePort = metadata.sourcePort;
           } else if (sourceOwner) edge.sourcePort = sourceOwner.portName;
@@ -405,7 +439,21 @@ export function fromELK(elkRoot: ElkNode): VisualGraph {
   const edgeIdx = { value: 0 };
   const portOwner = new Map<string, { nodeId: string; portName: string }>();
 
-  flattenElkNodes(elkRoot, null, nodes, edges, edgeIdx, portOwner);
+  // How routed sections should be interpreted, from the root edgeRouting
+  // option (ELK layered default is orthogonal)
+  const elkEdgeRouting = String(
+    elkRoot.layoutOptions?.["elk.edgeRouting"] ??
+      elkRoot.layoutOptions?.["org.eclipse.elk.edgeRouting"] ??
+      "",
+  ).toUpperCase();
+  const edgeRouting: EdgeRouting =
+    elkEdgeRouting === "SPLINES"
+      ? "splines"
+      : elkEdgeRouting === "POLYLINE"
+        ? "polyline"
+        : "orthogonal";
+
+  flattenElkNodes(elkRoot, null, nodes, edges, edgeIdx, portOwner, edgeRouting);
 
   // Deduplicate edges by id (same edge may appear at compound and root level)
   const seenEdges = new Map<string, VisualEdge>();

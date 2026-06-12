@@ -116,6 +116,12 @@ export function getFullyFeaturedGraphFixture(): Graph {
         targetPort: 'in',
         label: 'A to B',
         weight: 2.5,
+        points: [
+          { x: 0, y: 0 },
+          { x: 50, y: 25 },
+          { x: 100, y: 50 },
+        ],
+        routing: 'orthogonal',
         data: {
           kind: 'transition',
         },

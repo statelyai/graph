@@ -170,6 +170,8 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
           label: e.label,
           mode: e.mode,
           weight: e.weight,
+          points: e.points,
+          routing: e.routing,
           color: e.color,
           style: e.style,
           x: e.x,
@@ -279,6 +281,12 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
         }),
         ...(metadata?.weight !== undefined && {
           weight: metadata.weight as number,
+        }),
+        ...(metadata?.points !== undefined && {
+          points: metadata.points as VisualGraph['edges'][number]['points'],
+        }),
+        ...(metadata?.routing !== undefined && {
+          routing: metadata.routing as VisualGraph['edges'][number]['routing'],
         }),
         ...(metadata?.color !== undefined && { color: metadata.color as string }),
         ...(metadata?.style !== undefined && {

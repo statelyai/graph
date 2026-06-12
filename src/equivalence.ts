@@ -12,7 +12,16 @@ function differs(a: unknown, b: unknown): boolean {
 
 export const LAYOUT_KEYS = {
   node: ['x', 'y', 'width', 'height', 'style', 'color', 'shape'] as const,
-  edge: ['x', 'y', 'width', 'height', 'style', 'color'] as const,
+  edge: [
+    'x',
+    'y',
+    'width',
+    'height',
+    'points',
+    'routing',
+    'style',
+    'color',
+  ] as const,
 };
 
 const LAYOUT_KEY_SET = {

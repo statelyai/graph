@@ -19,6 +19,22 @@ export interface EntityRect {
   height: number;
 }
 
+/** A 2D point, used for edge routing waypoints. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * How an edge's {@link GraphEdge.points} should be interpreted by renderers:
+ *
+ * - `'polyline'` — straight segments through the points.
+ * - `'orthogonal'` — axis-aligned segments (ELK layered routing).
+ * - `'splines'` — bezier control points (Graphviz convention: 3n+1 chained
+ *   cubic curves, tail → head).
+ */
+export type EdgeRouting = 'polyline' | 'orthogonal' | 'splines';
+
 /** Shared optional visual/style props for nodes, edges, ports. */
 export interface GraphEntity {
   x?: number;
@@ -93,6 +109,13 @@ export interface NodeConfig<TNodeData = any, TPortData = any>
   color?: string;
 }
 
+/**
+ * Note on edge geometry: an edge's `x`/`y`/`width`/`height` are canonically
+ * the **label rect** (top-left + size). Layout adapters write computed edge
+ * label positions here, and engines that need label dimensions as input
+ * (dagre, ELK) read `width`/`height`. The edge's *route* lives in
+ * {@link EdgeConfig.points}.
+ */
 export interface EdgeConfig<TEdgeData = any> extends GraphEntity {
   /**
    * The id of the edge.
@@ -125,6 +148,13 @@ export interface EdgeConfig<TEdgeData = any> extends GraphEntity {
    * {@link GraphConfig.mode}.
    */
   mode?: GraphMode;
+  /**
+   * Edge route waypoints (including endpoints, tail → head), as computed by a
+   * layout engine. Interpretation is governed by {@link EdgeConfig.routing}.
+   */
+  points?: Point[];
+  /** How {@link EdgeConfig.points} should be interpreted. Default: polyline. */
+  routing?: EdgeRouting;
   data?: TEdgeData;
   color?: string;
 }
@@ -161,6 +191,11 @@ export interface GraphNode<TNodeData = any, TPortData = any>
   color?: string;
 }
 
+/**
+ * Note on edge geometry: an edge's `x`/`y`/`width`/`height` are canonically
+ * the **label rect** (top-left + size); the edge's *route* lives in
+ * {@link GraphEdge.points}. See {@link EdgeConfig} for details.
+ */
 export interface GraphEdge<TEdgeData = any> extends GraphEntity {
   type: 'edge';
   id: string;
@@ -182,6 +217,13 @@ export interface GraphEdge<TEdgeData = any> extends GraphEntity {
    * {@link Graph.mode}.
    */
   mode?: GraphMode;
+  /**
+   * Edge route waypoints (including endpoints, tail → head), as computed by a
+   * layout engine. Interpretation is governed by {@link GraphEdge.routing}.
+   */
+  points?: Point[];
+  /** How {@link GraphEdge.points} should be interpreted. Default: polyline. */
+  routing?: EdgeRouting;
   data: TEdgeData;
   color?: string;
 }
@@ -276,6 +318,9 @@ export interface EdgeUpdate<TEdgeData = any> {
   sourcePort?: string | null;
   /** Port name on the target node, or `null` to clear the port reference. */
   targetPort?: string | null;
+  /** Edge route waypoints, or `null` to clear the route. */
+  points?: Point[] | null;
+  routing?: EdgeRouting | null;
   x?: number | null;
   y?: number | null;
   width?: number | null;

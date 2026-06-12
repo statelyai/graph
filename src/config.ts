@@ -34,6 +34,8 @@ type EdgeFieldsHandled =
   | 'mode'
   | 'sourcePort'
   | 'targetPort'
+  | 'points'
+  | 'routing'
   | 'x'
   | 'y'
   | 'width'
@@ -103,6 +105,9 @@ export function toEdgeConfig<E>(edge: GraphEdge<E>): EdgeConfig<E> {
   if (edge.mode !== undefined) config.mode = edge.mode;
   if (edge.sourcePort !== undefined) config.sourcePort = edge.sourcePort;
   if (edge.targetPort !== undefined) config.targetPort = edge.targetPort;
+  if (edge.points !== undefined)
+    config.points = edge.points.map((p) => ({ ...p }));
+  if (edge.routing !== undefined) config.routing = edge.routing;
   if (edge.x !== undefined) config.x = edge.x;
   if (edge.y !== undefined) config.y = edge.y;
   if (edge.width !== undefined) config.width = edge.width;

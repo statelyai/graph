@@ -226,6 +226,73 @@ async function main(): Promise<void> {
         `elkGraph.children?.[0]?.id;`,
       ],
     },
+    './layout': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }], edges: [] });`,
+        `assert.equal($MOD.getLayoutBounds(graph).width, 10);`,
+        `$MOD.applyLayoutFrame(graph, { positions: { a: { x: 5, y: 5 } }, alpha: 0 });`,
+        `assert.equal(graph.nodes[0].x, 5);`,
+      ],
+      types: [
+        `const opts: $MOD.LayoutOptions = { direction: 'down', seed: 1 };`,
+        `opts.direction;`,
+      ],
+    },
+    './layout/elk': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = await $MOD.getElkLayout(graph);`,
+        `assert.equal(laidOut.nodes.length, 2);`,
+        `assert.ok(laidOut.edges[0].points && laidOut.edges[0].points.length >= 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const pending: Promise<m0.VisualGraph> = $MOD.getElkLayout(graph);`,
+        `void pending;`,
+      ],
+    },
+    './layout/dagre': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = $MOD.getDagreLayout(graph);`,
+        `assert.ok(laidOut.nodes[1].y > laidOut.nodes[0].y);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const laidOut: m0.VisualGraph = $MOD.getDagreLayout(graph, { direction: 'right' });`,
+        `void laidOut;`,
+      ],
+    },
+    './layout/d3-force': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = $MOD.getForceLayout(graph, { seed: 1, iterations: 10 });`,
+        `assert.equal(laidOut.nodes.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const frames: Generator<import('@statelyai/graph/layout').LayoutFrame, m0.VisualGraph> = $MOD.genForceLayout(graph);`,
+        `void frames;`,
+      ],
+    },
+    './layout/graphviz': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = await $MOD.getGraphvizLayout(graph);`,
+        `assert.equal(laidOut.nodes.length, 2);`,
+        `assert.equal(laidOut.edges[0].routing, 'splines');`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const pending: Promise<m0.VisualGraph> = $MOD.getGraphvizLayout(graph, { engine: 'dot' });`,
+        `void pending;`,
+      ],
+    },
     './gexf': {
       phase: 'optional',
       runtime: [
@@ -448,7 +515,18 @@ async function main(): Promise<void> {
 
     execFileSync(
       'pnpm',
-      ['add', '--ignore-workspace', 'dotparser', 'fast-xml-parser', 'zod'],
+      [
+        'add',
+        '--ignore-workspace',
+        'dotparser',
+        'fast-xml-parser',
+        'zod',
+        // Layout adapter optional peers
+        'elkjs',
+        '@dagrejs/dagre',
+        'd3-force',
+        '@hpcc-js/wasm-graphviz',
+      ],
       {
         cwd: consumerDir,
         stdio: 'inherit',

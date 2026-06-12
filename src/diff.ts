@@ -55,6 +55,8 @@ const EDGE_COMPARE_KEYS = [
   'mode',
   'sourcePort',
   'targetPort',
+  'points',
+  'routing',
   'x',
   'y',
   'width',

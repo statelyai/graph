@@ -42,6 +42,8 @@ const ROUND_TRIP_KEYS = {
     'style',
     'sourcePort',
     'targetPort',
+    'points',
+    'routing',
   ] as Array<keyof Graph['edges'][number]>,
 };
 
