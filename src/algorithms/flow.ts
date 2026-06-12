@@ -20,6 +20,24 @@ export interface MaxFlowResult<E = any> {
   cutEdges: GraphEdge<E>[];
 }
 
+export interface MinCutOptions<E = any> {
+  /** Source node id. */
+  source: string;
+  /** Sink node id. */
+  sink: string;
+  /** Edge capacity accessor. Defaults to `edge.weight ?? 1`. */
+  getCapacity?: (edge: GraphEdge<E>) => number;
+}
+
+export interface MinCutResult {
+  /** Total capacity of the cut (equals the max-flow value). */
+  value: number;
+  /** Ids of the edges crossing the cut. */
+  cutEdges: string[];
+  /** Node ids on each side of the cut, in `graph.nodes` order. */
+  partition: { source: string[]; sink: string[] };
+}
+
 interface Arc {
   to: string;
   capacity: number;
@@ -30,46 +48,38 @@ interface Arc {
   sign?: 1 | -1;
 }
 
-/**
- * Returns the maximum flow from `from` to `to` using the Edmonds-Karp
- * algorithm (BFS augmenting paths).
- *
- * Directed edges carry capacity from source to target only. Edges whose
- * effective mode is not `'directed'` (undirected/bidirectional) are modeled
- * as two independent opposite arcs, each with the edge's full capacity.
- *
- * The returned `flows` record maps every edge id to its net flow (positive
- * in the source→target direction). `cutEdges` is a minimum s-t cut: the
- * edges crossing from the source side to the sink side of the final
- * residual graph; the sum of their capacities equals `value`.
- *
- * @example
- * ```ts
- * const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' });
- * ```
- */
-export function getMaxFlow<N, E>(
-  graph: Graph<N, E>,
-  options: MaxFlowOptions<E>,
-): MaxFlowResult<E> {
-  const { from, to } = options;
-  const getCapacity =
-    options.getCapacity ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+interface MaxFlowSolution<E> extends MaxFlowResult<E> {
+  /** Node ids reachable from the source in the final residual graph. */
+  sourceSide: Set<string>;
+}
 
+/**
+ * Shared Edmonds-Karp solver behind {@link getMaxFlow} and {@link getMinCut}.
+ * `caller`/`fromOption`/`toOption` only shape the error messages.
+ */
+function solveMaxFlow<N, E>(
+  graph: Graph<N, E>,
+  caller: string,
+  fromOption: string,
+  toOption: string,
+  from: string,
+  to: string,
+  getCapacity: (edge: GraphEdge<E>) => number,
+): MaxFlowSolution<E> {
   const idx = getIndex(graph);
   if (!idx.nodeById.has(from)) {
     throw new Error(
-      `getMaxFlow: source node "${from}" not found in graph — pass an existing node id as options.from`,
+      `${caller}: source node "${from}" not found in graph — pass an existing node id as ${fromOption}`,
     );
   }
   if (!idx.nodeById.has(to)) {
     throw new Error(
-      `getMaxFlow: sink node "${to}" not found in graph — pass an existing node id as options.to`,
+      `${caller}: sink node "${to}" not found in graph — pass an existing node id as ${toOption}`,
     );
   }
   if (from === to) {
     throw new Error(
-      `getMaxFlow: source and sink are both "${from}" — they must be different nodes`,
+      `${caller}: source and sink are both "${from}" — they must be different nodes`,
     );
   }
 
@@ -95,7 +105,7 @@ export function getMaxFlow<N, E>(
     const capacity = getCapacity(edge as GraphEdge<E>);
     if (capacity < 0) {
       throw new Error(
-        `getMaxFlow: edge "${edge.id}" has negative capacity ${capacity} — capacities must be >= 0; fix edge.weight or provide a non-negative getCapacity`,
+        `${caller}: edge "${edge.id}" has negative capacity ${capacity} — capacities must be >= 0; fix edge.weight or provide a non-negative getCapacity`,
       );
     }
     if (edge.sourceId === edge.targetId) continue; // self-loops carry no s-t flow
@@ -186,5 +196,88 @@ export function getMaxFlow<N, E>(
     cutEdgeIds.has(edge.id),
   ) as GraphEdge<E>[];
 
+  return { value, flows, cutEdges, sourceSide };
+}
+
+/**
+ * Returns the maximum flow from `from` to `to` using the Edmonds-Karp
+ * algorithm (BFS augmenting paths).
+ *
+ * Directed edges carry capacity from source to target only. Edges whose
+ * effective mode is not `'directed'` (undirected/bidirectional) are modeled
+ * as two independent opposite arcs, each with the edge's full capacity.
+ *
+ * The returned `flows` record maps every edge id to its net flow (positive
+ * in the source→target direction). `cutEdges` is a minimum s-t cut: the
+ * edges crossing from the source side to the sink side of the final
+ * residual graph; the sum of their capacities equals `value`.
+ *
+ * @example
+ * ```ts
+ * const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' });
+ * ```
+ */
+export function getMaxFlow<N, E>(
+  graph: Graph<N, E>,
+  options: MaxFlowOptions<E>,
+): MaxFlowResult<E> {
+  const getCapacity =
+    options.getCapacity ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const { value, flows, cutEdges } = solveMaxFlow(
+    graph,
+    'getMaxFlow',
+    'options.from',
+    'options.to',
+    options.from,
+    options.to,
+    getCapacity,
+  );
   return { value, flows, cutEdges };
+}
+
+/**
+ * Returns a minimum s-t cut between `source` and `sink` via the max-flow
+ * min-cut theorem: runs the same Edmonds-Karp solver as {@link getMaxFlow},
+ * then splits the nodes by residual reachability from the source.
+ *
+ * `partition.source` holds every node reachable from `source` in the final
+ * residual graph; `partition.sink` holds the rest (both in `graph.nodes`
+ * order). `cutEdges` are the ids of the edges crossing the cut, and their
+ * total capacity equals `value` (the max-flow value).
+ *
+ * @example
+ * ```ts
+ * const { value, cutEdges, partition } = getMinCut(graph, {
+ *   source: 's',
+ *   sink: 't',
+ * });
+ * ```
+ */
+export function getMinCut<N, E>(
+  graph: Graph<N, E>,
+  options: MinCutOptions<E>,
+): MinCutResult {
+  const getCapacity =
+    options.getCapacity ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const { value, cutEdges, sourceSide } = solveMaxFlow(
+    graph,
+    'getMinCut',
+    'options.source',
+    'options.sink',
+    options.source,
+    options.sink,
+    getCapacity,
+  );
+
+  const sourcePartition: string[] = [];
+  const sinkPartition: string[] = [];
+  for (const node of graph.nodes) {
+    (sourceSide.has(node.id) ? sourcePartition : sinkPartition).push(node.id);
+  }
+
+  return {
+    value,
+    cutEdges: cutEdges.map((edge) => edge.id),
+    partition: { source: sourcePartition, sink: sinkPartition },
+  };
 }

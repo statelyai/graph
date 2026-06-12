@@ -4,6 +4,7 @@ import { connectedComponents } from 'graphology-components';
 import { dijkstra } from 'graphology-shortest-path';
 import pagerank from 'graphology-metrics/centrality/pagerank';
 import betweennessCentrality from 'graphology-metrics/centrality/betweenness';
+import eigenvectorCentrality from 'graphology-metrics/centrality/eigenvector';
 
 import { createGraph } from '../../src/graph';
 import {
@@ -11,6 +12,7 @@ import {
   getShortestPath,
   getBetweennessCentrality,
   getPageRank,
+  getEigenvectorCentrality,
 } from '../../src/algorithms';
 import { getDegree, getInDegree, getOutDegree } from '../../src/queries';
 import type { Graph } from '../../src/types';
@@ -428,5 +430,92 @@ describe('oracle: betweenness centrality', () => {
         }
       });
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6. Eigenvector centrality
+// ---------------------------------------------------------------------------
+
+// Both implementations run the same (A + I)-shifted power iteration with L2
+// normalization and an L1 < N * tolerance convergence check, so per-node
+// agreement within 1e-4 is meaningful. Connected undirected graphs only:
+// that is the well-defined setting both libraries document.
+const EIGENVECTOR_TOLERANCE = 1e-4;
+const EIGENVECTOR_OPTIONS = { maxIterations: 1000, tolerance: 1e-9 };
+
+describe('oracle: eigenvector centrality', () => {
+  it('hand-verified: undirected star K1,3 gives center sqrt(3/6), leaves sqrt(1/6)', () => {
+    const ours = createGraph({
+      mode: 'undirected',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      edges: [
+        { id: 'e1', sourceId: 'a', targetId: 'b' },
+        { id: 'e2', sourceId: 'a', targetId: 'c' },
+        { id: 'e3', sourceId: 'a', targetId: 'd' },
+      ],
+    });
+    const theirs = toGraphology(ours, 'undirected');
+
+    const ourScores = getEigenvectorCentrality(ours, EIGENVECTOR_OPTIONS);
+    const theirScores = eigenvectorCentrality(theirs, {
+      ...EIGENVECTOR_OPTIONS,
+      getEdgeWeight: null,
+    });
+
+    expect(ourScores['a']).toBeCloseTo(Math.sqrt(3 / 6), 6);
+    expect(ourScores['b']).toBeCloseTo(Math.sqrt(1 / 6), 6);
+    expect(theirScores['a']).toBeCloseTo(Math.sqrt(3 / 6), 6);
+    expect(theirScores['b']).toBeCloseTo(Math.sqrt(1 / 6), 6);
+  });
+
+  for (const seed of SEEDS) {
+    it(`unweighted agrees with graphology within ${EIGENVECTOR_TOLERANCE} (undirected, seed ${seed})`, () => {
+      const ours = makeRandomGraph(seed, {
+        mode: 'undirected',
+        connected: true,
+        density: 1.6,
+        maxNodes: 80,
+      });
+      const theirs = toGraphology(ours, 'undirected');
+
+      const ourScores = getEigenvectorCentrality(ours, EIGENVECTOR_OPTIONS);
+      const theirScores = eigenvectorCentrality(theirs, {
+        ...EIGENVECTOR_OPTIONS,
+        getEdgeWeight: null,
+      });
+
+      for (const node of ours.nodes) {
+        expect(
+          Math.abs(ourScores[node.id] - theirScores[node.id]),
+          `eigenvector(${node.id})`,
+        ).toBeLessThan(EIGENVECTOR_TOLERANCE);
+      }
+    });
+
+    it(`weighted agrees with graphology within ${EIGENVECTOR_TOLERANCE} (undirected, seed ${seed})`, () => {
+      const ours = makeRandomGraph(seed, {
+        mode: 'undirected',
+        connected: true,
+        weighted: true,
+        density: 1.6,
+        maxNodes: 80,
+      });
+      const theirs = toGraphology(ours, 'undirected');
+
+      const ourScores = getEigenvectorCentrality(ours, {
+        ...EIGENVECTOR_OPTIONS,
+        getWeight: (edge) => edge.weight ?? 1,
+      });
+      // graphology reads the 'weight' attribute by default.
+      const theirScores = eigenvectorCentrality(theirs, EIGENVECTOR_OPTIONS);
+
+      for (const node of ours.nodes) {
+        expect(
+          Math.abs(ourScores[node.id] - theirScores[node.id]),
+          `eigenvector(${node.id})`,
+        ).toBeLessThan(EIGENVECTOR_TOLERANCE);
+      }
+    });
   }
 });

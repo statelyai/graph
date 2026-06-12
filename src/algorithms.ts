@@ -44,11 +44,22 @@ export {
   getPageRank,
   getHITS,
   getEigenvectorCentrality,
+  getKatzCentrality,
 } from './algorithms/centrality';
 export type {
   IterativeCentralityOptions,
+  EigenvectorCentralityOptions,
+  KatzCentralityOptions,
   HITSResult,
 } from './algorithms/centrality';
+
+export { getCoreNumbers, getKCore } from './algorithms/cores';
+
+export {
+  isBipartite,
+  getMaximumBipartiteMatching,
+} from './algorithms/bipartite';
+export type { BipartiteMatch } from './algorithms/bipartite';
 
 export {
   getLabelPropagationCommunities,
@@ -74,8 +85,13 @@ export type { IsomorphismOptions } from './algorithms/isomorphism';
 export { getLouvainCommunities } from './algorithms/louvain';
 export type { LouvainOptions } from './algorithms/louvain';
 
-export { getMaxFlow } from './algorithms/flow';
-export type { MaxFlowOptions, MaxFlowResult } from './algorithms/flow';
+export { getMaxFlow, getMinCut } from './algorithms/flow';
+export type {
+  MaxFlowOptions,
+  MaxFlowResult,
+  MinCutOptions,
+  MinCutResult,
+} from './algorithms/flow';
 
 export { getDominatorTree } from './algorithms/dominators';
 export type { DominatorTreeOptions } from './algorithms/dominators';

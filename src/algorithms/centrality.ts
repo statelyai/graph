@@ -1,4 +1,4 @@
-import type { Graph } from '../types';
+import type { Graph, GraphEdge } from '../types';
 import { getDegree, getInDegree, getOutDegree } from '../queries';
 import { getCSR } from './csr';
 
@@ -6,6 +6,20 @@ export interface IterativeCentralityOptions {
   alpha?: number;
   maxIterations?: number;
   tolerance?: number;
+}
+
+export interface EigenvectorCentralityOptions<E = any>
+  extends IterativeCentralityOptions {
+  /** Edge weight accessor. Defaults to unweighted (every edge counts 1). */
+  getWeight?: (edge: GraphEdge<E>) => number;
+}
+
+export interface KatzCentralityOptions<E = any>
+  extends IterativeCentralityOptions {
+  /** Constant added to every node each iteration. Defaults to `1`. */
+  beta?: number;
+  /** Edge weight accessor. Defaults to unweighted (every edge counts 1). */
+  getWeight?: (edge: GraphEdge<E>) => number;
 }
 
 export interface HITSResult {
@@ -360,12 +374,18 @@ export function getHITS(
 /**
  * Returns eigenvector centrality scores for all nodes.
  *
- * Uses power iteration over incoming neighbors for directed graphs and
- * undirected adjacency for undirected graphs.
+ * Power iteration with the `A + I` shift (same scheme as graphology and
+ * networkx, so bipartite structures converge instead of oscillating).
+ * Scores flow along edge direction: a node's score is fed by its incoming
+ * neighbors; undirected edges feed both endpoints. The result vector is
+ * Euclidean (L2) normalized.
+ *
+ * Throws when the iteration has not converged (L1 error < `n × tolerance`)
+ * within `maxIterations`.
  */
-export function getEigenvectorCentrality(
-  graph: Graph,
-  options?: IterativeCentralityOptions,
+export function getEigenvectorCentrality<N, E>(
+  graph: Graph<N, E>,
+  options?: EigenvectorCentralityOptions<E>,
 ): Record<string, number> {
   const nodeIds = getNodeIds(graph);
   if (nodeIds.length === 0) {
@@ -374,28 +394,107 @@ export function getEigenvectorCentrality(
 
   const maxIterations = options?.maxIterations ?? 100;
   const tolerance = options?.tolerance ?? 1e-6;
+  const getWeight = options?.getWeight;
   const csr = getCSR(graph);
   const n = csr.ids.length;
-  let current = new Float64Array(n).fill(1);
-  normalizeTypedVector(current);
+  let current = new Float64Array(n).fill(1 / n);
+  let converged = false;
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
-    const next = new Float64Array(n);
+    // Start from `current` (the implicit +I) so bipartite graphs converge.
+    const next = Float64Array.from(current);
     for (let w = 0; w < n; w++) {
       for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
-        next[w] += current[csr.inOrigins[a]];
+        const weight = getWeight
+          ? getWeight(graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>)
+          : 1;
+        next[w] += current[csr.inOrigins[a]] * weight;
       }
     }
     normalizeTypedVector(next);
 
-    let diff = 0;
+    let error = 0;
     for (let i = 0; i < n; i++) {
-      diff = Math.max(diff, Math.abs(current[i] - next[i]));
+      error += Math.abs(next[i] - current[i]);
     }
     current = next;
-    if (diff <= tolerance) break;
+    if (error < n * tolerance) {
+      converged = true;
+      break;
+    }
   }
 
+  if (!converged) {
+    throw new Error(
+      `getEigenvectorCentrality: power iteration failed to converge within ${maxIterations} iterations (tolerance ${tolerance}) — increase options.maxIterations or loosen options.tolerance`,
+    );
+  }
+
+  const scores = createEmptyScoreMap(graph);
+  for (let i = 0; i < n; i++) scores[csr.ids[i]] = current[i];
+  return scores;
+}
+
+/**
+ * Returns Katz centrality scores for all nodes.
+ *
+ * Iterates `x' = alpha · Aᵀx + beta` to its fixed point (networkx-style),
+ * then Euclidean (L2) normalizes the result. Scores flow along edge
+ * direction: a node's score is fed by its incoming neighbors; undirected
+ * edges feed both endpoints.
+ *
+ * Converges only when `alpha` is below the reciprocal of the largest
+ * eigenvalue of the adjacency matrix; throws when the iteration has not
+ * converged (L1 error < `n × tolerance`) within `maxIterations`.
+ */
+export function getKatzCentrality<N, E>(
+  graph: Graph<N, E>,
+  options?: KatzCentralityOptions<E>,
+): Record<string, number> {
+  const nodeIds = getNodeIds(graph);
+  if (nodeIds.length === 0) {
+    return {};
+  }
+
+  const alpha = options?.alpha ?? 0.1;
+  const beta = options?.beta ?? 1;
+  const maxIterations = options?.maxIterations ?? 100;
+  const tolerance = options?.tolerance ?? 1e-6;
+  const getWeight = options?.getWeight;
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  let current = new Float64Array(n);
+  let converged = false;
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    const next = new Float64Array(n).fill(beta);
+    for (let w = 0; w < n; w++) {
+      for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
+        const weight = getWeight
+          ? getWeight(graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>)
+          : 1;
+        next[w] += alpha * current[csr.inOrigins[a]] * weight;
+      }
+    }
+
+    let error = 0;
+    for (let i = 0; i < n; i++) {
+      error += Math.abs(next[i] - current[i]);
+    }
+    current = next;
+    if (error < n * tolerance) {
+      converged = true;
+      break;
+    }
+  }
+
+  if (!converged) {
+    throw new Error(
+      `getKatzCentrality: iteration failed to converge within ${maxIterations} iterations — alpha ${alpha} may be >= 1/λ_max of the adjacency matrix; decrease options.alpha or increase options.maxIterations`,
+    );
+  }
+
+  normalizeTypedVector(current);
   const scores = createEmptyScoreMap(graph);
   for (let i = 0; i < n; i++) scores[csr.ids[i]] = current[i];
   return scores;

@@ -1,5 +1,6 @@
 import type { Graph, GraphEdge, GraphNode } from '../types';
 import { getIndex } from '../indexing';
+import { mulberry32 } from './shared';
 
 export interface GirvanNewmanOptions {
   level?: number;
@@ -8,6 +9,12 @@ export interface GirvanNewmanOptions {
 
 export interface LabelPropagationOptions {
   maxIterations?: number;
+  /**
+   * When provided, runs *asynchronous* label propagation with a shuffled
+   * node order per round and random tie-breaking, seeded with mulberry32 —
+   * deterministic per seed. Without a seed, ties break lexicographically.
+   */
+  seed?: number;
 }
 
 type Community<N = any> = GraphNode<N>[];
@@ -198,10 +205,65 @@ function toCommunityIds<N>(
 }
 
 /**
+ * Asynchronous LPA: labels update in place as the (seeded-shuffled) round
+ * proceeds; ties among maximal neighbor labels break uniformly at random,
+ * keeping the current label when it is already maximal so rounds terminate.
+ * Deterministic per seed.
+ */
+function getSeededLabelPropagation<N>(
+  graph: Graph<N>,
+  seed: number,
+  maxIterations: number,
+): Community<N>[] {
+  const rng = mulberry32(seed);
+  const labels = Object.fromEntries(
+    graph.nodes.map((node) => [node.id, node.id]),
+  ) as Record<string, string>;
+  const order = graph.nodes.map((node) => node.id);
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    // Fisher-Yates shuffle of the visit order.
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+
+    let changed = false;
+    for (const nodeId of order) {
+      const counts = new Map<string, number>();
+      for (const neighbor of getUndirectedNeighbors(graph, nodeId)) {
+        const label = labels[neighbor.nodeId];
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
+      if (counts.size === 0) continue;
+
+      let maxCount = 0;
+      for (const count of counts.values()) {
+        if (count > maxCount) maxCount = count;
+      }
+      const best: string[] = [];
+      for (const [label, count] of counts) {
+        if (count === maxCount) best.push(label);
+      }
+      if (best.includes(labels[nodeId])) continue;
+
+      labels[nodeId] = best[Math.floor(rng() * best.length)];
+      changed = true;
+    }
+
+    if (!changed) break;
+  }
+
+  return normalizeCommunities(graph, labels);
+}
+
+/**
  * Returns label-propagation communities for the graph.
  *
  * The implementation is deterministic: ties are broken by lexicographic label
- * order so test results remain stable.
+ * order so test results remain stable. Pass `options.seed` for the classic
+ * asynchronous variant (shuffled node order per round, random tie-breaking)
+ * — still deterministic per seed.
  */
 export function getLabelPropagationCommunities<N>(
   graph: Graph<N>,
@@ -212,6 +274,9 @@ export function getLabelPropagationCommunities<N>(
   }
 
   const maxIterations = options?.maxIterations ?? 50;
+  if (options?.seed !== undefined) {
+    return getSeededLabelPropagation(graph, options.seed, maxIterations);
+  }
   let labels = Object.fromEntries(
     graph.nodes.map((node) => [node.id, node.id]),
   ) as Record<string, string>;
