@@ -1,6 +1,49 @@
 import type { Graph, GraphNode, GraphEdge, GraphPort } from './types';
-import { getIndex } from './indexing';
+import { getIndex, type GraphIndex } from './indexing';
 import { getEdgeMode } from './mode';
+
+// Non-directed self-loop counts per node, cached per index version + graph
+// mode (mode affects edges without a per-edge override) — the same
+// revalidation scheme as the CSR snapshot. This is what makes getDegree O(1):
+// degree = |out| + |in| − (non-directed self-loops), exactly, because a
+// non-self-loop edge appears in exactly one of a node's two lists and a
+// self-loop in both.
+interface SelfLoopCacheEntry {
+  version: number;
+  mode: Graph['mode'];
+  counts: Map<string, number>;
+}
+
+const nonDirectedSelfLoopCache = new WeakMap<GraphIndex, SelfLoopCacheEntry>();
+
+function getNonDirectedSelfLoopCounts(
+  graph: Graph,
+  idx: GraphIndex,
+): Map<string, number> {
+  const cached = nonDirectedSelfLoopCache.get(idx);
+  if (
+    cached &&
+    cached.version === idx.version &&
+    cached.mode === graph.mode
+  ) {
+    return cached.counts;
+  }
+  const counts = new Map<string, number>();
+  for (const edge of graph.edges) {
+    if (
+      edge.sourceId === edge.targetId &&
+      getEdgeMode(graph, edge) !== 'directed'
+    ) {
+      counts.set(edge.sourceId, (counts.get(edge.sourceId) ?? 0) + 1);
+    }
+  }
+  nonDirectedSelfLoopCache.set(idx, {
+    version: idx.version,
+    mode: graph.mode,
+    counts,
+  });
+  return counts;
+}
 
 // --- Edge queries ---
 
@@ -260,20 +303,16 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
  */
 export function getDegree(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
-  const out = idx.outEdges.get(nodeId) ?? [];
-  const inE = idx.inEdges.get(nodeId) ?? [];
-  let degree = 0;
-  const countedNonDirected = new Set<string>();
-  for (const eid of [...out, ...inE]) {
-    const e = graph.edges[idx.edgeById.get(eid)!];
-    if (getEdgeMode(graph, e) === 'directed') {
-      degree++; // a directed self-loop appears in both lists → counts twice
-    } else if (!countedNonDirected.has(eid)) {
-      countedNonDirected.add(eid);
-      degree++;
-    }
-  }
-  return degree;
+  // O(1) per call (amortized): an incident non-self-loop edge contributes
+  // exactly one entry across the two lists regardless of mode, a directed
+  // self-loop both entries (counts twice, intended), and a non-directed
+  // self-loop both entries but should count once — subtract the cached count.
+  const out = idx.outEdges.get(nodeId);
+  const inE = idx.inEdges.get(nodeId);
+  const selfLoops = getNonDirectedSelfLoopCounts(graph, idx);
+  return (
+    (out?.length ?? 0) + (inE?.length ?? 0) - (selfLoops.get(nodeId) ?? 0)
+  );
 }
 
 /**
