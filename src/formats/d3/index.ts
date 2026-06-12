@@ -34,7 +34,7 @@ export interface D3Graph {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { toD3Graph } from '@statelyai/graph/formats/d3';
+ * import { toD3Graph } from '@statelyai/graph/d3';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
@@ -99,7 +99,7 @@ export function toD3Graph(graph: Graph): D3Graph {
  *
  * @example
  * ```ts
- * import { fromD3Graph } from '@statelyai/graph/formats/d3';
+ * import { fromD3Graph } from '@statelyai/graph/d3';
  *
  * const graph = fromD3Graph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
@@ -169,7 +169,7 @@ export function fromD3Graph(d3: D3Graph): Graph {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { d3Converter } from '@statelyai/graph/formats/d3';
+ * import { d3Converter } from '@statelyai/graph/d3';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],

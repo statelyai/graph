@@ -35,7 +35,7 @@ export interface JGFGraph {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { toJGF } from '@statelyai/graph/formats/jgf';
+ * import { toJGF } from '@statelyai/graph/jgf';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
@@ -111,7 +111,7 @@ export function toJGF(graph: Graph): JGFGraph {
  *
  * @example
  * ```ts
- * import { fromJGF } from '@statelyai/graph/formats/jgf';
+ * import { fromJGF } from '@statelyai/graph/jgf';
  *
  * const graph = fromJGF({
  *   graph: {
@@ -193,7 +193,7 @@ export function fromJGF(jgf: JGFGraph): Graph {
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { jgfConverter } from '@statelyai/graph/formats/jgf';
+ * import { jgfConverter } from '@statelyai/graph/jgf';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],

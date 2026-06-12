@@ -9,7 +9,7 @@ import { createFormatConverter } from '../converter';
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { toGML } from '@statelyai/graph/formats/gml';
+ * import { toGML } from '@statelyai/graph/gml';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
@@ -157,7 +157,7 @@ function gmlString(s: string): string {
  *
  * @example
  * ```ts
- * import { fromGML } from '@statelyai/graph/formats/gml';
+ * import { fromGML } from '@statelyai/graph/gml';
  *
  * const graph = fromGML(`
  *   graph [
@@ -454,7 +454,7 @@ function parseNumber(
  * @example
  * ```ts
  * import { createGraph } from '@statelyai/graph';
- * import { gmlConverter } from '@statelyai/graph/formats/gml';
+ * import { gmlConverter } from '@statelyai/graph/gml';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],

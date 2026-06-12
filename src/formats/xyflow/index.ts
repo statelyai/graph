@@ -109,7 +109,7 @@ function orderParentsFirst(nodes: XYFlowNode[]): XYFlowNode[] {
  * @example
  * ```ts
  * import { createVisualGraph } from '@statelyai/graph';
- * import { toXYFlow } from '@statelyai/graph/formats/xyflow';
+ * import { toXYFlow } from '@statelyai/graph/xyflow';
  *
  * const graph = createVisualGraph({
  *   nodes: [
@@ -191,7 +191,7 @@ export function toXYFlow(graph: VisualGraph): XYFlow {
  *
  * @example
  * ```ts
- * import { fromXYFlow } from '@statelyai/graph/formats/xyflow';
+ * import { fromXYFlow } from '@statelyai/graph/xyflow';
  *
  * const graph = fromXYFlow({
  *   nodes: [
@@ -303,7 +303,7 @@ export function fromXYFlow(flow: XYFlow): VisualGraph {
  * @example
  * ```ts
  * import { createVisualGraph } from '@statelyai/graph';
- * import { xyflowConverter } from '@statelyai/graph/formats/xyflow';
+ * import { xyflowConverter } from '@statelyai/graph/xyflow';
  *
  * const graph = createVisualGraph({
  *   nodes: [
