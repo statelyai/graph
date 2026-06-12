@@ -207,4 +207,31 @@ describe('getGraphvizLayout', () => {
     );
     expect(laidOut.edges.map(strip)).toEqual(graph.edges.map(strip));
   });
+
+  it('maps constraints.layer to dot rank=same groups', async () => {
+    // a→x and b→x: unconstrained dot puts a and b in the rank above x, but
+    // constraining b to x's layer forces them onto the same rank.
+    const make = () =>
+      createGraph({
+        direction: 'down',
+        nodes: [{ id: 'a' }, { id: 'b' }, { id: 'x' }],
+        edges: [
+          { id: 'e1', sourceId: 'a', targetId: 'x' },
+          { id: 'e2', sourceId: 'b', targetId: 'x' },
+        ],
+      });
+    const center = (n: { y: number; height: number }) => n.y + n.height / 2;
+
+    const free = await getGraphvizLayout(make());
+    const freeById = Object.fromEntries(free.nodes.map((n) => [n.id, n]));
+    expect(center(freeById.b)).toBeCloseTo(center(freeById.a), 3);
+    expect(center(freeById.b)).toBeLessThan(center(freeById.x));
+
+    const constrained = await getGraphvizLayout(make(), {
+      constraints: { layer: (node) => ({ b: 1, x: 1 } as Record<string, number>)[node.id] },
+    });
+    const byId = Object.fromEntries(constrained.nodes.map((n) => [n.id, n]));
+    expect(center(byId.b)).toBeCloseTo(center(byId.x), 3);
+    expect(center(byId.a)).toBeLessThan(center(byId.b));
+  });
 });

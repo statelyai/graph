@@ -150,6 +150,8 @@ let graphvizPromise: Promise<Graphviz> | undefined;
  *   has no directed edge operator).
  * - `options.seed` maps to the Graphviz `start` attribute (used by the
  *   randomized engines neato/fdp/sfdp; ignored by deterministic engines).
+ * - `options.constraints.layer` maps to `{ rank=same; … }` groups (`dot`
+ *   engine only — the other engines have no rank concept).
  *
  * @example
  * ```ts
@@ -207,6 +209,22 @@ export async function getGraphvizLayout(
     lines.push(
       `  ${escapeId(node.id)} [width=${width / POINTS_PER_INCH}, height=${height / POINTS_PER_INCH}, fixedsize=true, shape=box];`,
     );
+  }
+  // constraints.layer → dot rank=same groups (same-layer grouping; ordering
+  // between layers still follows the edges). Other engines have no ranks.
+  const layerOf = options?.constraints?.layer;
+  if (engine === 'dot' && layerOf) {
+    const layers = new Map<number, string[]>();
+    for (const node of graph.nodes) {
+      const layer = layerOf(node);
+      if (layer === undefined) continue;
+      let ids = layers.get(layer);
+      if (ids === undefined) layers.set(layer, (ids = []));
+      ids.push(node.id);
+    }
+    for (const [, ids] of [...layers].sort((a, b) => a[0] - b[0])) {
+      lines.push(`  { rank=same; ${ids.map(escapeId).join('; ')}; }`);
+    }
   }
   for (const edge of graph.edges) {
     const attrs: string[] = [];

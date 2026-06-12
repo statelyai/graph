@@ -70,8 +70,33 @@ export async function getElkLayout(
   });
 
   const root = toELK(sized);
+
+  // constraints.layer → ELK partitions (same value = same layer, ordered
+  // along the flow axis)
+  const layerOf = options?.constraints?.layer;
+  let hasPartitions = false;
+  if (layerOf) {
+    const nodeById = new Map(sized.nodes.map((node) => [node.id, node]));
+    const visit = (elkNode: ElkNode): void => {
+      for (const child of elkNode.children ?? []) {
+        const node = nodeById.get(child.id);
+        const layer = node === undefined ? undefined : layerOf(node);
+        if (layer !== undefined) {
+          hasPartitions = true;
+          child.layoutOptions = {
+            ...child.layoutOptions,
+            'elk.partitioning.partition': String(layer),
+          };
+        }
+        visit(child);
+      }
+    };
+    visit(root);
+  }
+
   root.layoutOptions = {
     'elk.algorithm': options?.algorithm ?? 'layered',
+    ...(hasPartitions && { 'elk.partitioning.activate': 'true' }),
     ...(options?.spacing?.node !== undefined && {
       'elk.spacing.nodeNode': String(options.spacing.node),
     }),

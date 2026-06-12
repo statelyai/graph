@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { createGraph } from '../../src';
+import { createGraph, createVisualGraph } from '../../src';
 import {
   DEFAULT_NODE_SIZE,
   applyLayoutFrame,
+  centerGraph,
+  genLayoutTransition,
   getLayoutBounds,
   getNodeSize,
+  translateGraph,
 } from '../../src/layout';
 
 describe('getNodeSize', () => {
@@ -78,5 +81,144 @@ describe('getLayoutBounds', () => {
       width: 0,
       height: 0,
     });
+  });
+});
+
+describe('genLayoutTransition', () => {
+  const from = createGraph({
+    nodes: [
+      { id: 'a', x: 0, y: 0, width: 10, height: 10 },
+      { id: 'b', width: 10, height: 10 }, // unpositioned
+    ],
+  });
+  const to = createVisualGraph({
+    nodes: [
+      { id: 'a', x: 100, y: 50, width: 10, height: 10 },
+      { id: 'b', x: 30, y: 40, width: 10, height: 10 },
+    ],
+  });
+
+  it('interpolates from start to end and returns the target graph', () => {
+    const frames = [];
+    const gen = genLayoutTransition(from, to, { steps: 4 });
+    let step = gen.next();
+    while (!step.done) {
+      frames.push(step.value);
+      step = gen.next();
+    }
+    expect(step.value).toBe(to);
+    expect(frames).toHaveLength(4);
+    // last frame lands exactly on the target
+    expect(frames[3].positions.a).toEqual({ x: 100, y: 50 });
+    expect(frames[3].alpha).toBe(0);
+    // intermediate frames are strictly between start and end
+    expect(frames[1].positions.a.x).toBeGreaterThan(0);
+    expect(frames[1].positions.a.x).toBeLessThan(100);
+  });
+
+  it('starts unmatched/unpositioned nodes at their target position', () => {
+    const [first] = genLayoutTransition(from, to, { steps: 2 });
+    expect(first.positions.b).toEqual({ x: 30, y: 40 });
+  });
+
+  it('supports a custom ease', () => {
+    const frames = [...genLayoutTransition(from, to, { steps: 2, ease: () => 1 })];
+    expect(frames[0].positions.a).toEqual({ x: 100, y: 50 });
+  });
+
+  it('drives applyLayoutFrame to morph the live graph', () => {
+    const live = createGraph({
+      nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }],
+    });
+    const target = createVisualGraph({
+      nodes: [{ id: 'a', x: 10, y: 10, width: 10, height: 10 }],
+    });
+    for (const frame of genLayoutTransition(live, target, { steps: 5 })) {
+      applyLayoutFrame(live, frame);
+    }
+    expect(live.nodes[0]).toMatchObject({ x: 10, y: 10 });
+  });
+});
+
+describe('translateGraph', () => {
+  it('shifts nodes, edge points, and edge label rects in place', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'a', x: 0, y: 0, width: 10, height: 10 },
+        { id: 'b', x: 100, y: 50 },
+        { id: 'unpositioned' },
+      ],
+      edges: [
+        {
+          id: 'e',
+          sourceId: 'a',
+          targetId: 'b',
+          x: 40,
+          y: 20,
+          points: [
+            { x: 5, y: 5 },
+            { x: 100, y: 55 },
+          ],
+        },
+      ],
+    });
+    translateGraph(g, 7, -3);
+    expect(g.nodes[0]).toMatchObject({ x: 7, y: -3 });
+    expect(g.nodes[1]).toMatchObject({ x: 107, y: 47 });
+    expect(g.nodes[2].x).toBeUndefined();
+    expect(g.edges[0]).toMatchObject({ x: 47, y: 17 });
+    expect(g.edges[0].points).toEqual([
+      { x: 12, y: 2 },
+      { x: 107, y: 52 },
+    ]);
+  });
+
+  it('leaves parent-relative children and nested-edge geometry alone', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'parent', x: 10, y: 10, width: 200, height: 200 },
+        { id: 'child1', parentId: 'parent', x: 5, y: 5 },
+        { id: 'child2', parentId: 'parent', x: 50, y: 5 },
+      ],
+      edges: [
+        {
+          id: 'inner',
+          sourceId: 'child1',
+          targetId: 'child2',
+          points: [
+            { x: 5, y: 5 },
+            { x: 50, y: 5 },
+          ],
+        },
+      ],
+    });
+    translateGraph(g, 100, 100);
+    expect(g.nodes[0]).toMatchObject({ x: 110, y: 110 });
+    expect(g.nodes[1]).toMatchObject({ x: 5, y: 5 });
+    expect(g.edges[0].points).toEqual([
+      { x: 5, y: 5 },
+      { x: 50, y: 5 },
+    ]);
+  });
+});
+
+describe('centerGraph', () => {
+  it('centers the layout bounds on the rect center', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'a', x: 0, y: 0, width: 10, height: 10 },
+        { id: 'b', x: 90, y: 40, width: 10, height: 10 },
+      ],
+    });
+    centerGraph(g, { x: 0, y: 0, width: 500, height: 300 });
+    const bounds = getLayoutBounds(g);
+    expect(bounds.x + bounds.width / 2).toBe(250);
+    expect(bounds.y + bounds.height / 2).toBe(150);
+  });
+
+  it('is a no-op for graphs without geometry', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }] });
+    centerGraph(g, { x: 0, y: 0, width: 500, height: 300 });
+    expect(g.nodes[0].x).toBeUndefined();
   });
 });

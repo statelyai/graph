@@ -5,6 +5,7 @@ import type {
   Point,
   VisualGraph,
 } from '../types';
+import { getLCA } from '../queries';
 
 /**
  * Common options understood by every layout adapter. Engine-specific options
@@ -35,6 +36,32 @@ export interface LayoutOptions {
   isFixed?: (node: GraphNode) => boolean;
   /** Seed for engines with randomness — same seed, same layout. */
   seed?: number;
+  /**
+   * Portable layout constraints. **Advisory**, like port `direction`: engines
+   * that can express a constraint honor it, others ignore it. Per-adapter
+   * support is documented on each adapter.
+   */
+  constraints?: LayoutConstraints;
+}
+
+/**
+ * Portable constraints understood by (some) layout adapters.
+ *
+ * | Constraint | ELK | Graphviz (dot) | dagre | force engines |
+ * |------------|-----|----------------|-------|----------------|
+ * | `layer`    | partitions | `rank=same` groups | ignored | ignored |
+ */
+export interface LayoutConstraints {
+  /**
+   * Assign nodes to ordered layers along the flow axis (`0`, `1`, `2`, …;
+   * `undefined` leaves the node unconstrained). Nodes with the same value
+   * land in the same layer; smaller values come earlier in the layout
+   * direction. ELK maps this to partitions
+   * (`elk.partitioning.partition`); the Graphviz `dot` engine maps it to
+   * `{ rank=same; … }` groups (same-layer grouping — ordering *between*
+   * constrained layers still follows the edges).
+   */
+  layer?: (node: GraphNode) => number | undefined;
 }
 
 /**
@@ -150,4 +177,114 @@ export function getLayoutBounds(graph: Graph | VisualGraph): EntityRect {
 
   if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 };
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+export interface LayoutTransitionOptions {
+  /** Number of frames to yield. Default: 30. */
+  steps?: number;
+  /**
+   * Easing function mapping linear progress `t` (0 → 1] to eased progress.
+   * Default: smoothstep (`t² · (3 − 2t)`).
+   */
+  ease?: (t: number) => number;
+}
+
+/**
+ * Animate between two layouts of the same graph: yields interpolated
+ * {@link LayoutFrame}s from the node positions in `from` to those in `to`
+ * (drive them with {@link applyLayoutFrame}, e.g. one per animation frame),
+ * and returns `to`. This is what makes layouts swappable live — lay out with
+ * one engine, re-lay out with another, and tween between them.
+ *
+ * Nodes are matched by id; nodes without a position in `from` (or absent from
+ * it) start at their `to` position. Edge routes are not interpolated — frames
+ * carry node positions only; hide or re-route edges during the transition.
+ * `alpha` cools linearly 1 → 0 like the physics layouts.
+ *
+ * @example
+ * ```ts
+ * const next = await getElkLayout(graph);
+ * for (const frame of genLayoutTransition(graph, next)) {
+ *   applyLayoutFrame(graph, frame);
+ *   render(graph);
+ * }
+ * ```
+ */
+export function* genLayoutTransition(
+  from: Graph | VisualGraph,
+  to: VisualGraph,
+  options?: LayoutTransitionOptions,
+): Generator<LayoutFrame, VisualGraph> {
+  const steps = Math.max(1, Math.floor(options?.steps ?? 30));
+  const ease = options?.ease ?? ((t: number) => t * t * (3 - 2 * t));
+  const fromById = new Map(from.nodes.map((node) => [node.id, node]));
+  const tweens = to.nodes.map((node) => {
+    const fromNode = fromById.get(node.id);
+    const hasStart = fromNode?.x !== undefined && fromNode.y !== undefined;
+    return {
+      id: node.id,
+      startX: hasStart ? fromNode.x! : node.x,
+      startY: hasStart ? fromNode.y! : node.y,
+      endX: node.x,
+      endY: node.y,
+    };
+  });
+
+  for (let step = 1; step <= steps; step++) {
+    const t = ease(step / steps);
+    const positions: LayoutFrame['positions'] = {};
+    for (const tween of tweens) {
+      positions[tween.id] = {
+        x: tween.startX + (tween.endX - tween.startX) * t,
+        y: tween.startY + (tween.endY - tween.startY) * t,
+      };
+    }
+    yield { positions, alpha: 1 - step / steps };
+  }
+  return to;
+}
+
+/**
+ * **Mutable.** Shift the graph's geometry by `(dx, dy)` in place: node
+ * positions, edge route `points`, and edge label rects. Non-structural, so no
+ * index invalidation is needed.
+ *
+ * Hierarchy-aware: child nodes (`parentId` set) use parent-relative
+ * coordinates (the ELK/xyflow convention), so only top-level nodes are
+ * shifted — children move with their parents. Likewise, an edge's geometry is
+ * shifted only when its containing coordinate system is the root (the LCA of
+ * its endpoints is no node).
+ */
+export function translateGraph(graph: Graph, dx: number, dy: number): void {
+  for (const node of graph.nodes) {
+    if (node.parentId != null) continue;
+    if (node.x !== undefined) node.x += dx;
+    if (node.y !== undefined) node.y += dy;
+  }
+  for (const edge of graph.edges) {
+    if (getLCA(graph, edge.sourceId, edge.targetId) !== undefined) continue;
+    if (edge.x !== undefined) edge.x += dx;
+    if (edge.y !== undefined) edge.y += dy;
+    for (const point of edge.points ?? []) {
+      point.x += dx;
+      point.y += dy;
+    }
+  }
+}
+
+/**
+ * **Mutable.** Translate the graph in place so its {@link getLayoutBounds}
+ * center coincides with `rect`'s center — e.g. center a fresh layout in the
+ * viewport. Graphs without geometry are left untouched.
+ *
+ * @example
+ * ```ts
+ * centerGraph(laidOut, { x: 0, y: 0, width: canvas.width, height: canvas.height });
+ * ```
+ */
+export function centerGraph(graph: Graph, rect: EntityRect): void {
+  const bounds = getLayoutBounds(graph);
+  const dx = rect.x + rect.width / 2 - (bounds.x + bounds.width / 2);
+  const dy = rect.y + rect.height / 2 - (bounds.y + bounds.height / 2);
+  translateGraph(graph, dx, dy);
 }

@@ -110,4 +110,29 @@ describe('getElkLayout', () => {
       getLayoutBounds(tight).height,
     );
   });
+
+  it('maps constraints.layer to ELK partitions', async () => {
+    // Fan a→b, a→c: unconstrained layered puts b and c in the same layer;
+    // partitioning b=1, c=2 forces c into a later layer than b.
+    const layers: Record<string, number> = { a: 0, b: 1, c: 2 };
+    const make = () =>
+      createGraph({
+        direction: 'down',
+        nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+        edges: [
+          { id: 'e1', sourceId: 'a', targetId: 'b' },
+          { id: 'e2', sourceId: 'a', targetId: 'c' },
+        ],
+      });
+    const free = await getElkLayout(make());
+    const freeById = Object.fromEntries(free.nodes.map((n) => [n.id, n]));
+    expect(freeById.c.y).toBe(freeById.b.y);
+
+    const constrained = await getElkLayout(make(), {
+      constraints: { layer: (node) => layers[node.id] },
+    });
+    const byId = Object.fromEntries(constrained.nodes.map((n) => [n.id, n]));
+    expect(byId.a.y).toBeLessThan(byId.b.y);
+    expect(byId.b.y).toBeLessThan(byId.c.y);
+  });
 });
