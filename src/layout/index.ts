@@ -16,7 +16,11 @@ export interface LayoutOptions {
    * Layout direction. Defaults to `graph.direction ?? 'down'`.
    */
   direction?: 'up' | 'down' | 'left' | 'right';
-  /** Spacing hints (engines map these to their native options). */
+  /**
+   * Spacing hints (engines map these to their native options where the
+   * mapping is well-defined; engines without one ignore them — see each
+   * adapter's JSDoc).
+   */
   spacing?: {
     /** Space between sibling nodes. */
     node?: number;

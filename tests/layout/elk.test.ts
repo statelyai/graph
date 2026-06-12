@@ -111,6 +111,18 @@ describe('getElkLayout', () => {
     );
   });
 
+  it('maps seed to elk.randomSeed (randomized algorithms)', async () => {
+    const first = await getElkLayout(makeGraph(), {
+      algorithm: 'force',
+      seed: 7,
+    });
+    const second = await getElkLayout(makeGraph(), {
+      algorithm: 'force',
+      seed: 7,
+    });
+    expect(second).toEqual(first);
+  });
+
   it('maps constraints.layer to ELK partitions', async () => {
     // Fan a→b, a→c: unconstrained layered puts b and c in the same layer;
     // partitioning b=1, c=2 forces c into a later layer than b.

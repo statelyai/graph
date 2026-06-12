@@ -74,26 +74,23 @@ export async function getElkLayout(
   // constraints.layer → ELK partitions (same value = same layer, ordered
   // along the flow axis)
   const layerOf = options?.constraints?.layer;
-  // `boolean` annotation: assigned inside the visitor closure, which TS's
-  // narrowing doesn't see — without it the spread below narrows to `false`.
-  let hasPartitions: boolean = false;
+  let hasPartitions = false;
   if (layerOf) {
     const nodeById = new Map(sized.nodes.map((node) => [node.id, node]));
-    const visit = (elkNode: ElkNode): void => {
-      for (const child of elkNode.children ?? []) {
-        const node = nodeById.get(child.id);
-        const layer = node === undefined ? undefined : layerOf(node);
-        if (layer !== undefined) {
-          hasPartitions = true;
-          child.layoutOptions = {
-            ...(child.layoutOptions ?? {}),
-            'elk.partitioning.partition': String(layer),
-          };
-        }
-        visit(child);
+    const stack = [...(root.children ?? [])];
+    while (stack.length > 0) {
+      const child = stack.pop()!;
+      const node = nodeById.get(child.id);
+      const layer = node === undefined ? undefined : layerOf(node);
+      if (layer !== undefined) {
+        hasPartitions = true;
+        child.layoutOptions = {
+          ...child.layoutOptions,
+          'elk.partitioning.partition': String(layer),
+        };
       }
-    };
-    visit(root);
+      stack.push(...(child.children ?? []));
+    }
   }
 
   root.layoutOptions = {
@@ -106,6 +103,11 @@ export async function getElkLayout(
       'elk.layered.spacing.nodeNodeBetweenLayers': String(
         options.spacing.layer,
       ),
+    }),
+    // Honored by ELK's randomized algorithms (force, stress); ignored by the
+    // deterministic ones.
+    ...(options?.seed !== undefined && {
+      'elk.randomSeed': String(options.seed),
     }),
     ...root.layoutOptions,
     ...options?.layoutOptions,
