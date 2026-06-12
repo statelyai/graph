@@ -293,6 +293,58 @@ async function main(): Promise<void> {
         `void pending;`,
       ],
     },
+    './layout/forceatlas2': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = $MOD.getForceAtlas2Layout(graph, { seed: 1, iterations: 10 });`,
+        `assert.equal(laidOut.nodes.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const laidOut: m0.VisualGraph = $MOD.getForceAtlas2Layout(graph);`,
+        `void laidOut;`,
+      ],
+    },
+    './layout/d3-hierarchy': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = $MOD.getTidyTreeLayout(graph);`,
+        `assert.ok(laidOut.nodes[1].y > laidOut.nodes[0].y);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const laidOut: m0.VisualGraph = $MOD.getTidyTreeLayout(graph, { rootId: 'a' });`,
+        `void laidOut;`,
+      ],
+    },
+    './layout/webcola': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = $MOD.getColaLayout(graph, { seed: 1 });`,
+        `assert.equal(laidOut.nodes.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const laidOut: m0.VisualGraph = $MOD.getColaLayout(graph, { linkDistance: 100 });`,
+        `void laidOut;`,
+      ],
+    },
+    './layout/cytoscape': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const laidOut = await $MOD.getCytoscapeLayout(graph, { name: 'grid' });`,
+        `assert.equal(laidOut.nodes.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }], edges: [] });`,
+        `const pending: Promise<m0.VisualGraph> = $MOD.getCytoscapeLayout(graph);`,
+        `void pending;`,
+      ],
+    },
     './gexf': {
       phase: 'optional',
       runtime: [
@@ -526,6 +578,11 @@ async function main(): Promise<void> {
         '@dagrejs/dagre',
         'd3-force',
         '@hpcc-js/wasm-graphviz',
+        'graphology',
+        'graphology-layout-forceatlas2',
+        'd3-hierarchy',
+        'webcola',
+        'cytoscape',
       ],
       {
         cwd: consumerDir,

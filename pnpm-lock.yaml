@@ -20,9 +20,6 @@ devDependencies:
   '@hpcc-js/wasm-graphviz':
     specifier: ^1.22.0
     version: 1.22.0
-  '@types/cytoscape':
-    specifier: ^3.31.0
-    version: 3.31.0
   '@types/d3-array':
     specifier: ^3.2.2
     version: 3.2.2
@@ -1214,13 +1211,6 @@ packages:
     dependencies:
       '@types/deep-eql': 4.0.2
       assertion-error: 2.0.1
-    dev: true
-
-  /@types/cytoscape@3.31.0:
-    resolution: {integrity: sha512-EXHOHxqQjGxLDEh5cP4te6J0bi7LbCzmZkzsR6f703igUac8UGMdEohMyU3GHAayCTZrLQOMnaE/lqB2Ekh8Ww==, tarball: https://registry.npmjs.org/@types/cytoscape/-/cytoscape-3.31.0.tgz}
-    deprecated: This is a stub types definition. cytoscape provides its own type definitions, so you do not need this installed.
-    dependencies:
-      cytoscape: 3.34.0
     dev: true
 
   /@types/d3-array@3.2.2:

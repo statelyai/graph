@@ -29,6 +29,10 @@ export default defineConfig({
     'src/layout/dagre.ts',
     'src/layout/d3-force.ts',
     'src/layout/graphviz.ts',
+    'src/layout/forceatlas2.ts',
+    'src/layout/d3-hierarchy.ts',
+    'src/layout/webcola.ts',
+    'src/layout/cytoscape.ts',
   ],
   exports: {
     customExports(exports) {

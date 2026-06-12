@@ -42,10 +42,14 @@
     "./tgf": "./dist/formats/tgf/index.mjs",
     "./xyflow": "./dist/formats/xyflow/index.mjs",
     "./layout": "./dist/layout/index.mjs",
+    "./layout/cytoscape": "./dist/layout/cytoscape.mjs",
     "./layout/d3-force": "./dist/layout/d3-force.mjs",
+    "./layout/d3-hierarchy": "./dist/layout/d3-hierarchy.mjs",
     "./layout/dagre": "./dist/layout/dagre.mjs",
     "./layout/elk": "./dist/layout/elk.mjs",
+    "./layout/forceatlas2": "./dist/layout/forceatlas2.mjs",
     "./layout/graphviz": "./dist/layout/graphviz.mjs",
+    "./layout/webcola": "./dist/layout/webcola.mjs",
     "./queries": "./dist/queries.mjs",
     "./schemas": "./dist/schemas.mjs",
     "./package.json": "./package.json"
@@ -80,7 +84,6 @@
     "@dagrejs/dagre": "^3.0.0",
     "@dagrejs/graphlib": "^4.0.1",
     "@hpcc-js/wasm-graphviz": "^1.22.0",
-    "@types/cytoscape": "^3.31.0",
     "@types/d3-array": "^3.2.2",
     "@types/d3-force": "^3.0.10",
     "@types/d3-hierarchy": "^3.1.7",
@@ -117,16 +120,29 @@
     "@hpcc-js/wasm-graphviz": "^1.0.0",
     "cytoscape": "^3.0.0",
     "d3-force": "^3.0.0",
+    "d3-hierarchy": "^3.0.0",
     "dotparser": "^1.0.0",
     "elkjs": "^0.9.0 || ^0.10.0 || ^0.11.0",
     "fast-xml-parser": "^5.0.0",
+    "graphology": "^0.26.0",
+    "graphology-layout-forceatlas2": "^0.10.0",
+    "webcola": "^3.4.0",
     "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
+    "@dagrejs/dagre": {
+      "optional": true
+    },
+    "@hpcc-js/wasm-graphviz": {
+      "optional": true
+    },
     "cytoscape": {
       "optional": true
     },
     "d3-force": {
+      "optional": true
+    },
+    "d3-hierarchy": {
       "optional": true
     },
     "dotparser": {
@@ -138,13 +154,16 @@
     "fast-xml-parser": {
       "optional": true
     },
+    "graphology": {
+      "optional": true
+    },
+    "graphology-layout-forceatlas2": {
+      "optional": true
+    },
+    "webcola": {
+      "optional": true
+    },
     "zod": {
-      "optional": true
-    },
-    "@dagrejs/dagre": {
-      "optional": true
-    },
-    "@hpcc-js/wasm-graphviz": {
       "optional": true
     }
   }
