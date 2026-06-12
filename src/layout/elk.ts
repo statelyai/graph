@@ -74,7 +74,9 @@ export async function getElkLayout(
   // constraints.layer → ELK partitions (same value = same layer, ordered
   // along the flow axis)
   const layerOf = options?.constraints?.layer;
-  let hasPartitions = false;
+  // `boolean` annotation: assigned inside the visitor closure, which TS's
+  // narrowing doesn't see — without it the spread below narrows to `false`.
+  let hasPartitions: boolean = false;
   if (layerOf) {
     const nodeById = new Map(sized.nodes.map((node) => [node.id, node]));
     const visit = (elkNode: ElkNode): void => {
@@ -84,7 +86,7 @@ export async function getElkLayout(
         if (layer !== undefined) {
           hasPartitions = true;
           child.layoutOptions = {
-            ...child.layoutOptions,
+            ...(child.layoutOptions ?? {}),
             'elk.partitioning.partition': String(layer),
           };
         }
