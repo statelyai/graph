@@ -146,7 +146,7 @@ describe('getGraphvizLayout', () => {
       edges: [],
     });
     await expect(getGraphvizLayout(graph)).rejects.toThrow(
-      /compound graphs are not supported.*"child".*getElkLayout.*flatten/s,
+      /compound graphs are not supported.*"child".*getElkLayout.*getFlattenedGraph/s,
     );
   });
 

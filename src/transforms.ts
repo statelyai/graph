@@ -13,7 +13,7 @@ import { toNodeConfig, toEdgeConfig } from './config';
  *
  * @example
  * ```ts
- * import { createGraph, flatten } from '@statelyai/graph';
+ * import { createGraph, getFlattenedGraph } from '@statelyai/graph';
  *
  * const graph = createGraph({
  *   nodes: [
@@ -25,12 +25,12 @@ import { toNodeConfig, toEdgeConfig } from './config';
  *   edges: [{ id: 'e1', sourceId: 'other', targetId: 'parent' }],
  * });
  *
- * const flat = flatten(graph);
+ * const flat = getFlattenedGraph(graph);
  * // flat.nodes → [child1, child2, other] (leaf nodes only)
  * // flat.edges → edge from 'other' → 'child1' (resolved via initialNodeId)
  * ```
  */
-export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
+export function getFlattenedGraph<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
   const idx = getIndex(graph);
 
   // Identify leaf nodes (nodes with no children)
@@ -153,6 +153,13 @@ export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
   });
 }
 
+/**
+ * @deprecated Use {@link getFlattenedGraph}.
+ */
+export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
+  return getFlattenedGraph(graph);
+}
+
 // Induced subgraph
 
 /**
@@ -228,7 +235,7 @@ export function getSubgraph<N, E, G>(
  *
  * @example
  * ```ts
- * import { createGraph, reverseGraph } from '@statelyai/graph';
+ * import { createGraph, getReversedGraph } from '@statelyai/graph';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
@@ -238,14 +245,14 @@ export function getSubgraph<N, E, G>(
  *   ],
  * });
  *
- * const rev = reverseGraph(graph);
+ * const rev = getReversedGraph(graph);
  * // rev edges: b→a, c→b
  *
- * const filtered = reverseGraph(graph, (e) => e.id !== 'bc');
+ * const filtered = getReversedGraph(graph, (e) => e.id !== 'bc');
  * // filtered edges: b→a (only ab reversed, bc excluded)
  * ```
  */
-export function reverseGraph<N, E, G>(
+export function getReversedGraph<N, E, G>(
   graph: Graph<N, E, G>,
   filterEdge?: (edge: GraphEdge<E>) => boolean,
 ): Graph<N, E, G> {
@@ -269,4 +276,14 @@ export function reverseGraph<N, E, G>(
     }),
     data: graph.data,
   });
+}
+
+/**
+ * @deprecated Use {@link getReversedGraph}.
+ */
+export function reverseGraph<N, E, G>(
+  graph: Graph<N, E, G>,
+  filterEdge?: (edge: GraphEdge<E>) => boolean,
+): Graph<N, E, G> {
+  return getReversedGraph(graph, filterEdge);
 }

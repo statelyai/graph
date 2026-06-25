@@ -102,10 +102,10 @@ updateNode(graph, 'a', { color: null }); // unset
 
 ## Hierarchy
 
-Nodes support parent-child relationships for compound/nested graphs. Query children, ancestors, descendants, depth, and least common ancestor. Use `flatten()` to decompose into a flat leaf-node graph.
+Nodes support parent-child relationships for compound/nested graphs. Query children, ancestors, descendants, depth, and least common ancestor. Use `getFlattenedGraph()` to decompose into a flat leaf-node graph.
 
 ```ts
-import { createGraph, getChildren, getLCA, flatten } from '@statelyai/graph';
+import { createGraph, getChildren, getLCA, getFlattenedGraph } from '@statelyai/graph';
 
 const graph = createGraph({
   nodes: [
@@ -123,7 +123,7 @@ const graph = createGraph({
 });
 
 const children = getChildren(graph, 'b'); // [b1, b2]
-const flat = flatten(graph); // only leaf nodes, edges resolved
+const flat = getFlattenedGraph(graph); // only leaf nodes, edges resolved
 ```
 
 ## Ports
@@ -200,8 +200,8 @@ Hot algorithm loops (centrality, components) run on an internal compressed-spars
 
 ```ts
 import {
-  bfs,
-  dfs,
+  genBFS,
+  genDFS,
   hasPath,
   isAcyclic,
   getShortestPath,
@@ -220,10 +220,10 @@ import {
   isIsomorphic,
 } from '@statelyai/graph';
 
-for (const node of bfs(graph, 'a')) {
+for (const node of genBFS(graph, 'a')) {
   /* breadth-first */
 }
-for (const node of dfs(graph, 'a')) {
+for (const node of genDFS(graph, 'a')) {
   /* depth-first */
 }
 
@@ -279,9 +279,9 @@ Edge `x`/`y`/`width`/`height` are canonically the edge-label rect; routes live i
 
 Beyond classic graph algorithms, the library also includes utilities for evolving and exploring graph state:
 
-- `getDiff()`, `getPatches()`, `applyPatches()` for graph change tracking
+- `getDiff()`, `getPatches()`, `updateGraphWithPatches()` for graph change tracking
 - `genRandomWalk()`, `genWeightedRandomWalk()`, and coverage helpers for model-based testing and simulation
-- `getSubgraph()` and `reverseGraph()` for structural transforms
+- `getSubgraph()` and `getReversedGraph()` for structural transforms
 
 ## Visual Graphs
 

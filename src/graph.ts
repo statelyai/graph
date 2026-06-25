@@ -66,6 +66,16 @@ function validatePortNames(ports: PortConfig[]): void {
   }
 }
 
+function validateNodeReference(
+  nodeIds: Set<string>,
+  ref: string | null | undefined,
+  message: (ref: string) => string,
+): void {
+  if (ref != null && !nodeIds.has(ref)) {
+    throw new Error(message(ref));
+  }
+}
+
 /**
  * Create a resolved graph node from a config. Fills in defaults.
  *
@@ -427,6 +437,11 @@ export function addNode<N, P = any>(
   if (config.parentId && !idx.nodeById.has(config.parentId)) {
     throw new Error(`Parent node "${config.parentId}" does not exist`);
   }
+  validateNodeReference(
+    new Set([...idx.nodeById.keys(), config.id]),
+    config.initialNodeId,
+    (initialNodeId) => `Initial node "${initialNodeId}" does not exist`,
+  );
   const arrayIndex = graph.nodes.push(node) - 1;
   indexAddNode(idx, node, arrayIndex);
   return node;
@@ -635,6 +650,11 @@ export function updateNode<N, P = any>(
         ai !== undefined ? (graph.nodes[ai].parentId ?? null) : null;
     }
   }
+  validateNodeReference(
+    new Set(idx.nodeById.keys()),
+    update.initialNodeId,
+    (initialNodeId) => `Initial node "${initialNodeId}" does not exist`,
+  );
   if (update.ports != null && update.ports.length > 0) {
     validatePortNames(update.ports);
   }
@@ -815,8 +835,33 @@ export function addEntities<N, E>(
   graph: Graph<N, E>,
   entities: EntitiesConfig<N, E>,
 ): void {
-  for (const nodeConfig of entities.nodes ?? []) {
-    addNode(graph, nodeConfig);
+  const nodeConfigs = entities.nodes ?? [];
+  if (nodeConfigs.length > 0) {
+    const idx = getIndex(graph);
+    const nodeIds = new Set(idx.nodeById.keys());
+    for (const nodeConfig of nodeConfigs) {
+      if (nodeIds.has(nodeConfig.id)) {
+        throw new Error(`Node "${nodeConfig.id}" already exists`);
+      }
+      nodeIds.add(nodeConfig.id);
+    }
+    const nodes = nodeConfigs.map(createGraphNode);
+    for (const nodeConfig of nodeConfigs) {
+      validateNodeReference(
+        nodeIds,
+        nodeConfig.parentId,
+        (parentId) => `Parent node "${parentId}" does not exist`,
+      );
+      validateNodeReference(
+        nodeIds,
+        nodeConfig.initialNodeId,
+        (initialNodeId) => `Initial node "${initialNodeId}" does not exist`,
+      );
+    }
+    for (const node of nodes) {
+      const arrayIndex = graph.nodes.push(node) - 1;
+      indexAddNode(idx, node, arrayIndex);
+    }
   }
   for (const edgeConfig of entities.edges ?? []) {
     addEdge(graph, edgeConfig);

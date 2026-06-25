@@ -136,12 +136,15 @@ export {
 
 // Algorithms
 export {
+  genBFS,
+  genDFS,
   bfs,
   dfs,
   isAcyclic,
   getConnectedComponents,
   getTopologicalSort,
   hasPath,
+  getJoinedPath,
   joinPaths,
   isConnected,
   isTree,
@@ -211,15 +214,23 @@ export {
 export {
   getDiff,
   isEmptyDiff,
+  getInvertedDiff,
   invertDiff,
   getPatches,
+  updateGraphWithPatches,
   applyPatches,
   toPatches,
   toDiff,
 } from './diff';
 
 // Transforms
-export { flatten, getSubgraph, reverseGraph } from './transforms';
+export {
+  getFlattenedGraph,
+  flatten,
+  getSubgraph,
+  getReversedGraph,
+  reverseGraph,
+} from './transforms';
 
 // Walks (MBT)
 export {
@@ -227,6 +238,11 @@ export {
   genWeightedRandomWalk,
   genQuickRandomWalk,
   genPredefinedWalk,
+  genWalkSteps,
+  genWalkUntilNode,
+  genWalkUntilEdge,
+  genWalkUntilNodeCoverage,
+  genWalkUntilEdgeCoverage,
   takeSteps,
   takeUntilNode,
   takeUntilEdge,

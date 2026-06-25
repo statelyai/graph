@@ -80,7 +80,7 @@
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",
-    "@changesets/cli": "^2.29.8",
+    "@changesets/cli": "^2.31.0",
     "@dagrejs/dagre": "^3.0.0",
     "@dagrejs/graphlib": "^4.0.1",
     "@hpcc-js/wasm-graphviz": "^1.22.0",
@@ -108,7 +108,7 @@
     "ngraph.path": "^1.6.1",
     "publint": "^0.3.15",
     "tsdown": "^0.18.1",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16",
     "webcola": "^3.4.0",

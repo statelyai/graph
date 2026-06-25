@@ -10,8 +10,8 @@ Conventions: `n` = nodes, `m` = edges, `k` = iterations. Default edge weight is 
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `bfs(graph, startId)` | Lazy breadth-first node visit | O(n + m) | CSR-backed generator. Mode-aware: non-directed edges traversable both ways. Unknown start yields nothing. |
-| `dfs(graph, startId)` | Lazy depth-first node visit | O(n + m) | Iterative (no recursion limit), CSR-backed. |
+| `genBFS(graph, startId)` | Lazy breadth-first node visit | O(n + m) | CSR-backed generator. Mode-aware: non-directed edges traversable both ways. Unknown start yields nothing. |
+| `genDFS(graph, startId)` | Lazy depth-first node visit | O(n + m) | Iterative (no recursion limit), CSR-backed. |
 | `getPreorder(graph, opts?)` / `getPostorder(graph, opts?)` | One DFS pre/post ordering from `from` | O(n + m) | Deterministic: neighbors in index order. |
 | `genPreorders(graph, opts?)` / `genPostorders(graph, opts?)` | All possible DFS pre/post orderings | exponential (output-sensitive) | Lazy; branches on every neighbor choice. `getPreorders`/`getPostorders` are the eager forms. |
 
@@ -47,7 +47,7 @@ Conventions: `n` = nodes, `m` = edges, `k` = iterations. Default edge weight is 
 | `getAStarPath(graph, { from, to, heuristic, ... })` | One heuristic-guided shortest path | O((n + m) log n), heuristic-dependent | Admissible heuristic ⇒ optimal path. |
 | `getAllPairsShortestPaths(graph, opts?)` | Shortest paths between all pairs | Dijkstra-per-source (default) O(n(n + m) log n); `'floyd-warshall'` O(n³); `'bellman-ford'` O(n²m) | Floyd-Warshall throws on a negative cycle (self-distance < 0). Eager — output can be huge. |
 | `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | DFS with backtracking; without `to`, every non-empty simple path is yielded. |
-| `joinPaths(headPath, tailPath)` | Concatenated `GraphPath` | O(steps) | Throws unless head ends where tail starts. |
+| `getJoinedPath(headPath, tailPath)` | Concatenated `GraphPath` | O(steps) | Throws unless head ends where tail starts. |
 
 **Negative-weight contract.** Dijkstra, A*, and the bidirectional/early-exit searches may legitimately finish without ever scanning a negative edge — so they assert "no negative weights" **up front**: O(1) via the CSR's cached `firstNegativeEdge` flag for the default weight, or one O(m) sweep when a custom `getWeight` is supplied. They throw with a pointer to `{ algorithm: 'bellman-ford' }` (O(n·m), handles negative edges; negative *cycles* still throw).
 
@@ -123,8 +123,8 @@ Walk generators yield `GraphStep`s lazily and honor effective edge modes (non-di
 | `genWeightedRandomWalk(graph, opts?)` | Probability ∝ `getWeight` (`edge.weight ?? 1`) | Negative weights clamp to 0; all-zero stops the walk. |
 | `genQuickRandomWalk(graph, opts?)` | Targets unvisited edges; BFS-hops to the nearest one when stuck | Ends when no unvisited edge is reachable — fast edge coverage. |
 | `genPredefinedWalk(graph, edgeIds, opts?)` | Replays an explicit edge-id sequence | Throws on a missing or non-adjacent edge. |
-| `takeSteps(gen, n)` / `takeUntilNode(gen, id)` / `takeUntilEdge(gen, id)` | Stop-condition wrappers | Compose around any step generator. |
-| `takeUntilNodeCoverage(gen, graph, c, opts?)` / `takeUntilEdgeCoverage(gen, graph, c)` | Stop at coverage fraction `c` (0–1) | Start node counts as visited for node coverage. |
+| `genWalkSteps(gen, n)` / `genWalkUntilNode(gen, id)` / `genWalkUntilEdge(gen, id)` | Stop-condition wrappers | Compose around any step generator. |
+| `genWalkUntilNodeCoverage(gen, graph, c, opts?)` / `genWalkUntilEdgeCoverage(gen, graph, c)` | Stop at coverage fraction `c` (0–1) | Start node counts as visited for node coverage. |
 | `getCoverage(graph, steps, opts?)` | `CoverageStats` for a completed walk | Node/edge coverage ratios + visited ids. |
 
 ## Graph generators

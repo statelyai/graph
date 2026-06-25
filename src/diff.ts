@@ -181,18 +181,18 @@ export function isEmptyDiff(diff: GraphDiff): boolean {
  *
  * @example
  * ```ts
- * import { createGraph, getDiff, invertDiff } from '@statelyai/graph';
+ * import { createGraph, getDiff, getInvertedDiff } from '@statelyai/graph';
  *
  * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
  * const b = createGraph({ nodes: [{ id: 'n2' }], edges: [] });
  *
  * const diff = getDiff(a, b);
- * const inv = invertDiff(diff);
+ * const inv = getInvertedDiff(diff);
  * // inv.nodes.added contains n1 (was removed)
  * // inv.nodes.removed contains n2 (was added)
  * ```
  */
-export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
+export function getInvertedDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
   // Deep copy (graphs are JSON-serializable by contract) so nested values
   // (ports, style, data) are not shared between the input and the inverse.
   return {
@@ -215,6 +215,13 @@ export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
       })),
     },
   };
+}
+
+/**
+ * @deprecated Use {@link getInvertedDiff}.
+ */
+export function invertDiff<N, E>(diff: GraphDiff<N, E>): GraphDiff<N, E> {
+  return getInvertedDiff(diff);
 }
 
 // Patch functions
@@ -249,17 +256,17 @@ export function getPatches<N, E>(
  *
  * @example
  * ```ts
- * import { createGraph, getPatches, applyPatches } from '@statelyai/graph';
+ * import { createGraph, getPatches, updateGraphWithPatches } from '@statelyai/graph';
  *
  * const a = createGraph({ nodes: [{ id: 'n1' }], edges: [] });
  * const b = createGraph({ nodes: [{ id: 'n1' }, { id: 'n2' }], edges: [] });
  *
  * const patches = getPatches(a, b);
- * applyPatches(a, patches);
+ * updateGraphWithPatches(a, patches);
  * // a now contains both n1 and n2
  * ```
  */
-export function applyPatches<N, E>(
+export function updateGraphWithPatches<N, E>(
   graph: Graph<N, E>,
   patches: GraphPatch<N, E>[],
 ): void {
@@ -286,6 +293,16 @@ export function applyPatches<N, E>(
         break;
     }
   }
+}
+
+/**
+ * @deprecated Use {@link updateGraphWithPatches}.
+ */
+export function applyPatches<N, E>(
+  graph: Graph<N, E>,
+  patches: GraphPatch<N, E>[],
+): void {
+  updateGraphWithPatches(graph, patches);
 }
 
 // Conversion functions

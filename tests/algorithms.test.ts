@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createGraph } from '../src/graph';
 import {
-  bfs,
-  dfs,
+  genBFS,
+  genDFS,
   isAcyclic,
   getConnectedComponents,
   getTopologicalSort,
@@ -51,23 +51,23 @@ function makeDisconnectedGraph() {
 }
 
 describe('BFS / DFS', () => {
-  it('bfs visits in breadth-first order', () => {
+  it('genBFS visits in breadth-first order', () => {
     const g = makeDAG();
-    const visited = [...bfs(g, 'a')].map((n) => n.id);
+    const visited = [...genBFS(g, 'a')].map((n) => n.id);
     expect(visited[0]).toBe('a');
     // b and c should come before d
     expect(visited.indexOf('b')).toBeLessThan(visited.indexOf('d'));
     expect(visited.indexOf('c')).toBeLessThan(visited.indexOf('d'));
   });
 
-  it('dfs visits in depth-first order', () => {
+  it('genDFS visits in depth-first order', () => {
     const g = makeDAG();
-    const visited = [...dfs(g, 'a')].map((n) => n.id);
+    const visited = [...genDFS(g, 'a')].map((n) => n.id);
     expect(visited[0]).toBe('a');
     expect(visited).toHaveLength(4);
   });
 
-  it('bfs follows undirected edge overrides in directed graphs', () => {
+  it('genBFS follows undirected edge overrides in directed graphs', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [
@@ -76,17 +76,17 @@ describe('BFS / DFS', () => {
       ],
     });
 
-    expect([...bfs(g, 'b')].map((n) => n.id)).toEqual(['b', 'a', 'c']);
+    expect([...genBFS(g, 'b')].map((n) => n.id)).toEqual(['b', 'a', 'c']);
   });
 
-  it('bfs follows directed edge overrides in undirected graphs', () => {
+  it('genBFS follows directed edge overrides in undirected graphs', () => {
     const g = createGraph({
       mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', mode: 'directed' }],
     });
 
-    expect([...bfs(g, 'b')].map((n) => n.id)).toEqual(['b']);
+    expect([...genBFS(g, 'b')].map((n) => n.id)).toEqual(['b']);
   });
 });
 

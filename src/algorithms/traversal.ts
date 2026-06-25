@@ -10,7 +10,7 @@ import { genCycles, getStronglyConnectedComponents } from './paths';
 import { getCSR } from './csr';
 import { getSubgraph } from '../transforms';
 
-export function* bfs<N>(
+export function* genBFS<N>(
   graph: Graph<N>,
   startId: string,
 ): Generator<GraphNode<N>> {
@@ -40,7 +40,17 @@ export function* bfs<N>(
   }
 }
 
-export function* dfs<N>(
+/**
+ * @deprecated Use {@link genBFS}.
+ */
+export function* bfs<N>(
+  graph: Graph<N>,
+  startId: string,
+): Generator<GraphNode<N>> {
+  yield* genBFS(graph, startId);
+}
+
+export function* genDFS<N>(
   graph: Graph<N>,
   startId: string,
 ): Generator<GraphNode<N>> {
@@ -65,6 +75,16 @@ export function* dfs<N>(
       }
     }
   }
+}
+
+/**
+ * @deprecated Use {@link genDFS}.
+ */
+export function* dfs<N>(
+  graph: Graph<N>,
+  startId: string,
+): Generator<GraphNode<N>> {
+  yield* genDFS(graph, startId);
 }
 
 export function isAcyclic(graph: Graph): boolean {

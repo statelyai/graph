@@ -1,4 +1,6 @@
 export {
+  genBFS,
+  genDFS,
   bfs,
   dfs,
   isAcyclic,
@@ -21,6 +23,7 @@ export {
   genCycles,
   getAllPairsShortestPaths,
   getAStarPath,
+  getJoinedPath,
   joinPaths,
 } from './algorithms/paths';
 

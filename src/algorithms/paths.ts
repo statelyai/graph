@@ -1219,7 +1219,7 @@ export function getAStarPath<N, E>(
   return undefined;
 }
 
-export function joinPaths<N, E>(
+export function getJoinedPath<N, E>(
   headPath: GraphPath<N, E>,
   tailPath: GraphPath<N, E>,
 ): GraphPath<N, E> {
@@ -1238,4 +1238,14 @@ export function joinPaths<N, E>(
     source: headPath.source,
     steps: [...headPath.steps, ...tailPath.steps],
   };
+}
+
+/**
+ * @deprecated Use {@link getJoinedPath}.
+ */
+export function joinPaths<N, E>(
+  headPath: GraphPath<N, E>,
+  tailPath: GraphPath<N, E>,
+): GraphPath<N, E> {
+  return getJoinedPath(headPath, tailPath);
 }

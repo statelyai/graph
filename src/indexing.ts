@@ -44,7 +44,8 @@ const indexes = new WeakMap<Graph, GraphIndex>();
  *
  * @example
  * ```ts
- * import { createGraph, getIndex } from '@statelyai/graph';
+ * import { createGraph } from '@statelyai/graph';
+ * import { getIndex } from './indexing';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
@@ -80,14 +81,15 @@ export function getIndex(graph: Graph): GraphIndex {
  *
  * @example
  * ```ts
- * import { createGraph, invalidateIndex, getIndex } from '@statelyai/graph';
+ * import { createGraph, getSuccessors, invalidateIndex } from '@statelyai/graph';
  *
  * const graph = createGraph({
  *   nodes: [{ id: 'a' }, { id: 'b' }],
  *   edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
  * });
  * graph.edges[0].targetId = 'a'; // in-place field mutation
- * invalidateIndex(graph); // forces rebuild on next getIndex()
+ * invalidateIndex(graph); // forces rebuild on next indexed read
+ * getSuccessors(graph, 'a');
  * ```
  */
 export function invalidateIndex(graph: Graph): void {

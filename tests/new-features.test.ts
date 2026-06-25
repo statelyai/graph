@@ -7,7 +7,7 @@ import {
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
 } from '../src/algorithms';
-import { getSubgraph, reverseGraph } from '../src/transforms';
+import { getSubgraph, getReversedGraph } from '../src/transforms';
 import { getSuccessors, getPredecessors } from '../src/queries';
 
 // Edge weight property
@@ -390,9 +390,9 @@ describe('getSubgraph', () => {
   });
 });
 
-// reverseGraph
+// getReversedGraph
 
-describe('reverseGraph', () => {
+describe('getReversedGraph', () => {
   it('flips all edge directions', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
@@ -401,7 +401,7 @@ describe('reverseGraph', () => {
         { id: 'bc', sourceId: 'b', targetId: 'c' },
       ],
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     expect(rev.edges[0].sourceId).toBe('b');
     expect(rev.edges[0].targetId).toBe('a');
     expect(rev.edges[1].sourceId).toBe('c');
@@ -413,7 +413,7 @@ describe('reverseGraph', () => {
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     expect(rev.nodes).toHaveLength(2);
   });
 
@@ -425,7 +425,7 @@ describe('reverseGraph', () => {
         { id: 'bc', sourceId: 'b', targetId: 'c' },
       ],
     });
-    const rev = reverseGraph(g, (e) => e.id === 'ab');
+    const rev = getReversedGraph(g, (e) => e.id === 'ab');
     expect(rev.edges).toHaveLength(1);
     expect(rev.edges[0].sourceId).toBe('b');
     expect(rev.edges[0].targetId).toBe('a');
@@ -436,7 +436,7 @@ describe('reverseGraph', () => {
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
     });
-    const rev2 = reverseGraph(reverseGraph(g));
+    const rev2 = getReversedGraph(getReversedGraph(g));
     expect(rev2.edges[0].sourceId).toBe('a');
     expect(rev2.edges[0].targetId).toBe('b');
   });
@@ -449,7 +449,7 @@ describe('reverseGraph', () => {
         { id: 'ac', sourceId: 'a', targetId: 'c' },
       ],
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     // In original, a has successors b, c. In reversed, b and c have successor a.
     expect(getSuccessors(rev, 'b').map((n) => n.id)).toEqual(['a']);
     expect(getSuccessors(rev, 'c').map((n) => n.id)).toEqual(['a']);
@@ -462,7 +462,7 @@ describe('reverseGraph', () => {
 
   it('empty graph produces empty graph', () => {
     const g = createGraph();
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     expect(rev.nodes).toHaveLength(0);
     expect(rev.edges).toHaveLength(0);
   });
@@ -472,7 +472,7 @@ describe('reverseGraph', () => {
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'ab', sourceId: 'a', targetId: 'b', weight: 7 }],
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     expect(rev.edges[0].weight).toBe(7);
   });
 
@@ -483,7 +483,7 @@ describe('reverseGraph', () => {
       edges: [],
       data: { meta: 'info' },
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     expect(rev.mode).toBe('undirected');
     expect(rev.data).toEqual({ meta: 'info' });
   });
@@ -493,7 +493,7 @@ describe('reverseGraph', () => {
       nodes: [{ id: 'a' }],
       edges: [{ id: 'aa', sourceId: 'a', targetId: 'a' }],
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     expect(rev.edges[0].sourceId).toBe('a');
     expect(rev.edges[0].targetId).toBe('a');
   });

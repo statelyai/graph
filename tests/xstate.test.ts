@@ -14,7 +14,7 @@ import {
   getSimplePaths,
   getCycles,
   hasPath,
-  joinPaths,
+  getJoinedPath,
 } from '../src/algorithms';
 import { getOutEdges } from '../src/queries';
 
@@ -544,7 +544,7 @@ describe('xstate integration', () => {
     });
   });
 
-  describe('chained from→to paths with joinPaths (from shortestPaths.test.ts)', () => {
+  describe('chained from→to paths with getJoinedPath (from shortestPaths.test.ts)', () => {
     const transition = (s: string, e: { type: string }) => {
       if (s === 'a' && e.type === 'TO_Y') return 'y';
       if (s === 'a' && e.type === 'TO_B') return 'b';
@@ -570,7 +570,7 @@ describe('xstate integration', () => {
       const paths = pathsToB.flatMap((pathToB) => {
         const lastId = pathToB.steps.at(-1)?.node.id ?? pathToB.source.id;
         const pathsToY = getShortestPaths(graph, { from: lastId, to: 'y' });
-        return pathsToY.map((pathToY) => joinPaths(pathToB, pathToY));
+        return pathsToY.map((pathToY) => getJoinedPath(pathToB, pathToY));
       });
 
       expect(paths).toHaveLength(1);
@@ -730,7 +730,7 @@ describe('xstate integration', () => {
       const chained = pathsToB.flatMap((pathToB) => {
         const bId = pathToB.steps.at(-1)!.node.id;
         return getShortestPaths(graph, { from: bId })
-          .map((ext) => joinPaths(pathToB, ext));
+          .map((ext) => getJoinedPath(pathToB, ext));
       });
       expect(chained).toHaveLength(4);
       expect(chained.every((p) => p.steps.length === 2)).toBe(true);
@@ -742,7 +742,7 @@ describe('xstate integration', () => {
         const bId = pathToB.steps.at(-1)!.node.id;
         return getSimplePaths(graph, { from: bId })
           .filter((ext) => ext.steps.length > 0)
-          .map((ext) => joinPaths(pathToB, ext));
+          .map((ext) => getJoinedPath(pathToB, ext));
       });
       expect(chained).toHaveLength(4);
     });

@@ -5,11 +5,11 @@ import {
   genWeightedRandomWalk,
   genQuickRandomWalk,
   genPredefinedWalk,
-  takeSteps,
-  takeUntilNode,
-  takeUntilEdge,
-  takeUntilNodeCoverage,
-  takeUntilEdgeCoverage,
+  genWalkSteps,
+  genWalkUntilNode,
+  genWalkUntilEdge,
+  genWalkUntilNodeCoverage,
+  genWalkUntilEdgeCoverage,
   getCoverage,
 } from '../src';
 
@@ -57,8 +57,8 @@ describe('genRandomWalk', () => {
     expect(steps[1].edge.id).toBe('bc');
   });
 
-  it('walks indefinitely on cycle (use takeSteps)', () => {
-    const steps = [...takeSteps(genRandomWalk(cycleGraph(), { seed: 1 }), 9)];
+  it('walks indefinitely on cycle (use genWalkSteps)', () => {
+    const steps = [...genWalkSteps(genRandomWalk(cycleGraph(), { seed: 1 }), 9)];
     expect(steps).toHaveLength(9);
     // Should cycle: ab, bc, ca, ab, bc, ca, ...
     expect(steps[0].edge.id).toBe('ab');
@@ -69,8 +69,8 @@ describe('genRandomWalk', () => {
 
   it('is deterministic with same seed', () => {
     const graph = diamondGraph();
-    const walk1 = [...takeSteps(genRandomWalk(graph, { seed: 99 }), 5)];
-    const walk2 = [...takeSteps(genRandomWalk(graph, { seed: 99 }), 5)];
+    const walk1 = [...genWalkSteps(genRandomWalk(graph, { seed: 99 }), 5)];
+    const walk2 = [...genWalkSteps(genRandomWalk(graph, { seed: 99 }), 5)];
     expect(walk1.map((s) => s.edge.id)).toEqual(walk2.map((s) => s.edge.id));
   });
 
@@ -119,7 +119,7 @@ describe('genWeightedRandomWalk', () => {
     // Over many trials with seed, should overwhelmingly pick 'ab'
     let abCount = 0;
     for (let seed = 0; seed < 100; seed++) {
-      const steps = [...takeSteps(genWeightedRandomWalk(graph, { seed }), 1)];
+      const steps = [...genWalkSteps(genWeightedRandomWalk(graph, { seed }), 1)];
       if (steps[0].edge.id === 'ab') abCount++;
     }
     expect(abCount).toBeGreaterThan(80);
@@ -181,43 +181,43 @@ describe('genPredefinedWalk', () => {
   });
 });
 
-describe('takeSteps', () => {
+describe('genWalkSteps', () => {
   it('limits walk length', () => {
-    const steps = [...takeSteps(genRandomWalk(cycleGraph(), { seed: 1 }), 3)];
+    const steps = [...genWalkSteps(genRandomWalk(cycleGraph(), { seed: 1 }), 3)];
     expect(steps).toHaveLength(3);
   });
 
   it('returns fewer if walk ends early', () => {
-    const steps = [...takeSteps(genRandomWalk(linearGraph(), { seed: 1 }), 10)];
+    const steps = [...genWalkSteps(genRandomWalk(linearGraph(), { seed: 1 }), 10)];
     expect(steps).toHaveLength(2);
   });
 });
 
-describe('takeUntilNode', () => {
+describe('genWalkUntilNode', () => {
   it('stops at target node', () => {
     const steps = [
-      ...takeUntilNode(genRandomWalk(linearGraph(), { seed: 1 }), 'b'),
+      ...genWalkUntilNode(genRandomWalk(linearGraph(), { seed: 1 }), 'b'),
     ];
     expect(steps).toHaveLength(1);
     expect(steps[0].node.id).toBe('b');
   });
 });
 
-describe('takeUntilEdge', () => {
+describe('genWalkUntilEdge', () => {
   it('stops after target edge', () => {
     const steps = [
-      ...takeUntilEdge(genRandomWalk(cycleGraph(), { seed: 1 }), 'ca'),
+      ...genWalkUntilEdge(genRandomWalk(cycleGraph(), { seed: 1 }), 'ca'),
     ];
     expect(steps).toHaveLength(3);
     expect(steps[2].edge.id).toBe('ca');
   });
 });
 
-describe('takeUntilNodeCoverage', () => {
+describe('genWalkUntilNodeCoverage', () => {
   it('stops when all nodes visited', () => {
     const graph = cycleGraph();
     const steps = [
-      ...takeUntilNodeCoverage(genRandomWalk(graph, { seed: 1 }), graph, 1.0),
+      ...genWalkUntilNodeCoverage(genRandomWalk(graph, { seed: 1 }), graph, 1.0),
     ];
     const visited = new Set(steps.map((s) => s.node.id));
     visited.add('a'); // start node
@@ -225,11 +225,11 @@ describe('takeUntilNodeCoverage', () => {
   });
 });
 
-describe('takeUntilEdgeCoverage', () => {
+describe('genWalkUntilEdgeCoverage', () => {
   it('stops when all edges visited', () => {
     const graph = cycleGraph();
     const steps = [
-      ...takeUntilEdgeCoverage(genRandomWalk(graph, { seed: 1 }), graph, 1.0),
+      ...genWalkUntilEdgeCoverage(genRandomWalk(graph, { seed: 1 }), graph, 1.0),
     ];
     const visited = new Set(steps.map((s) => s.edge.id));
     expect(visited.size).toBe(3);
@@ -299,14 +299,14 @@ describe('quick walk multi-hop detours', () => {
     expect(steps).toHaveLength(0);
   });
 
-  it('takeUntilEdgeCoverage yields nothing for a zero target', () => {
+  it('genWalkUntilEdgeCoverage yields nothing for a zero target', () => {
     const g = createGraph({
       initialNodeId: 'a',
       nodes: [{ id: 'a' }],
       edges: [{ id: 'loop', sourceId: 'a', targetId: 'a' }],
     });
     const steps = [
-      ...takeUntilEdgeCoverage(genRandomWalk(g, { seed: 1 }), g, 0),
+      ...genWalkUntilEdgeCoverage(genRandomWalk(g, { seed: 1 }), g, 0),
     ];
     expect(steps).toHaveLength(0);
   });

@@ -170,6 +170,13 @@ describe('Mutable: addNode / addEdge', () => {
     );
   });
 
+  it('addNode() throws on invalid initialNodeId', () => {
+    const g = createGraph();
+    expect(() => addNode(g, { id: 'a', initialNodeId: 'missing' })).toThrow(
+      'does not exist',
+    );
+  });
+
   it('addNode() throws on empty string id', () => {
     const g = createGraph();
     expect(() => addNode(g, { id: '' })).toThrow('non-empty string');
@@ -313,6 +320,13 @@ describe('Mutable: updateNode / updateEdge', () => {
     );
   });
 
+  it('updateNode() throws on invalid initialNodeId', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }] });
+    expect(() => updateNode(g, 'a', { initialNodeId: 'missing' })).toThrow(
+      'does not exist',
+    );
+  });
+
   it('updateEdge() mutates in place', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
@@ -386,6 +400,27 @@ describe('Mutable batch: addEntities()', () => {
       edges: [{ id: 'e1', sourceId: 'x', targetId: 'y' }],
     });
     expect(g.edges).toHaveLength(1);
+  });
+
+  it('nodes can reference initial nodes added in same call', () => {
+    const g = createGraph();
+    addEntities(g, {
+      nodes: [
+        { id: 'parent', initialNodeId: 'child' },
+        { id: 'child', parentId: 'parent' },
+      ],
+    });
+    expect(getNode(g, 'parent')?.initialNodeId).toBe('child');
+  });
+
+  it('addEntities() throws on invalid initialNodeId before mutating', () => {
+    const g = createGraph();
+    expect(() =>
+      addEntities(g, {
+        nodes: [{ id: 'parent', initialNodeId: 'missing' }],
+      }),
+    ).toThrow('does not exist');
+    expect(g.nodes).toHaveLength(0);
   });
 
   it('adds only nodes when no edges provided', () => {

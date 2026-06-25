@@ -3,9 +3,9 @@ import {
   createGraph,
   getDiff,
   isEmptyDiff,
-  invertDiff,
+  getInvertedDiff,
   getPatches,
-  applyPatches,
+  updateGraphWithPatches,
   toPatches,
   toDiff,
 } from '../src/index';
@@ -103,10 +103,10 @@ describe('isEmptyDiff', () => {
   });
 });
 
-describe('invertDiff', () => {
+describe('getInvertedDiff', () => {
   it('swaps added and removed', () => {
     const diff = getDiff(makeGraphA(), makeGraphB());
-    const inv = invertDiff(diff);
+    const inv = getInvertedDiff(diff);
 
     expect(inv.nodes.added).toEqual(diff.nodes.removed);
     expect(inv.nodes.removed).toEqual(diff.nodes.added);
@@ -116,7 +116,7 @@ describe('invertDiff', () => {
 
   it('does not alias the input diff (mutating one does not corrupt the other)', () => {
     const diff = getDiff(makeGraphA(), makeGraphB());
-    const inv = invertDiff(diff);
+    const inv = getInvertedDiff(diff);
 
     inv.nodes.added.push({ id: 'mutant' });
     expect(diff.nodes.removed.some((n) => n.id === 'mutant')).toBe(false);
@@ -128,7 +128,7 @@ describe('invertDiff', () => {
       nodes: [{ id: 'n', ports: [{ name: 'p' }, { name: 'q' }] }],
     });
     const diff = getDiff(a, b);
-    const inv = invertDiff(diff);
+    const inv = getInvertedDiff(diff);
 
     (inv.nodes.updated[0].old.ports as any[]).push({ name: 'mutant' });
     expect(
@@ -140,7 +140,7 @@ describe('invertDiff', () => {
 
   it('swaps old and new in updates', () => {
     const diff = getDiff(makeGraphA(), makeGraphB());
-    const inv = invertDiff(diff);
+    const inv = getInvertedDiff(diff);
 
     for (let i = 0; i < diff.nodes.updated.length; i++) {
       expect(inv.nodes.updated[i].old).toEqual(diff.nodes.updated[i].new);
@@ -186,14 +186,14 @@ describe('getPatches', () => {
   });
 });
 
-describe('applyPatches', () => {
+describe('updateGraphWithPatches', () => {
   it('transforms graph a into graph b', () => {
     const a = makeGraphA();
     const b = makeGraphB();
     const patches = getPatches(a, b);
 
     const target = makeGraphA();
-    applyPatches(target, patches);
+    updateGraphWithPatches(target, patches);
 
     expect(target.nodes.map((n) => n.id).sort()).toEqual(
       b.nodes.map((n) => n.id).sort(),
@@ -220,7 +220,7 @@ describe('applyPatches', () => {
       edges: [],
     });
     const patches = getPatches(a, b);
-    applyPatches(a, patches);
+    updateGraphWithPatches(a, patches);
 
     expect(a.nodes).toHaveLength(1);
     expect(a.nodes[0].id).toBe('x');
@@ -234,7 +234,7 @@ describe('applyPatches', () => {
     });
     const b = createGraph({ id: 'test' });
     const patches = getPatches(a, b);
-    applyPatches(a, patches);
+    updateGraphWithPatches(a, patches);
 
     expect(a.nodes).toHaveLength(0);
     expect(a.edges).toHaveLength(0);
@@ -271,26 +271,26 @@ describe('toPatches / toDiff conversion', () => {
 });
 
 describe('round-trip', () => {
-  it('getDiff → toPatches → applyPatches reproduces target graph', () => {
+  it('getDiff → toPatches → updateGraphWithPatches reproduces target graph', () => {
     const a = makeGraphA();
     const b = makeGraphB();
     const diff = getDiff(a, b);
     const patches = toPatches(diff);
 
     const target = makeGraphA();
-    applyPatches(target, patches);
+    updateGraphWithPatches(target, patches);
 
     const finalDiff = getDiff(target, b);
     expect(isEmptyDiff(finalDiff)).toBe(true);
   });
 
-  it('getPatches → applyPatches reproduces target graph', () => {
+  it('getPatches → updateGraphWithPatches reproduces target graph', () => {
     const a = makeGraphA();
     const b = makeGraphB();
     const patches = getPatches(a, b);
 
     const target = makeGraphA();
-    applyPatches(target, patches);
+    updateGraphWithPatches(target, patches);
 
     const finalDiff = getDiff(target, b);
     expect(isEmptyDiff(finalDiff)).toBe(true);

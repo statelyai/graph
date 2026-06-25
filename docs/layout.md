@@ -31,7 +31,7 @@ d3-force, ForceAtlas2, d3-hierarchy, WebCola, and Cytoscape position nodes only 
 
 **Edge labels.** `edge.x`/`edge.y`/`edge.width`/`edge.height` are canonically the **edge-label rect**. Give an edge a label plus `width`/`height` and label-aware engines (ELK, dagre, Graphviz) reserve space and write the placed rect back.
 
-**Coordinate systems.** ELK is the one engine that produces **parent-relative** child coordinates (a node with `parentId` is positioned within its parent — the xyflow convention). dagre and cytoscape support compound graphs but emit **absolute** coordinates; all flat engines are absolute. Graphviz rejects compound graphs (throws — use ELK or `flatten()` first).
+**Coordinate systems.** ELK is the one engine that produces **parent-relative** child coordinates (a node with `parentId` is positioned within its parent — the xyflow convention). dagre and cytoscape support compound graphs but emit **absolute** coordinates; all flat engines are absolute. Graphviz rejects compound graphs (throws — use ELK or `getFlattenedGraph()` first).
 
 ## Sizing: the `measure` callback
 

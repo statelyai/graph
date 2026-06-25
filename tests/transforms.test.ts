@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   createGraph,
-  flatten,
+  getFlattenedGraph,
   getShortestPaths,
   getTopologicalSort,
   isAcyclic,
   getConnectedComponents,
 } from '../src';
 
-describe('flatten', () => {
+describe('getFlattenedGraph', () => {
   it('a→b(b1→b2)→c resolves to a→b1, b1→b2, b1→c, b2→c', () => {
     const g = createGraph({
       nodes: [
@@ -25,7 +25,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
 
     // Only leaf nodes
     const nodeIds = flat.nodes.map((n) => n.id).sort();
@@ -48,7 +48,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(flat.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c']);
     expect(flat.edges.map((e) => `${e.sourceId}->${e.targetId}`)).toEqual([
       'a->b',
@@ -73,7 +73,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
 
     const nodeIds = flat.nodes.map((n) => n.id).sort();
     expect(nodeIds).toEqual(['a', 'b1a', 'b1b', 'c']);
@@ -95,7 +95,7 @@ describe('flatten', () => {
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`);
     // Falls back to first child
     expect(edges).toEqual(['a->b1']);
@@ -115,7 +115,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`);
     expect(edges).toEqual(['a->b1']); // deduplicated
   });
@@ -130,7 +130,7 @@ describe('flatten', () => {
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', label: 'GO' }],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(flat.edges[0].label).toBe('GO');
   });
 
@@ -146,7 +146,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(flat.edges[0].data).toEqual({ weight: 5 });
   });
 
@@ -159,7 +159,7 @@ describe('flatten', () => {
       edges: [],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(flat.id).toBe('my-graph');
     expect(flat.mode).toBe('directed');
     expect(flat.data).toEqual({ name: 'test' });
@@ -167,7 +167,7 @@ describe('flatten', () => {
 
   it('empty graph', () => {
     const g = createGraph();
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(flat.nodes).toEqual([]);
     expect(flat.edges).toEqual([]);
   });
@@ -182,7 +182,7 @@ describe('flatten', () => {
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     // b has no children so it's a leaf itself
     expect(flat.nodes.map((n) => n.id)).toEqual(['a', 'b']);
     expect(flat.edges.map((e) => `${e.sourceId}->${e.targetId}`)).toEqual([
@@ -206,7 +206,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const paths = getShortestPaths(flat, { from: 'a', to: 'c' });
 
     // a→b1→c (length 2) is shorter than a→b1→b2→c (length 3)
@@ -228,7 +228,7 @@ describe('flatten', () => {
       edges: [],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     // Document order preserved: x, c1, c2, y (compound removed)
     expect(flat.nodes.map((n) => n.id)).toEqual(['x', 'c1', 'c2', 'y']);
   });
@@ -253,7 +253,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
     expect(flat.nodes.map((n) => n.id).sort()).toEqual([
@@ -288,7 +288,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
     // a→b expands to: a1→b1, a2→b1
@@ -318,7 +318,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
     expect(edges).toEqual([
@@ -349,7 +349,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
     // s1b→s2 resolves to s1b→s2a (s2's initial)
@@ -372,7 +372,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
     // b→b expands: all leaves of b → initial of b
@@ -402,7 +402,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const nodeIds = flat.nodes.map((n) => n.id).sort();
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
@@ -434,7 +434,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(isAcyclic(flat)).toBe(true);
 
     const sorted = getTopologicalSort(flat);
@@ -459,7 +459,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     expect(isAcyclic(flat)).toBe(false);
 
     // idle→on→idle is a cycle, on→off→idle is a cycle
@@ -489,7 +489,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const comps = getConnectedComponents(flat);
     expect(comps).toHaveLength(2);
   });
@@ -517,7 +517,7 @@ describe('flatten', () => {
       ],
     });
 
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const edges = flat.edges.map((e) => `${e.sourceId}->${e.targetId}`).sort();
 
     // parallel has no initialNodeId, so first child (regionA) is used

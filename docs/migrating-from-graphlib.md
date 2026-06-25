@@ -43,7 +43,7 @@ A guide for developers moving an existing `@dagrejs/graphlib` (often plus `dagre
 | `alg.topsort(g)` | `getTopologicalSort(graph)` — returns `null` on cycles instead of throwing `CycleException` |
 | `alg.components(g)` | `getConnectedComponents(graph)` |
 | `alg.preorder(g, vs)` / `alg.postorder(g, vs)` | `getPreorder(graph, { from })` / `getPostorder(graph, { from })` (also `getPreorders`/`getPostorders` and lazy `genPreorders`/`genPostorders`) |
-| `alg.dfs(g, vs, order)` | `dfs(graph, startId)` / `bfs(graph, startId)` — lazy generators yielding nodes |
+| `alg.dfs(g, vs, order)` | `genDFS(graph, startId)` / `genBFS(graph, startId)` — lazy generators yielding nodes |
 | `alg.isAcyclic(g)` | `isAcyclic(graph)` |
 | `alg.findCycles(g)` | `getCycles(graph)` (or lazy `genCycles(graph)`) |
 | `alg.prim(g, weightFn)` | `getMinimumSpanningTree(graph, { algorithm: 'prim' \| 'kruskal', getWeight })` |

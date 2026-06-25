@@ -11,8 +11,8 @@ import {
   isAcyclic,
 } from '../../src/algorithms';
 import { getDegree } from '../../src/queries';
-import { applyPatches, getDiff, getPatches, isEmptyDiff } from '../../src/diff';
-import { reverseGraph } from '../../src/transforms';
+import { updateGraphWithPatches, getDiff, getPatches, isEmptyDiff } from '../../src/diff';
+import { getReversedGraph } from '../../src/transforms';
 import type { Graph, GraphMode } from '../../src/types';
 import {
   makeRandomGraph,
@@ -85,10 +85,10 @@ describe('property: undirected graph ≡ directed graph with all-undirected edge
 });
 
 // ---------------------------------------------------------------------------
-// 2. reverseGraph involution
+// 2. getReversedGraph involution
 // ---------------------------------------------------------------------------
 
-describe('property: reverseGraph(reverseGraph(g)) ≡ g', () => {
+describe('property: getReversedGraph(getReversedGraph(g)) ≡ g', () => {
   for (const seed of SEEDS) {
     it(`round-trips (seed ${seed})`, () => {
       const rng = mulberry32(seed * 31 + 5);
@@ -105,7 +105,7 @@ describe('property: reverseGraph(reverseGraph(g)) ≡ g', () => {
         else if (r < 0.3) edge.mode = 'bidirectional';
       }
 
-      const roundTripped = reverseGraph(reverseGraph(graph));
+      const roundTripped = getReversedGraph(getReversedGraph(graph));
 
       expect(roundTripped.nodes.map((n) => n.id).sort()).toEqual(
         graph.nodes.map((n) => n.id).sort(),
@@ -195,7 +195,7 @@ function mutateRandomly(graph: Graph, seed: number, opCount: number): void {
   }
 }
 
-describe('property: applyPatches(a, getPatches(a, b)) converges to b', () => {
+describe('property: updateGraphWithPatches(a, getPatches(a, b)) converges to b', () => {
   for (const seed of SEEDS) {
     it(`converges (seed ${seed})`, () => {
       const a = makeRichRandomGraph(seed, {
@@ -212,7 +212,7 @@ describe('property: applyPatches(a, getPatches(a, b)) converges to b', () => {
       expect(isEmptyDiff(getDiff(a, b))).toBe(false);
 
       const fresh = structuredClone(a);
-      applyPatches(fresh, getPatches(a, b));
+      updateGraphWithPatches(fresh, getPatches(a, b));
       expect(isEmptyDiff(getDiff(fresh, b))).toBe(true);
     });
   }

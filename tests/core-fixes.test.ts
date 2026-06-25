@@ -12,23 +12,52 @@ import {
   getSinks,
   getDiff,
   getPatches,
-  applyPatches,
+  updateGraphWithPatches,
   isEmptyDiff,
-  invertDiff,
+  getInvertedDiff,
   toPatches,
   getChildren,
-  flatten,
+  getFlattenedGraph,
   getSubgraph,
-  reverseGraph,
+  getReversedGraph,
   areEntitiesEqual,
   isNonLayoutEqual,
   genRandomWalk,
   genQuickRandomWalk,
   genPredefinedWalk,
-  takeSteps,
-  takeUntilNodeCoverage,
+  genWalkSteps,
+  genWalkUntilNodeCoverage,
+  bfs as deprecatedBFS,
+  dfs as deprecatedDFS,
+  joinPaths as deprecatedJoinPaths,
+  applyPatches as deprecatedApplyPatches,
+  invertDiff as deprecatedInvertDiff,
+  flatten as deprecatedFlatten,
+  reverseGraph as deprecatedReverseGraph,
+  takeSteps as deprecatedTakeSteps,
+  takeUntilNode as deprecatedTakeUntilNode,
+  takeUntilEdge as deprecatedTakeUntilEdge,
+  takeUntilNodeCoverage as deprecatedTakeUntilNodeCoverage,
+  takeUntilEdgeCoverage as deprecatedTakeUntilEdgeCoverage,
 } from '../src';
 import { createGraphNode } from '../src/graph';
+
+describe('deprecated unprefixed aliases', () => {
+  it('remain callable for backwards compatibility', () => {
+    expect(typeof deprecatedBFS).toBe('function');
+    expect(typeof deprecatedDFS).toBe('function');
+    expect(typeof deprecatedJoinPaths).toBe('function');
+    expect(typeof deprecatedApplyPatches).toBe('function');
+    expect(typeof deprecatedInvertDiff).toBe('function');
+    expect(typeof deprecatedFlatten).toBe('function');
+    expect(typeof deprecatedReverseGraph).toBe('function');
+    expect(typeof deprecatedTakeSteps).toBe('function');
+    expect(typeof deprecatedTakeUntilNode).toBe('function');
+    expect(typeof deprecatedTakeUntilEdge).toBe('function');
+    expect(typeof deprecatedTakeUntilNodeCoverage).toBe('function');
+    expect(typeof deprecatedTakeUntilEdgeCoverage).toBe('function');
+  });
+});
 
 describe('updateNode/updateEdge apply all declared fields', () => {
   it('updateNode applies visual and style fields', () => {
@@ -339,7 +368,7 @@ describe('diff covers ports, weight, mode and port refs', () => {
   it('diff → patches → apply converges for visual props', () => {
     const a = createGraph({ nodes: [{ id: 'n', x: 0 }] });
     const b = createGraph({ nodes: [{ id: 'n', x: 100, color: 'red' }] });
-    applyPatches(a, getPatches(a, b));
+    updateGraphWithPatches(a, getPatches(a, b));
     expect(isEmptyDiff(getDiff(a, b))).toBe(true);
   });
 
@@ -352,7 +381,7 @@ describe('diff covers ports, weight, mode and port refs', () => {
       nodes: [{ id: 'x' }, { id: 'y' }],
       edges: [{ id: 'e', sourceId: 'x', targetId: 'y' }],
     });
-    applyPatches(a, getPatches(a, b));
+    updateGraphWithPatches(a, getPatches(a, b));
     expect(isEmptyDiff(getDiff(a, b))).toBe(true);
     expect('weight' in a.edges[0]).toBe(false);
     expect('shape' in a.nodes[0]).toBe(false);
@@ -361,7 +390,7 @@ describe('diff covers ports, weight, mode and port refs', () => {
   it('diff → patches → apply converges for port changes', () => {
     const a = createGraph({ nodes: [{ id: 'n', ports: [{ name: 'p' }] }] });
     const b = createGraph({ nodes: [{ id: 'n', ports: [{ name: 'q' }] }] });
-    applyPatches(a, getPatches(a, b));
+    updateGraphWithPatches(a, getPatches(a, b));
     expect(isEmptyDiff(getDiff(a, b))).toBe(true);
   });
 
@@ -384,7 +413,7 @@ describe('diff covers ports, weight, mode and port refs', () => {
         },
       ],
     });
-    applyPatches(empty, getPatches(empty, b));
+    updateGraphWithPatches(empty, getPatches(empty, b));
     expect(isEmptyDiff(getDiff(empty, b))).toBe(true);
     expect(empty.edges[0].sourcePort).toBe('out');
     expect(empty.nodes[0].ports?.[0].name).toBe('out');
@@ -393,15 +422,15 @@ describe('diff covers ports, weight, mode and port refs', () => {
   it('applying an inverted diff restores the original graph', () => {
     const a = createGraph({ nodes: [{ id: 'n', x: 0 }] });
     const b = createGraph({ nodes: [{ id: 'n', x: 100 }] });
-    const inverted = invertDiff(getDiff(a, b));
+    const inverted = getInvertedDiff(getDiff(a, b));
     const c = createGraph({ nodes: [{ id: 'n', x: 100 }] });
-    applyPatches(c, toPatches(inverted));
+    updateGraphWithPatches(c, toPatches(inverted));
     expect(isEmptyDiff(getDiff(c, a))).toBe(true);
   });
 });
 
 describe('transforms preserve ports, mode and weight', () => {
-  it('reverseGraph swaps port references and keeps mode/weight/node ports', () => {
+  it('getReversedGraph swaps port references and keeps mode/weight/node ports', () => {
     const g = createGraph({
       nodes: [
         { id: 'a', ports: [{ name: 'out' }] },
@@ -419,7 +448,7 @@ describe('transforms preserve ports, mode and weight', () => {
         },
       ],
     });
-    const rev = reverseGraph(g);
+    const rev = getReversedGraph(g);
     const e = rev.edges[0];
     expect(e.sourceId).toBe('b');
     expect(e.targetId).toBe('a');
@@ -445,7 +474,7 @@ describe('transforms preserve ports, mode and weight', () => {
     expect(sub.edges[0].mode).toBe('undirected');
   });
 
-  it('flatten preserves authored leaf self-loops with weight and mode', () => {
+  it('getFlattenedGraph preserves authored leaf self-loops with weight and mode', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [
@@ -453,14 +482,14 @@ describe('transforms preserve ports, mode and weight', () => {
         { id: 'e', sourceId: 'a', targetId: 'b' },
       ],
     });
-    const flat = flatten(g);
+    const flat = getFlattenedGraph(g);
     const loop = flat.edges.find((e) => e.sourceId === 'a' && e.targetId === 'a');
     expect(loop).toBeDefined();
     expect(loop?.weight).toBe(2);
     expect(loop?.mode).toBe('undirected');
   });
 
-  it('flatten resolves graph initialNodeId to the initial leaf', () => {
+  it('getFlattenedGraph resolves graph initialNodeId to the initial leaf', () => {
     const g = createGraph({
       initialNodeId: 'p',
       nodes: [
@@ -469,10 +498,10 @@ describe('transforms preserve ports, mode and weight', () => {
         { id: 'c2', parentId: 'p' },
       ],
     });
-    expect(flatten(g).initialNodeId).toBe('c1');
+    expect(getFlattenedGraph(g).initialNodeId).toBe('c1');
   });
 
-  it('flatten survives malformed initialNodeId cycles', () => {
+  it('getFlattenedGraph survives malformed initialNodeId cycles', () => {
     const g = createGraph({
       nodes: [
         { id: 'p', initialNodeId: 'q' },
@@ -480,7 +509,7 @@ describe('transforms preserve ports, mode and weight', () => {
         { id: 'r', parentId: 'q' },
       ],
     });
-    expect(() => flatten(g)).not.toThrow();
+    expect(() => getFlattenedGraph(g)).not.toThrow();
   });
 });
 
@@ -508,7 +537,7 @@ describe('mode-aware walks', () => {
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }],
     });
-    const steps = [...takeSteps(genRandomWalk(g, { seed: 1 }), 1)];
+    const steps = [...genWalkSteps(genRandomWalk(g, { seed: 1 }), 1)];
     expect(steps).toHaveLength(1);
     expect(steps[0].node.id).toBe('a');
   });
@@ -553,14 +582,14 @@ describe('mode-aware walks', () => {
     expect(steps.map((s) => s.edge.id)).toEqual(['e1']);
   });
 
-  it('takeUntilNodeCoverage yields no steps when target is already met', () => {
+  it('genWalkUntilNodeCoverage yields no steps when target is already met', () => {
     const g = createGraph({
       initialNodeId: 'a',
       nodes: [{ id: 'a' }],
       edges: [{ id: 'loop', sourceId: 'a', targetId: 'a' }],
     });
     const steps = [
-      ...takeUntilNodeCoverage(genRandomWalk(g, { seed: 1 }), g, 1),
+      ...genWalkUntilNodeCoverage(genRandomWalk(g, { seed: 1 }), g, 1),
     ];
     expect(steps).toHaveLength(0);
   });

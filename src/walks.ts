@@ -298,7 +298,7 @@ export function* genPredefinedWalk<N, E>(
 /**
  * Yield at most `n` steps from the source generator.
  */
-export function* takeSteps<N, E>(
+export function* genWalkSteps<N, E>(
   gen: Generator<GraphStep<N, E>>,
   n: number,
 ): Generator<GraphStep<N, E>> {
@@ -310,9 +310,19 @@ export function* takeSteps<N, E>(
 }
 
 /**
+ * @deprecated Use {@link genWalkSteps}.
+ */
+export function* takeSteps<N, E>(
+  gen: Generator<GraphStep<N, E>>,
+  n: number,
+): Generator<GraphStep<N, E>> {
+  yield* genWalkSteps(gen, n);
+}
+
+/**
  * Yield steps until a specific node is reached.
  */
-export function* takeUntilNode<N, E>(
+export function* genWalkUntilNode<N, E>(
   gen: Generator<GraphStep<N, E>>,
   nodeId: string,
 ): Generator<GraphStep<N, E>> {
@@ -323,9 +333,19 @@ export function* takeUntilNode<N, E>(
 }
 
 /**
+ * @deprecated Use {@link genWalkUntilNode}.
+ */
+export function* takeUntilNode<N, E>(
+  gen: Generator<GraphStep<N, E>>,
+  nodeId: string,
+): Generator<GraphStep<N, E>> {
+  yield* genWalkUntilNode(gen, nodeId);
+}
+
+/**
  * Yield steps until a specific edge is traversed.
  */
-export function* takeUntilEdge<N, E>(
+export function* genWalkUntilEdge<N, E>(
   gen: Generator<GraphStep<N, E>>,
   edgeId: string,
 ): Generator<GraphStep<N, E>> {
@@ -336,9 +356,19 @@ export function* takeUntilEdge<N, E>(
 }
 
 /**
+ * @deprecated Use {@link genWalkUntilEdge}.
+ */
+export function* takeUntilEdge<N, E>(
+  gen: Generator<GraphStep<N, E>>,
+  edgeId: string,
+): Generator<GraphStep<N, E>> {
+  yield* genWalkUntilEdge(gen, edgeId);
+}
+
+/**
  * Yield steps until node coverage reaches the target (0–1).
  */
-export function* takeUntilNodeCoverage<N, E>(
+export function* genWalkUntilNodeCoverage<N, E>(
   gen: Generator<GraphStep<N, E>>,
   graph: Graph<N, E>,
   coverage: number,
@@ -359,9 +389,21 @@ export function* takeUntilNodeCoverage<N, E>(
 }
 
 /**
+ * @deprecated Use {@link genWalkUntilNodeCoverage}.
+ */
+export function* takeUntilNodeCoverage<N, E>(
+  gen: Generator<GraphStep<N, E>>,
+  graph: Graph<N, E>,
+  coverage: number,
+  options?: { from?: string },
+): Generator<GraphStep<N, E>> {
+  yield* genWalkUntilNodeCoverage(gen, graph, coverage, options);
+}
+
+/**
  * Yield steps until edge coverage reaches the target (0–1).
  */
-export function* takeUntilEdgeCoverage<N, E>(
+export function* genWalkUntilEdgeCoverage<N, E>(
   gen: Generator<GraphStep<N, E>>,
   graph: Graph<N, E>,
   coverage: number,
@@ -377,6 +419,17 @@ export function* takeUntilEdgeCoverage<N, E>(
     yield step;
     if (visited.size >= target) return;
   }
+}
+
+/**
+ * @deprecated Use {@link genWalkUntilEdgeCoverage}.
+ */
+export function* takeUntilEdgeCoverage<N, E>(
+  gen: Generator<GraphStep<N, E>>,
+  graph: Graph<N, E>,
+  coverage: number,
+): Generator<GraphStep<N, E>> {
+  yield* genWalkUntilEdgeCoverage(gen, graph, coverage);
 }
 
 // --- Coverage tracking ---

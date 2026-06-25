@@ -144,7 +144,7 @@ export function getMaximumBipartiteMatching(graph: Graph): BipartiteMatch[] {
   const dist = new Int32Array(n);
   const queue = new Int32Array(n);
 
-  function bfs(): boolean {
+  function hasAugmentingLayer(): boolean {
     let head = 0;
     let tail = 0;
     for (let u = 0; u < n; u++) {
@@ -172,11 +172,14 @@ export function getMaximumBipartiteMatching(graph: Graph): BipartiteMatch[] {
     return foundAugmenting;
   }
 
-  function dfs(u: number): boolean {
+  function hasAugmentedMatchFrom(u: number): boolean {
     for (let a = offsets[u]; a < offsets[u + 1]; a++) {
       const v = targets[a];
       const w = matchRight[v];
-      if (w === -1 || (dist[w] === dist[u] + 1 && dfs(w))) {
+      if (
+        w === -1 ||
+        (dist[w] === dist[u] + 1 && hasAugmentedMatchFrom(w))
+      ) {
         matchLeft[u] = v;
         matchRight[v] = u;
         matchEdge[u] = arcEdge[a];
@@ -187,10 +190,10 @@ export function getMaximumBipartiteMatching(graph: Graph): BipartiteMatch[] {
     return false;
   }
 
-  while (bfs()) {
+  while (hasAugmentingLayer()) {
     for (let u = 0; u < n; u++) {
       if (colors[u] === 0 && matchLeft[u] === -1) {
-        dfs(u);
+        hasAugmentedMatchFrom(u);
       }
     }
   }

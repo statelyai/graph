@@ -143,7 +143,7 @@ let graphvizPromise: Promise<Graphviz> | undefined;
  *
  * Notes:
  * - Compound graphs (`parentId`) are not supported — use `getElkLayout`, or
- *   `flatten()` the graph first. (Graphviz clusters: planned.)
+ *   `getFlattenedGraph()` the graph first. (Graphviz clusters: planned.)
  * - In a directed graph, edges with `mode: 'undirected'` are laid out as
  *   directed but drawn without arrowheads (`dir=none`); in an undirected
  *   graph, per-edge `mode: 'directed'` overrides are ignored (DOT `graph`
@@ -172,7 +172,7 @@ export async function getGraphvizLayout(
     throw new Error(
       `getGraphvizLayout: compound graphs are not supported by the Graphviz adapter yet ` +
         `(node "${compoundNode.id}" has parentId "${compoundNode.parentId}"). ` +
-        `Use getElkLayout for hierarchical layout, or flatten() the graph first.`,
+        `Use getElkLayout for hierarchical layout, or getFlattenedGraph() the graph first.`,
     );
   }
 
