@@ -1,5 +1,56 @@
 # @statelyai/graph
 
+## 2.1.0
+
+### Minor Changes
+
+- [#28](https://github.com/statelyai/graph/pull/28) [`0498d52`](https://github.com/statelyai/graph/commit/0498d52e7f55e9aa495d5870ab59a54613b75f6c) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Layout suite round two: transitions, geometry utilities, portable constraints, and four more engines.
+
+  - **`genLayoutTransition(from, to, options?)`** (`@statelyai/graph/layout`, zero-dep) — tween between two layouts of the same graph: yields interpolated `LayoutFrame`s (drive with `applyLayoutFrame`, one per animation frame) and returns the target layout. Lay out with one engine, re-lay out with another, morph live. Options: `steps` (default 30), `ease` (default smoothstep).
+  - **Geometry utilities** (`@statelyai/graph/layout`) — `translateGraph(graph, dx, dy)` and `centerGraph(graph, rect)` (**mutable**, in place): shift/center node positions, edge route `points`, and edge label rects. Hierarchy-aware — parent-relative children and container-relative edge routes are left alone.
+  - **`LayoutOptions.constraints`** — portable, advisory layout constraints. First constraint: `layer(node)` assigns nodes to ordered layers along the flow axis. ELK maps it to partitions (`elk.partitioning.partition`); the Graphviz `dot` engine maps it to `{ rank=same; … }` groups; engines without a layer concept ignore it.
+  - **`@statelyai/graph/layout/forceatlas2`** — `getForceAtlas2Layout` (sync; optional peers `graphology` + `graphology-layout-forceatlas2`): seeded determinism, native pinning via `isFixed`, edge `weight` influence.
+  - **`@statelyai/graph/layout/d3-hierarchy`** — `getTidyTreeLayout` (sync; optional peer `d3-hierarchy`): Reingold–Tilford tidy tree. Root from `rootId` → `initialNodeId` → unique source; forests supported; non-tree extra edges preserved (spanning-tree layout).
+  - **`@statelyai/graph/layout/webcola`** — `getColaLayout` (sync; optional peer `webcola`): constraint-based layout with overlap avoidance, seeded determinism, `isFixed` pinning, DAG flow via `direction`.
+  - **`@statelyai/graph/layout/cytoscape`** — `getCytoscapeLayout` (async; optional peer `cytoscape`, headless): bridges cytoscape's layout ecosystem (`grid`, `circle`, `concentric`, `breadthfirst`, `cose`, plus caller-registered extensions via the injectable `cy` option). Compound nodes map to cytoscape parents.
+
+  The package smoke test exercises all nine layout entry points against the packed tarball.
+
+- [#28](https://github.com/statelyai/graph/pull/28) [`0498d52`](https://github.com/statelyai/graph/commit/0498d52e7f55e9aa495d5870ab59a54613b75f6c) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Analytical coverage tail: cores, Katz, bipartite matching, min-cut, seeded label propagation, and graph generators.
+
+  - **k-core** — `getCoreNumbers(graph)` (Batagelj–Zaveršnik, O(m)) and `getKCore(graph, k)`; degrees are undirected per the standard definition.
+  - **Katz centrality** — `getKatzCentrality(graph, { alpha, beta, getWeight, ... })`; throws a descriptive error when `alpha` exceeds the spectral bound and iteration diverges.
+  - **Eigenvector centrality** hardened — `(A+I)`-shifted power iteration (no more bipartite oscillation), `getWeight` support, descriptive non-convergence error. Differentially tested against graphology.
+  - **Bipartite** — `isBipartite(graph)` and `getMaximumBipartiteMatching(graph)` (Hopcroft–Karp, O(m√n)); the non-bipartite error names the edge that closes the odd cycle.
+  - **Min-cut** — `getMinCut(graph, { source, sink, getCapacity? })` → `{ value, cutEdges, partition }`, sharing the max-flow solver (`value` always equals `getMaxFlow(...)` by construction).
+  - **Seeded label propagation** — `getLabelPropagationCommunities` gains `seed`: asynchronous LPA with seeded shuffling/tie-breaking, deterministic per seed.
+  - **Generators** — `createCompleteGraph(n)`, `createGridGraph(rows, cols)`, `createRandomGraph(n, p, { seed })` (G(n,p), deterministic per seed) in the root export.
+
+- [#25](https://github.com/statelyai/graph/pull/25) [`e1e2107`](https://github.com/statelyai/graph/commit/e1e2107f2fd0b4788d224f07ff010e30e748d0b4) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Pluggable layout: a renderer-agnostic layout contract with adapters for ELK, Graphviz, dagre, and d3-force — no layout algorithms of our own, just typed plug-and-play over the plain-JSON graph.
+
+  - **Model:** edges gain `points?: {x,y}[]` (route waypoints incl. endpoints, tail→head) and `routing?: 'polyline' | 'orthogonal' | 'splines'` (`splines` = Graphviz 3n+1 bezier control-point convention). Both round-trip through every full-fidelity format, diff/patch, and `LAYOUT_KEYS`. Edge `x/y/width/height` are now canonically the **edge-label rect** (top-left + size) — engines read `width`/`height` as label dimensions and write computed label positions back; this matches dagre's own convention and was previously undefined.
+  - **`@statelyai/graph/layout`** (zero-dep): `LayoutFn`/`IterativeLayoutFn`/`LayoutFrame`/`LayoutOptions` (direction, spacing, `measure` for renderer-owned text measurement, `isFixed` pinning, `seed`), plus `applyLayoutFrame` (per-animation-frame position writes, safe under the index contract), `getLayoutBounds`, `getNodeSize`.
+  - **`@statelyai/graph/layout/elk`** — `getElkLayout` (async; optional peer `elkjs`): hierarchy + ports first-class, orthogonal edge routes captured into `points`, computed edge label rects, all ELK algorithms via `algorithm`/`layoutOptions`, injectable ELK instance for web workers. (`fromELK` now also captures routed sections and label geometry for anyone running ELK manually.)
+  - **`@statelyai/graph/layout/dagre`** — `getDagreLayout` (sync; optional peer `@dagrejs/dagre`): polyline routes, label rects, multigraph parallel edges, compound support.
+  - **`@statelyai/graph/layout/d3-force`** — `genForceLayout` generator (one simulation tick per `next()`, caller owns pacing/cancellation; yields `LayoutFrame`s, returns the settled `VisualGraph`) + `getForceLayout`; seeded determinism (same seed ⇒ same layout), `isFixed` pinning; optional peer `d3-force`.
+  - **`@statelyai/graph/layout/graphviz`** — `getGraphvizLayout` (async WASM; optional peer `@hpcc-js/wasm-graphviz`): all eight Graphviz engines (dot, neato, fdp, sfdp, circo, twopi, osage, patchwork), spline control points into `points`/`routing: 'splines'`, label positions, y-flip/center→top-left conversion handled.
+
+  The package smoke test exercises every adapter against the packed tarball.
+
+- [#28](https://github.com/statelyai/graph/pull/28) [`0e5982a`](https://github.com/statelyai/graph/commit/0e5982a0662d72a7cff89e1e73d8d4023f98aa2d) Thanks [@davidkpiano](https://github.com/davidkpiano)! - xyflow: labels now land where the renderers actually read them. `toXYFlow` emits edge labels as the top-level `edge.label` (the prop React Flow / Svelte Flow render — previously the label went to `edge.data.label`, which built-in edges ignore) and node labels as `data.label` (what React Flow's default node renders). `fromXYFlow` reads both spots back for external React Flow input, and full-fidelity round-tripping via the `__statelyai` metadata is unchanged. If you relied on `edge.data.label` in `toXYFlow` output, read `edge.label` instead.
+
+### Patch Changes
+
+- [#28](https://github.com/statelyai/graph/pull/28) [`0e5982a`](https://github.com/statelyai/graph/commit/0e5982a0662d72a7cff89e1e73d8d4023f98aa2d) Thanks [@davidkpiano](https://github.com/davidkpiano)! - `getDegree` is now O(1) per call: `|out| + |in|` corrected by a cached per-node count of non-directed self-loops (revalidated by index version + graph mode, like the CSR snapshot). A full degree sweep over a 100k-node/300k-edge graph drops from ~148 ms to ~10 ms — at parity with ngraph and graphology, which was the one benchmark cell this library lost across the board.
+
+- [`a9d5a4b`](https://github.com/statelyai/graph/commit/a9d5a4b649e9c73351352d76f06f9569b9f82f91) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Allow nullable `initialNodeId` config inputs in TypeScript, mark the package as side-effect free for bundlers, and add repo-wide type/convention checks to the verification gate.
+
+- [#28](https://github.com/statelyai/graph/pull/28) [`0498d52`](https://github.com/statelyai/graph/commit/0498d52e7f55e9aa495d5870ab59a54613b75f6c) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Pathfinding internals: lazy path materialization and a typed-array heap. `genShortestPaths` now reconstructs a path only when it is actually yielded (abandoning the generator early skips the work), and the Dijkstra/A\*/bidirectional hot loops use a Float64Array/Int32Array binary heap instead of object nodes. Same API, same results — measured −70% on first-path-then-stop, −41% on all-targets, −71% on single-target early exit (10k-node graph).
+
+- [`af77e3f`](https://github.com/statelyai/graph/commit/af77e3f98924a0552cf42733f3ef5ea2e839d754) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Validate node `initialNodeId` references in `addNode`, `updateNode`, and batch node additions.
+
+  Add prefixed canonical exports for traversal, transforms, diff patching, path joining, and walk stop helpers while preserving the old names as deprecated aliases.
+
 ## 2.0.0
 
 ### Major Changes
