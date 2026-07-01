@@ -11,7 +11,12 @@ pnpm verify
 
 `pnpm verify` runs the same core checks we rely on before release:
 
+<!-- verification command list derived from package.json#scripts.verify -->
+
 - `pnpm typecheck`
+- `pnpm typecheck:repo`
+- `pnpm check:generated`
+- `pnpm check:conventions`
 - `pnpm test -- --run`
 - `pnpm build`
 - `pnpm validate:package`

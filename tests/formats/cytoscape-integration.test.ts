@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import cytoscape from 'cytoscape';
 import { toCytoscapeJSON, fromCytoscapeJSON } from '../../src/formats/cytoscape';
 import { createGraph, getShortestPath, getChildren } from '../../src';
-import type { Graph, CytoscapeJSON } from '../../src';
+import type { CytoscapeJSON } from '../../src/formats/cytoscape';
 
 describe('Cytoscape.js integration', () => {
   describe('our Graph → Cytoscape.js', () => {
@@ -60,7 +60,7 @@ describe('Cytoscape.js integration', () => {
       expect(children.map((n) => n.id()).sort()).toEqual(['child1', 'child2']);
 
       // child1's parent is parent
-      expect(cy.getElementById('child1').parent().id()).toBe('parent');
+      expect(cy.getElementById('child1').parent()[0]?.id()).toBe('parent');
 
       cy.destroy();
     });

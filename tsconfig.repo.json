@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "noUnusedLocals": false
+  },
+  "include": [
+    "*.ts",
+    "bench/**/*.ts",
+    "scripts/**/*.ts",
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

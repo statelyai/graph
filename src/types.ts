@@ -89,7 +89,7 @@ export interface GraphConfig<
   id?: string;
   /** Default directedness for all edges. Defaults to `'directed'`. */
   mode?: GraphMode;
-  initialNodeId?: string;
+  initialNodeId?: string | null;
   nodes?: NodeConfig<TNodeData, TPortData>[];
   edges?: EdgeConfig<TEdgeData>[];
   data?: TGraphData;
@@ -101,7 +101,7 @@ export interface NodeConfig<TNodeData = any, TPortData = any>
   extends GraphEntity {
   id: string;
   parentId?: string | null;
-  initialNodeId?: string;
+  initialNodeId?: string | null;
   label?: string | null;
   data?: TNodeData;
   ports?: PortConfig<TPortData>[];

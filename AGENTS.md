@@ -5,9 +5,12 @@ Plain JSON-serializable graph library. No classes (except optional `GraphInstanc
 ## Commands
 
 ```bash
-pnpm test -- --run   # run tests
-pnpm typecheck       # tsc --noEmit
-pnpm build           # tsdown → dist/
+pnpm verify              # full local/CI gate
+pnpm test -- --run       # run tests
+pnpm typecheck           # tsc --noEmit for src
+pnpm typecheck:repo      # tsc --noEmit for src/tests/scripts
+pnpm check:conventions   # public API naming/deprecation checks
+pnpm build               # tsdown → dist/
 ```
 
 ## Naming Conventions
@@ -53,7 +56,7 @@ Generics order: `<TNodeData, TEdgeData, TGraphData, TPortData>`, shortened to `<
 - **`graph.ts`** — factory, lookups, mutations (add/delete/update), batch ops, port creation
 - **`queries.ts`** — neighborhood, hierarchy, degree, edge queries, port queries
 - **`algorithms.ts`** — traversal, components, cycles, paths, ordering, MST
-- **`transforms.ts`** — `flatten()` (statechart decomposition)
+- **`transforms.ts`** — `getFlattenedGraph()` (statechart decomposition)
 - **`formats/`** — DOT, GraphML, adjacency list, edge list
 - **`indexing.ts`** — transparent WeakMap indexing, auto-rebuilt on access
 - **`types.ts`** — all type definitions

@@ -39,7 +39,7 @@ function undirectedDefaultGraph(): Graph {
 describe.each([
   ['GraphML', (g: Graph) => fromGraphML(toGraphML(g)), 'directed="false"'],
   ['GEXF', (g: Graph) => fromGEXF(toGEXF(g)), 'type="undirected"'],
-] as const)('%s per-edge directedness', (_name, roundTrip) => {
+] as const)('%s per-edge directedness', (_name, roundTrip, _expectedMarker) => {
   it('round-trips a directed graph with per-edge overrides', () => {
     const g = mixedGraph();
     const out = roundTrip(g);

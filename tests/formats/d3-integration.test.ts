@@ -7,7 +7,7 @@ import {
 } from 'd3-force';
 import { toD3Graph, fromD3Graph } from '../../src/formats/d3';
 import { createGraph, getShortestPath } from '../../src';
-import type { D3Graph } from '../../src';
+import type { D3Graph } from '../../src/formats/d3';
 
 describe('D3 force integration', () => {
   describe('our Graph → D3 force simulation', () => {
@@ -30,7 +30,7 @@ describe('D3 force integration', () => {
       const d3Data = toD3Graph(graph);
 
       // D3 force simulation accepts our data directly
-      const simulation = forceSimulation(d3Data.nodes)
+      const simulation = forceSimulation(d3Data.nodes as any)
         .force(
           'link',
           forceLink(d3Data.links).id((d: any) => d.id),
@@ -72,7 +72,7 @@ describe('D3 force integration', () => {
       const d3Data = toD3Graph(graph);
 
       // D3 simulation mutates in place, but our extra properties survive
-      const simulation = forceSimulation(d3Data.nodes)
+      const simulation = forceSimulation(d3Data.nodes as any)
         .force(
           'link',
           forceLink(d3Data.links).id((d: any) => d.id),
@@ -104,7 +104,7 @@ describe('D3 force integration', () => {
       };
 
       // Simulate D3's mutation of source/target to objects
-      const simulation = forceSimulation(d3Data.nodes)
+      const simulation = forceSimulation(d3Data.nodes as any)
         .force(
           'link',
           forceLink(d3Data.links).id((d: any) => d.id),
@@ -182,7 +182,7 @@ describe('D3 force integration', () => {
       const d3Data = toD3Graph(original);
 
       // Run D3 simulation to lay out positions
-      const simulation = forceSimulation(d3Data.nodes)
+      const simulation = forceSimulation(d3Data.nodes as any)
         .force(
           'link',
           forceLink(d3Data.links).id((d: any) => d.id),
