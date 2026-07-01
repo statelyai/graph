@@ -25,7 +25,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          # Pinned: Node 24.17.0 regressed node-fetch@2's gzip handling, making
+          # @changesets/changelog-github's GraphQL call fail with
+          # ERR_STREAM_PREMATURE_CLOSE. 24.16.0 is the last known-good 24.x.
+          # https://github.com/changesets/changesets/issues/2115
+          node-version: 24.16.0
           cache: pnpm
 
       - name: Install Dependencies
