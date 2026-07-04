@@ -457,6 +457,24 @@ async function main(): Promise<void> {
         `neighbors[0]?.id;`,
       ],
     },
+    './kernel': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const csr = $MOD.getCSR(graph);`,
+        `assert.equal(csr.ids.length, 2);`,
+        `const memo = $MOD.memoizeByGraph((g) => g.nodes.length);`,
+        `assert.equal(memo(graph), 2);`,
+        `assert.equal(memo(graph), 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }] });`,
+        `const index: $MOD.GraphIndex = $MOD.getIndex(graph);`,
+        `index.version.toFixed();`,
+        `const csr: $MOD.GraphCSR = $MOD.getCSR(graph);`,
+        `csr.ids.length.toFixed();`,
+      ],
+    },
     './schemas': {
       phase: 'optional',
       runtime: [

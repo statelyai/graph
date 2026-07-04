@@ -1,6 +1,7 @@
 import type { Graph } from '../types';
 import { getIndex } from '../indexing';
 import { getNeighborEdges, resolveFrom } from './shared';
+import { throwIfAborted } from './abort';
 
 export interface DominatorTreeOptions {
   /**
@@ -8,6 +9,11 @@ export interface DominatorTreeOptions {
    * zero-in-degree node.
    */
   from?: string;
+  /**
+   * Abort signal, checked once per fixpoint sweep of the CHK iteration.
+   * Throws `signal.reason`.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -28,6 +34,9 @@ export interface DominatorTreeOptions {
  * getDominatorTree(graph, { from: 'a' });
  * // { a: null, b: 'a', c: 'a', d: 'a' }
  * ```
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per fixpoint
+ * sweep and throws `signal.reason`.
  */
 export function getDominatorTree(
   graph: Graph,
@@ -106,6 +115,7 @@ export function getDominatorTree(
 
   let changed = true;
   while (changed) {
+    throwIfAborted(options?.signal);
     changed = false;
     for (const id of rpo) {
       if (id === root) continue;

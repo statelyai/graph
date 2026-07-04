@@ -4,6 +4,7 @@ import {
   validateInput,
   prepareLines,
   escapeMermaidLabel,
+  unescapeMermaidLabel,
   generateEdgeId,
 } from './shared';
 
@@ -14,8 +15,18 @@ export interface BlockNodeData {
 }
 
 export interface BlockEdgeData {
-  // TODO: block diagram edge types follow flowchart patterns
-  // but the spec is still evolving — minimal support for now
+  /**
+   * Stroke style of the connector, mapped from the arrow token.
+   * `'thick'` ← `==>`, `'dotted'` ← `-.->`, otherwise `'normal'`.
+   */
+  stroke?: 'normal' | 'thick' | 'dotted';
+  /** `'arrow'` when the connector has an arrowhead (`-->`), `'none'` for `---`. */
+  arrowType?: 'arrow' | 'none';
+  /**
+   * The original arrow token (e.g. `-->`, `-.->`), preserved so emit is exact
+   * even when the mapping to stroke/arrowType is approximate.
+   */
+  arrowToken?: string;
 }
 
 export interface BlockGraphData {
@@ -124,11 +135,16 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
       continue;
     }
 
-    // Edge: A --> B
-    const edgeMatch = line.match(/^(\S+)\s*(-->|---|==>|-\.->)\s*(\S+)\s*$/);
+    // Edge: A --> B, A --- B, A ==> B, A -.-> B, optionally with a pipe label:
+    // A -->|label| B
+    const edgeMatch = line.match(
+      /^(\S+)\s*(-->|---|==>|-\.->)\s*(?:\|([^|]*)\|\s*)?(\S+)\s*$/,
+    );
     if (edgeMatch) {
       const sourceId = edgeMatch[1];
-      const targetId = edgeMatch[3];
+      const token = edgeMatch[2];
+      const label = edgeMatch[3]?.trim() ?? '';
+      const targetId = edgeMatch[4];
       ensureNode(sourceId);
       ensureNode(targetId);
       const edgeId = generateEdgeId(sourceId, targetId, edgeCounter++);
@@ -137,8 +153,13 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
         id: edgeId,
         sourceId,
         targetId,
-        label: '',
-        data: {},
+        label: label ? unescapeMermaidLabel(label) : '',
+        data: {
+          stroke:
+            token === '==>' ? 'thick' : token === '-.->' ? 'dotted' : 'normal',
+          arrowType: token === '---' ? 'none' : 'arrow',
+          arrowToken: token,
+        },
       });
       continue;
     }
@@ -235,9 +256,18 @@ export function toMermaidBlock(graph: MermaidBlockGraph): string {
 
   writeNodes(null, '    ');
 
-  // Emit edges
+  // Emit edges. Prefer the preserved original token so approximate mappings
+  // round-trip exactly; otherwise derive from stroke/arrowType.
   for (const edge of graph.edges) {
-    lines.push(`    ${edge.sourceId} --> ${edge.targetId}`);
+    const d = edge.data;
+    let arrow = d?.arrowToken;
+    if (!arrow) {
+      if (d?.stroke === 'thick') arrow = '==>';
+      else if (d?.stroke === 'dotted') arrow = '-.->';
+      else arrow = d?.arrowType === 'none' ? '---' : '-->';
+    }
+    const label = edge.label ? `|${escapeMermaidLabel(edge.label)}| ` : '';
+    lines.push(`    ${edge.sourceId} ${arrow} ${label}${edge.targetId}`);
   }
 
   return lines.join('\n');

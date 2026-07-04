@@ -80,11 +80,31 @@ Parses:
 - `node [...]` / `edge [...]` default attributes
 - Auto-creates nodes referenced in edges
 
-**Not fully mapped:**
-- HTML labels (`<...>`) — stored as raw string
-- Compass points in port syntax (`:port:compass`)
-- `rank=same` and layout hints beyond `rankdir`
-- `style` attribute (beyond color extraction)
+### Round-trip preservation
+
+Constructs that have no native `Graph`/`Node`/`Edge` field are preserved under a
+single namespaced `dot` key inside the relevant entity's `data`, so
+`fromDOT` → `toDOT` is non-lossy for them (matching how the graphml/gexf/gml
+converters store unmapped state in `data`). The value is plain JSON.
+
+- **Graph** `data.dot`:
+  - `attrs` — leftover `graph [...]` attributes (`bgcolor`, `fontname`, …; `rankdir` is excluded, it maps to `direction`).
+  - `nodeDefaults` / `edgeDefaults` — the `node [...]` / `edge [...]` default attribute bags declared at graph scope.
+  - `ranks` — `rank=same` (and `min`/`max`/…) groups, as `{ rank, nodes }`. Rank subgraphs are treated as layout constraints, not compound nodes.
+- **Node / Edge** `data.dot`:
+  - `attrs` — any attribute not mapped to a native field (`label`, `shape`, `color`).
+  - `labelHtml` — set when the label came from an HTML-like `<...>` value; the label string is stored verbatim and re-emitted with `<>` delimiters.
+  - `sourceCompass` / `targetCompass` (edges) — compass points from `node:port:compass` port syntax, re-emitted as the third `:`-segment.
+
+**Remaining known losses:**
+- Compass points only survive when written in the full three-segment
+  `node:port:compass` form. A two-segment `node:se` is ambiguous (dotparser
+  reports `se` as the port id, not a compass), so it round-trips as a port.
+- Statement ordering and comments are not preserved (attributes are re-emitted
+  in a canonical order).
+- `style` on nodes is partly interpreted: `color`/`fillcolor` become the native
+  `color` field; the raw `style` attribute is otherwise kept in the `dot.attrs`
+  bag rather than reconstructed field-by-field.
 
 ### `dotConverter`
 

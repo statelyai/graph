@@ -1,10 +1,13 @@
 import type { Graph, GraphEdge, GraphNode } from '../types';
 import { getIndex } from '../indexing';
 import { mulberry32 } from './shared';
+import { throwIfAborted } from './abort';
 
 export interface GirvanNewmanOptions {
   level?: number;
   maxLevels?: number;
+  /** Abort signal, checked once per split round. Throws `signal.reason`. */
+  signal?: AbortSignal;
 }
 
 export interface LabelPropagationOptions {
@@ -15,6 +18,13 @@ export interface LabelPropagationOptions {
    * deterministic per seed. Without a seed, ties break lexicographically.
    */
   seed?: number;
+  /** Abort signal, checked once per iteration. Throws `signal.reason`. */
+  signal?: AbortSignal;
+}
+
+export interface GreedyModularityOptions {
+  /** Abort signal, checked once per merge round. Throws `signal.reason`. */
+  signal?: AbortSignal;
 }
 
 type Community<N = any> = GraphNode<N>[];
@@ -214,6 +224,7 @@ function getSeededLabelPropagation<N>(
   graph: Graph<N>,
   seed: number,
   maxIterations: number,
+  signal?: AbortSignal,
 ): Community<N>[] {
   const rng = mulberry32(seed);
   const labels = Object.fromEntries(
@@ -222,6 +233,7 @@ function getSeededLabelPropagation<N>(
   const order = graph.nodes.map((node) => node.id);
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    throwIfAborted(signal);
     // Fisher-Yates shuffle of the visit order.
     for (let i = order.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
@@ -264,6 +276,9 @@ function getSeededLabelPropagation<N>(
  * order so test results remain stable. Pass `options.seed` for the classic
  * asynchronous variant (shuffled node order per round, random tie-breaking)
  * — still deterministic per seed.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per iteration
+ * and throws `signal.reason`.
  */
 export function getLabelPropagationCommunities<N>(
   graph: Graph<N>,
@@ -275,7 +290,12 @@ export function getLabelPropagationCommunities<N>(
 
   const maxIterations = options?.maxIterations ?? 50;
   if (options?.seed !== undefined) {
-    return getSeededLabelPropagation(graph, options.seed, maxIterations);
+    return getSeededLabelPropagation(
+      graph,
+      options.seed,
+      maxIterations,
+      options.signal,
+    );
   }
   let labels = Object.fromEntries(
     graph.nodes.map((node) => [node.id, node.id]),
@@ -283,6 +303,7 @@ export function getLabelPropagationCommunities<N>(
   const nodeIds = graph.nodes.map((node) => node.id).sort();
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    throwIfAborted(options?.signal);
     const nextLabels = { ...labels };
     let changed = false;
 
@@ -318,6 +339,9 @@ export function getLabelPropagationCommunities<N>(
 /**
  * Lazily yields Girvan-Newman community splits as edge betweenness removes
  * bridge-like edges from the graph.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per split round
+ * and throws `signal.reason`.
  */
 export function* genGirvanNewmanCommunities<N>(
   graph: Graph<N>,
@@ -333,6 +357,7 @@ export function* genGirvanNewmanCommunities<N>(
   let previousCount = getUndirectedConnectedComponents(graph).length;
 
   while (edges.length > 0 && yielded < maxLevels) {
+    throwIfAborted(options?.signal);
     const workingGraph = cloneWithEdges(graph, edges);
     const betweenness = getEdgeBetweenness(workingGraph);
     const maxScore = Math.max(...Object.values(betweenness));
@@ -351,6 +376,9 @@ export function* genGirvanNewmanCommunities<N>(
  * Returns the requested Girvan-Newman split level eagerly.
  *
  * `level: 1` returns the first split yielded by `genGirvanNewmanCommunities`.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per split round
+ * and throws `signal.reason`.
  */
 export function getGirvanNewmanCommunities<N>(
   graph: Graph<N>,
@@ -369,6 +397,7 @@ export function getGirvanNewmanCommunities<N>(
   let level = 0;
   for (const partition of genGirvanNewmanCommunities(graph, {
     maxLevels: targetLevel,
+    signal: options?.signal,
   })) {
     last = partition;
     level++;
@@ -435,9 +464,13 @@ export function getModularity<N>(
 /**
  * Returns communities found by greedily merging partitions that improve
  * modularity the most at each step.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per merge round
+ * and throws `signal.reason`.
  */
 export function getGreedyModularityCommunities<N>(
   graph: Graph<N>,
+  options?: GreedyModularityOptions,
 ): Community<N>[] {
   if (graph.nodes.length === 0) {
     return [];
@@ -447,6 +480,7 @@ export function getGreedyModularityCommunities<N>(
   let currentScore = getModularity(graph, communities);
 
   while (communities.length > 1) {
+    throwIfAborted(options?.signal);
     let bestScore = currentScore;
     let bestMerge: Community<N>[] | undefined;
 

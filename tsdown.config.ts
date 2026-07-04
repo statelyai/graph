@@ -7,6 +7,8 @@ export default defineConfig({
     'src/algorithms.ts',
     'src/format-support.ts',
     'src/queries.ts',
+    // Kernel — public fast-path primitives for plugins & large graphs
+    'src/kernel.ts',
     // Formats — each gets its own subpath export
     'src/formats/adjacency-list/index.ts',
     'src/formats/converter/index.ts',

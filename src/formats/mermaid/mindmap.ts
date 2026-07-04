@@ -10,7 +10,10 @@ import {
 // --- Types ---
 
 export interface MindmapNodeData {
-  // TODO: ::icon() syntax stored but not rendered
+  /**
+   * Icon class from `::icon(fa fa-book)` syntax (stores the inner text, e.g.
+   * `"fa fa-book"`). Parsed and re-emitted on its own indented line.
+   */
   icon?: string;
 }
 
@@ -91,13 +94,22 @@ export function fromMermaidMindmap(input: string): MermaidMindmapGraph {
     const indent = rawLine.length - rawLine.trimStart().length;
     const content = rawLine.trim();
 
-    // TODO: ::icon(fa fa-book) — parse and store in nodeData.icon
+    // ::icon(fa fa-book) — parse and store in nodeData.icon
     let icon: string | undefined;
     let cleanContent = content;
     const iconMatch = content.match(/::icon\(([^)]+)\)/);
     if (iconMatch) {
       icon = iconMatch[1];
       cleanContent = content.replace(/::icon\([^)]+\)/, '').trim();
+    }
+
+    // A standalone `::icon(...)` line (Mermaid's canonical placement, on its own
+    // indented line under the node) decorates the most recent node rather than
+    // creating a new one.
+    if (icon && cleanContent === '' && stack.length > 0) {
+      const owner = nodeMap.get(stack[stack.length - 1].id);
+      if (owner) owner.data.icon = icon;
+      continue;
     }
 
     const { label, shape } = parseNodeText(cleanContent);

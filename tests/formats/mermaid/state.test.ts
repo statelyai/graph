@@ -773,6 +773,33 @@ stateDiagram-v2
       );
       expect(real2.map((n) => n.id).sort()).toEqual(real1.map((n) => n.id).sort());
     });
+
+    it('round-trips inline and block notes (position + text + format)', () => {
+      const input = `stateDiagram-v2
+    [*] --> Active
+    note right of Active : Short inline note
+    note left of Active
+        First line
+        Second line
+    end note`;
+      const g1 = fromMermaidState(input);
+      const active1 = g1.nodes.find((n) => n.id === 'Active')!;
+      expect(active1.data.notes).toEqual([
+        { position: 'right', text: 'Short inline note', format: 'inline' },
+        { position: 'left', text: 'First line\nSecond line', format: 'block' },
+      ]);
+
+      const out = toMermaidState(g1);
+      expect(out).toContain('note right of Active : Short inline note');
+      expect(out).toContain('note left of Active\n');
+      expect(out).toContain('First line');
+      expect(out).toContain('Second line');
+      expect(out).toContain('end note');
+
+      const g2 = fromMermaidState(out);
+      const active2 = g2.nodes.find((n) => n.id === 'Active')!;
+      expect(active2.data.notes).toEqual(active1.data.notes);
+    });
   });
 
   describe('_region_ substring in user state ids', () => {

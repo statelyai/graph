@@ -1,0 +1,45 @@
+# Cross-library comparison benchmark.
+#
+# Manual dispatch only — this does NOT run on push or pull_request. It exists to
+# verify the benchmark harness runs end-to-end from a clean checkout and to
+# capture a machine-readable JSON artifact, NOT to publish canonical timings.
+#
+# IMPORTANT: shared GitHub-hosted runners are noisy and shared; their absolute
+# numbers are not comparable to a quiet local machine and should never be quoted
+# as results. Canonical numbers come from `pnpm bench:compare` on dedicated
+# hardware (see docs/benchmarks.md). This job runs the QUICK variant (1k/10k) so
+# it finishes in a couple of minutes.
+name: Bench (cross-library, manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bench-compare:
+    name: Quick cross-library bench (repro check)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run quick cross-library benchmark
+        run: pnpm bench:compare:quick
+
+      - name: Upload results JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-compare-results
+          path: bench/compare/results/*.json
+          if-no-files-found: error

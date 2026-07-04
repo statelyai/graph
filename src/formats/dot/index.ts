@@ -2,6 +2,86 @@ import parse from 'dotparser';
 import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
 
+/**
+ * Round-trip preservation of DOT constructs that this library does not model
+ * as first-class fields.
+ *
+ * Following the convention used by the other format converters (graphml, gexf,
+ * gml store unmapped state inside `entity.data`), everything DOT-specific that
+ * has no native home is parked under a single namespaced `dot` key inside the
+ * corresponding entity's `data`. The value is plain JSON — no functions,
+ * classes, or symbols — so the graph stays serializable.
+ *
+ * - Graph `data.dot` — {@link DotGraphPreserve}: leftover `graph [...]`
+ *   attributes (bgcolor, fontname, …), the `node [...]` / `edge [...]` default
+ *   attribute bags, and `rank=same` (and other `rank`) groups.
+ * - Node/Edge `data.dot` — {@link DotEntityPreserve}: any attribute not mapped
+ *   to a native field (`label`, `shape`, `color`), plus HTML-label and compass
+ *   markers.
+ *
+ * `toDOT` reads these bags back out and re-emits them, so
+ * `fromDOT(toDOT(fromDOT(x)))` is stable for the covered constructs.
+ */
+interface DotEntityPreserve {
+  /** DOT attributes with no native field, verbatim. */
+  attrs?: Record<string, string>;
+  /** True when `label` came from an HTML-like `<...>` value; re-emit with `<>`. */
+  labelHtml?: boolean;
+  /** Compass point on the source endpoint of an edge (e.g. `n`, `se`). */
+  sourceCompass?: string;
+  /** Compass point on the target endpoint of an edge. */
+  targetCompass?: string;
+}
+
+interface DotRankGroup {
+  /** `rank` value, e.g. `same`, `min`, `max`, `source`, `sink`. */
+  rank: string;
+  /** Node ids constrained to that rank. */
+  nodes: string[];
+}
+
+interface DotGraphPreserve {
+  /** Leftover `graph [...]` attributes (excludes `rankdir`, mapped to direction). */
+  attrs?: Record<string, string>;
+  /** `node [...]` default attributes in effect at graph scope. */
+  nodeDefaults?: Record<string, string>;
+  /** `edge [...]` default attributes in effect at graph scope. */
+  edgeDefaults?: Record<string, string>;
+  /** `rank=same` (and other rank) groups. */
+  ranks?: DotRankGroup[];
+}
+
+/** Node attribute names mapped to native fields — excluded from the `dot` bag. */
+const MODELED_NODE_ATTRS = new Set(['label', 'shape', 'fillcolor', 'color', 'style']);
+/** Edge attribute names mapped to native fields — excluded from the `dot` bag. */
+const MODELED_EDGE_ATTRS = new Set(['label', 'color']);
+
+/** DOT compass points, in the port syntax `node:port:compass`. */
+const COMPASS_POINTS = new Set([
+  'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw', 'c', '_',
+]);
+
+function getDotPreserve(
+  data: unknown,
+): DotEntityPreserve | undefined {
+  if (data && typeof data === 'object' && 'dot' in data) {
+    return (data as { dot?: DotEntityPreserve }).dot;
+  }
+  return undefined;
+}
+
+/** Partition an attr map into modeled vs. leftover (preserved) attributes. */
+function leftoverAttrs(
+  attrs: Record<string, string>,
+  modeled: Set<string>,
+): Record<string, string> | undefined {
+  const rest: Record<string, string> = {};
+  for (const [k, v] of Object.entries(attrs)) {
+    if (!modeled.has(k)) rest[k] = v;
+  }
+  return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
 // --- toDOT ---
 
 /** DOT reserved keywords — must be quoted when used as identifiers. */
@@ -43,8 +123,20 @@ function unescapeLabel(label: string): string {
   return label.replace(/\\(\\|n)/g, (_, ch) => (ch === 'n' ? '\n' : '\\'));
 }
 
-function formatEndpoint(id: string, port?: string): string {
-  return `${escapeId(id)}${port ? `:${escapeId(port)}` : ''}`;
+function formatEndpoint(id: string, port?: string, compass?: string): string {
+  let out = escapeId(id);
+  if (port) out += `:${escapeId(port)}`;
+  if (compass) out += `:${escapeId(compass)}`;
+  return out;
+}
+
+/**
+ * Format a `key=value` attribute. HTML-like labels are emitted with `<...>`
+ * delimiters (verbatim, no escaping); everything else is a quoted string.
+ */
+function formatAttr(key: string, value: string, html = false): string {
+  if (html) return `${key}=<${value}>`;
+  return `${key}="${escapeLabel(value)}"`;
 }
 
 const DIRECTION_TO_RANKDIR: Record<string, string> = {
@@ -97,14 +189,35 @@ export function toDOT(graph: Graph): string {
     lines.push(`  rankdir=${rankdir};`);
   }
 
+  // Preserved graph-level state: bgcolor/fontname/… graph attrs and node/edge
+  // default attribute bags (see DotGraphPreserve).
+  const gp = (graph.data as { dot?: DotGraphPreserve } | undefined)?.dot;
+  if (gp?.attrs) {
+    for (const [k, v] of Object.entries(gp.attrs)) {
+      lines.push(`  ${formatAttr(k, v)};`);
+    }
+  }
+  if (gp?.nodeDefaults && Object.keys(gp.nodeDefaults).length > 0) {
+    const parts = Object.entries(gp.nodeDefaults).map(([k, v]) => formatAttr(k, v));
+    lines.push(`  node [${parts.join(', ')}];`);
+  }
+  if (gp?.edgeDefaults && Object.keys(gp.edgeDefaults).length > 0) {
+    const parts = Object.entries(gp.edgeDefaults).map(([k, v]) => formatAttr(k, v));
+    lines.push(`  edge [${parts.join(', ')}];`);
+  }
+
   for (const node of graph.nodes) {
+    const p = getDotPreserve(node.data);
     const attrs: string[] = [];
-    if (node.label) attrs.push(`label="${escapeLabel(node.label)}"`);
+    if (node.label) attrs.push(formatAttr('label', node.label, p?.labelHtml));
     if (node.shape) {
       const dotShape = SHAPE_TO_DOT[node.shape] ?? node.shape;
       attrs.push(`shape=${dotShape}`);
     }
     if (node.color) attrs.push(`fillcolor="${escapeLabel(node.color)}" style=filled`);
+    if (p?.attrs) {
+      for (const [k, v] of Object.entries(p.attrs)) attrs.push(formatAttr(k, v));
+    }
     if (attrs.length > 0) {
       lines.push(`  ${escapeId(node.id)} [${attrs.join(', ')}];`);
     } else {
@@ -113,13 +226,26 @@ export function toDOT(graph: Graph): string {
   }
 
   for (const edge of graph.edges) {
+    const p = getDotPreserve(edge.data);
     const attrs: string[] = [];
-    if (edge.label) attrs.push(`label="${escapeLabel(edge.label)}"`);
+    if (edge.label) attrs.push(formatAttr('label', edge.label, p?.labelHtml));
     if (edge.color) attrs.push(`color="${escapeLabel(edge.color)}"`);
+    if (p?.attrs) {
+      for (const [k, v] of Object.entries(p.attrs)) attrs.push(formatAttr(k, v));
+    }
     const attrStr = attrs.length > 0 ? ` [${attrs.join(', ')}]` : '';
     lines.push(
-      `  ${formatEndpoint(edge.sourceId, edge.sourcePort)} ${edgeOp} ${formatEndpoint(edge.targetId, edge.targetPort)}${attrStr};`,
+      `  ${formatEndpoint(edge.sourceId, edge.sourcePort, p?.sourceCompass)} ${edgeOp} ${formatEndpoint(edge.targetId, edge.targetPort, p?.targetCompass)}${attrStr};`,
     );
+  }
+
+  // Preserved `rank=same` (and other rank) groups, emitted as anonymous
+  // subgraphs so Graphviz re-applies the constraint.
+  if (gp?.ranks) {
+    for (const group of gp.ranks) {
+      const members = group.nodes.map((id) => `${escapeId(id)};`).join(' ');
+      lines.push(`  { rank=${escapeId(group.rank)}; ${members} }`);
+    }
   }
 
   lines.push('}');
@@ -155,6 +281,7 @@ interface AttrMap {
 interface EndpointRef {
   id: string;
   port?: string;
+  compass?: string;
 }
 
 function getPortId(nodeId: unknown): string | undefined {
@@ -162,12 +289,45 @@ function getPortId(nodeId: unknown): string | undefined {
   return typeof port?.id === 'string' ? port.id : undefined;
 }
 
-function attrsToMap(attrList: { id: string; eq: string | number }[]): AttrMap {
+function getCompass(nodeId: unknown): string | undefined {
+  const port = (nodeId as { port?: { compass_pt?: unknown } }).port;
+  const cp = port?.compass_pt;
+  return typeof cp === 'string' && COMPASS_POINTS.has(cp) ? cp : undefined;
+}
+
+/**
+ * A DOT attribute value: dotparser yields a string/number for quoted or bareword
+ * values, and `{ type: 'id', value, html: true }` for HTML-like `<...>` values.
+ */
+type DotAttrEq =
+  | string
+  | number
+  | { type: 'id'; value: string; html?: boolean };
+
+function attrValueString(eq: DotAttrEq): string {
+  if (eq !== null && typeof eq === 'object') return eq.value;
+  return String(eq);
+}
+
+function isHtmlAttr(eq: DotAttrEq): boolean {
+  return eq !== null && typeof eq === 'object' && eq.html === true;
+}
+
+function attrsToMap(attrList: { id: string; eq: DotAttrEq }[]): AttrMap {
   const map: AttrMap = {};
   for (const a of attrList) {
-    map[a.id] = String(a.eq);
+    map[a.id] = attrValueString(a.eq);
   }
   return map;
+}
+
+/** Names of attributes in the list whose value is an HTML-like `<...>` value. */
+function htmlAttrNames(attrList: { id: string; eq: DotAttrEq }[]): Set<string> {
+  const names = new Set<string>();
+  for (const a of attrList) {
+    if (isHtmlAttr(a.eq)) names.add(a.id);
+  }
+  return names;
 }
 
 function nodeFromAttrs(
@@ -175,12 +335,27 @@ function nodeFromAttrs(
   attrs: AttrMap,
   defaults: AttrMap,
   parentId: string | null,
+  htmlNames?: Set<string>,
 ): GraphNode {
   const merged = { ...defaults, ...attrs };
-  const label = unescapeLabel(merged['label'] ?? '');
+  const labelIsHtml = htmlNames?.has('label') ?? false;
+  const rawLabel = merged['label'] ?? '';
+  // HTML-like labels are preserved verbatim (no unescaping); plain labels use
+  // the DOT string escapes.
+  const label = labelIsHtml ? rawLabel : unescapeLabel(rawLabel);
   const rawShape = merged['shape'];
   const shape = rawShape ? (DOT_TO_SHAPE[rawShape] ?? rawShape) : undefined;
   const color = merged['fillcolor'] ?? merged['color'] ?? undefined;
+
+  // Preserve leftover node-explicit attributes (defaults are preserved once at
+  // graph scope, so they are not folded into the per-node bag).
+  const rest = leftoverAttrs(attrs, MODELED_NODE_ATTRS);
+  const preserve: DotEntityPreserve = {
+    ...(rest && { attrs: rest }),
+    ...(labelIsHtml && { labelHtml: true }),
+  };
+  const data =
+    Object.keys(preserve).length > 0 ? ({ dot: preserve } as any) : undefined;
 
   return {
     type: 'node',
@@ -188,7 +363,7 @@ function nodeFromAttrs(
     parentId,
     initialNodeId: null,
     label,
-    data: undefined as any,
+    data,
     ...(shape && { shape }),
     ...(color && { color }),
   };
@@ -238,6 +413,12 @@ export function fromDOT(dot: string): Graph {
   const edges: GraphEdge[] = [];
   let edgeIdx = 0;
   let direction: Graph['direction'] | undefined;
+
+  // Accumulated graph-level DOT state with no native field, for round-tripping.
+  const graphPreserveAttrs: Record<string, string> = {};
+  let rootNodeDefaults: Record<string, string> | undefined;
+  let rootEdgeDefaults: Record<string, string> | undefined;
+  const rankGroups: DotRankGroup[] = [];
 
   function ensureNode(
     id: string,
@@ -294,17 +475,29 @@ export function fromDOT(dot: string): Graph {
       switch (stmt.type) {
         case 'attr_stmt': {
           if (stmt.target === 'node') {
-            nd = { ...nd, ...attrsToMap(stmt.attr_list) };
+            const map = attrsToMap(stmt.attr_list);
+            nd = { ...nd, ...map };
+            // Preserve `node [...]` defaults declared at graph scope.
+            if (parentId === null) {
+              rootNodeDefaults = { ...(rootNodeDefaults ?? {}), ...map };
+            }
           } else if (stmt.target === 'edge') {
-            ed = { ...ed, ...attrsToMap(stmt.attr_list) };
+            const map = attrsToMap(stmt.attr_list);
+            ed = { ...ed, ...map };
+            // Preserve `edge [...]` defaults declared at graph scope.
+            if (parentId === null) {
+              rootEdgeDefaults = { ...(rootEdgeDefaults ?? {}), ...map };
+            }
           } else if (stmt.target === 'graph') {
             const graphAttrs = attrsToMap(stmt.attr_list);
-            if (graphAttrs['rankdir']) {
-              direction =
-                RANKDIR_TO_DIRECTION[graphAttrs['rankdir'].toUpperCase()] ??
-                undefined;
+            for (const [k, v] of Object.entries(graphAttrs)) {
+              if (k === 'rankdir') {
+                direction = RANKDIR_TO_DIRECTION[v.toUpperCase()] ?? undefined;
+              } else if (parentId === null) {
+                // Preserve other graph attributes (bgcolor, fontname, …).
+                graphPreserveAttrs[k] = v;
+              }
             }
-            // TODO: Other graph attributes (bgcolor, fontname, etc.) are ignored
           }
           break;
         }
@@ -312,14 +505,19 @@ export function fromDOT(dot: string): Graph {
         case 'node_stmt': {
           const id = stmt.node_id.id;
           const attrs = attrsToMap(stmt.attr_list);
-          const node = nodeFromAttrs(id, attrs, nd, parentId);
+          const html = htmlAttrNames(stmt.attr_list);
+          const node = nodeFromAttrs(id, attrs, nd, parentId, html);
           nodeMap.set(id, node);
           break;
         }
 
         case 'edge_stmt': {
           const edgeAttrs = attrsToMap(stmt.attr_list);
+          const edgeHtml = htmlAttrNames(stmt.attr_list);
           const mergedEdgeAttrs = { ...ed, ...edgeAttrs };
+          // Leftover edge-explicit attrs (defaults preserved once at graph scope).
+          const edgeRest = leftoverAttrs(edgeAttrs, MODELED_EDGE_ATTRS);
+          const labelIsHtml = edgeHtml.has('label');
 
           // Walk edge_list: each consecutive pair forms edges between endpoint sets.
           // DOT allows node IDs or subgraphs as endpoints; subgraphs expand to all
@@ -332,6 +530,7 @@ export function fromDOT(dot: string): Graph {
                 {
                   id: item.id,
                   ...(getPortId(item) && { port: getPortId(item) }),
+                  ...(getCompass(item) && { compass: getCompass(item) }),
                 },
               ]);
             } else if (item.type === 'subgraph') {
@@ -351,13 +550,23 @@ export function fromDOT(dot: string): Graph {
             const right = endpointGroups[i + 1];
             for (const source of left) {
               for (const target of right) {
+                const rawLabel = mergedEdgeAttrs['label'] ?? '';
+                const preserve: DotEntityPreserve = {
+                  ...(edgeRest && { attrs: edgeRest }),
+                  ...(labelIsHtml && { labelHtml: true }),
+                  ...(source.compass && { sourceCompass: source.compass }),
+                  ...(target.compass && { targetCompass: target.compass }),
+                };
                 const edge: GraphEdge = {
                   type: 'edge',
                   id: `e${edgeIdx++}`,
                   sourceId: source.id,
                   targetId: target.id,
-                  label: unescapeLabel(mergedEdgeAttrs['label'] ?? ''),
-                  data: undefined as any,
+                  label: labelIsHtml ? rawLabel : unescapeLabel(rawLabel),
+                  data:
+                    Object.keys(preserve).length > 0
+                      ? ({ dot: preserve } as any)
+                      : (undefined as any),
                   ...(source.port && { sourcePort: source.port }),
                   ...(target.port && { targetPort: target.port }),
                   ...(mergedEdgeAttrs['color'] && {
@@ -372,15 +581,30 @@ export function fromDOT(dot: string): Graph {
         }
 
         case 'subgraph': {
-          const subId = stmt.id ?? `subgraph_${nodeMap.size}`;
-          // Extract subgraph-level label from graph attr_stmt
+          // Extract subgraph-level graph attributes (label, rank, …).
           let subLabel = '';
+          let rank: string | undefined;
           for (const child of stmt.children) {
             if (child.type === 'attr_stmt' && child.target === 'graph') {
               const ga = attrsToMap(child.attr_list);
               if (ga['label']) subLabel = unescapeLabel(ga['label']);
+              if (ga['rank']) rank = ga['rank'];
             }
           }
+
+          // A `rank=...` subgraph is a layout constraint, not a container.
+          // Record the grouping and ensure its members exist, but do NOT
+          // re-walk its statements: the bare node references inside would
+          // otherwise clobber already-defined nodes (wiping their labels) and
+          // its `rank=` graph attr would leak into the graph-level attr bag.
+          if (rank) {
+            const members = getNodeIdsFromSubgraph(stmt.children);
+            rankGroups.push({ rank, nodes: members });
+            for (const m of members) ensureNode(m, parentId, nd);
+            break;
+          }
+
+          const subId = stmt.id ?? `subgraph_${nodeMap.size}`;
           const subNode: GraphNode = {
             type: 'node',
             id: subId,
@@ -400,9 +624,21 @@ export function fromDOT(dot: string): Graph {
 
   walkChildren(root.children, null, {}, {});
 
-  // TODO: HTML labels (<...>) are stored as-is in the label string
-  // TODO: Compass points in port syntax (:port:compass) are ignored
-  // TODO: rank=same and other layout hints beyond rankdir are ignored
+  // Assemble preserved graph-level DOT state (see DotGraphPreserve). Only
+  // populated when there is something to preserve, so plain graphs keep
+  // `data: undefined`.
+  const graphPreserve: DotGraphPreserve = {
+    ...(Object.keys(graphPreserveAttrs).length > 0 && {
+      attrs: graphPreserveAttrs,
+    }),
+    ...(rootNodeDefaults && { nodeDefaults: rootNodeDefaults }),
+    ...(rootEdgeDefaults && { edgeDefaults: rootEdgeDefaults }),
+    ...(rankGroups.length > 0 && { ranks: rankGroups }),
+  };
+  const graphData =
+    Object.keys(graphPreserve).length > 0
+      ? ({ dot: graphPreserve } as any)
+      : (undefined as any);
 
   return {
     id: root.id ?? '',
@@ -410,7 +646,7 @@ export function fromDOT(dot: string): Graph {
     initialNodeId: null,
     nodes: [...nodeMap.values()],
     edges,
-    data: undefined as any,
+    data: graphData,
     ...(direction && { direction }),
   };
 }

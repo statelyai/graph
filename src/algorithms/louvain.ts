@@ -1,4 +1,5 @@
 import type { Graph, GraphEdge } from '../types';
+import { throwIfAborted } from './abort';
 
 export interface LouvainOptions<E = any> {
   /** Edge weight accessor. Defaults to `edge.weight ?? 1`. */
@@ -7,6 +8,8 @@ export interface LouvainOptions<E = any> {
   resolution?: number;
   /** Maximum number of two-phase (local move + aggregation) passes. Default 10. */
   maxPasses?: number;
+  /** Abort signal, checked once per pass. Throws `signal.reason`. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -30,6 +33,9 @@ export interface LouvainOptions<E = any> {
  * const communities = getLouvainCommunities(graph);
  * // [['a', 'b', 'c'], ['d', 'e', 'f']]
  * ```
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per pass and
+ * throws `signal.reason`.
  */
 export function getLouvainCommunities<N, E>(
   graph: Graph<N, E>,
@@ -75,6 +81,7 @@ export function getLouvainCommunities<N, E>(
   let membership = nodeIds.map((_, i) => i);
 
   for (let pass = 0; pass < maxPasses; pass++) {
+    throwIfAborted(options?.signal);
     // --- Phase 1: local moving ---
     const degree = links.map(
       (neighbors, i) =>

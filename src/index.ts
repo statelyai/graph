@@ -60,6 +60,11 @@ export type {
   MinCutResult,
   BipartiteMatch,
   DominatorTreeOptions,
+  GraphColoring,
+  GraphColoringOptions,
+  TSPTour,
+  TSPOptions,
+  SteinerTreeOptions,
 } from './algorithms';
 
 // Factory & helpers
@@ -165,6 +170,7 @@ export {
   genPostorders,
   getMinimumSpanningTree,
   getAllPairsShortestPaths,
+  genAllPairsShortestPaths,
   getAStarPath,
   getDegreeCentrality,
   getInDegreeCentrality,
@@ -193,6 +199,11 @@ export {
   getMinCut,
   getDominatorTree,
   getTransitiveReduction,
+  getGraphColoring,
+  isValidColoring,
+  isPlanar,
+  getTSPTour,
+  getSteinerTree,
 } from './algorithms';
 
 // Generators
@@ -200,6 +211,8 @@ export {
   createCompleteGraph,
   createGridGraph,
   createRandomGraph,
+  createWattsStrogatzGraph,
+  createBarabasiAlbertGraph,
 } from './generators';
 
 // Equivalence

@@ -8,15 +8,36 @@ import {
   generateEdgeId,
   MERMAID_TO_DIRECTION,
   DIRECTION_TO_MERMAID,
+  directiveToString,
 } from './shared';
 
 // --- Types ---
 
+/**
+ * Structured form of a Mermaid `click` interaction.
+ * Mermaid supports two kinds: a hyperlink (`click X href "url" "tip" _target`)
+ * and a callback (`click X call fn() "tip"` / `click X fn "tip"`). Both forms
+ * are captured losslessly so emit reproduces the original.
+ */
+export interface FlowchartClick {
+  kind: 'href' | 'callback';
+  /** URL for `href` clicks, or callback function name/expression for `call` clicks. */
+  target: string;
+  tooltip?: string;
+  /** Link target attribute for `href` clicks (e.g. `_blank`). */
+  linkTarget?: string;
+  /** True when the callback form used the explicit `call` keyword. */
+  explicitCall?: boolean;
+}
+
 export interface FlowchartNodeData {
   classes?: string[];
+  /** @deprecated Legacy hyperlink field. New parses populate `click` instead. */
   link?: string;
   tooltip?: string;
   direction?: 'up' | 'down' | 'left' | 'right';
+  /** Structured `click` interaction, preserved round-trip. */
+  click?: FlowchartClick;
 }
 
 export interface FlowchartEdgeData {
@@ -25,14 +46,25 @@ export interface FlowchartEdgeData {
   endMarker?: 'arrow' | 'circle' | 'cross';
   startMarker?: 'arrow' | 'circle' | 'cross';
   bidirectional?: boolean;
-  // TODO: linkStyle by index is fragile after graph mutation
-  styleIndex?: number;
+  /**
+   * Inline `linkStyle` properties resolved onto this edge at parse time.
+   * Storing the style on the edge (rather than a positional index) keeps it
+   * attached across graph mutation; emit recomputes the `linkStyle N` index
+   * from the edge's current position.
+   */
+  linkStyle?: Record<string, string>;
 }
 
 export interface FlowchartGraphData {
   diagramType: 'flowchart';
   classDefs?: Record<string, Record<string, string>>;
-  // TODO: %%{init:...}%% directives not fully preserved
+  /** Default `linkStyle default ...` applied to all edges, preserved verbatim. */
+  defaultLinkStyle?: Record<string, string>;
+  /**
+   * Preserved `%%{init: ...}%%` directives, re-emitted at the top of the output.
+   * JSON-serializable; parsed by {@link stripDirectives}.
+   */
+  init?: Record<string, any>;
 }
 
 export type MermaidFlowchartGraph = Graph<FlowchartNodeData, FlowchartEdgeData, FlowchartGraphData>;
@@ -224,6 +256,49 @@ function findEdge(line: string): {
   return null;
 }
 
+// --- Click parsing ---
+
+/**
+ * Parse the tail of a `click` statement (everything after the node id) into a
+ * structured {@link FlowchartClick}. Handles:
+ *   - `href "url" "tip" _blank`
+ *   - `"url" "tip" _blank`   (implicit href)
+ *   - `call fn() "tip"`
+ *   - `fn "tip"`             (implicit callback)
+ */
+function parseClick(rest: string): FlowchartClick | undefined {
+  // href form (explicit or implicit via leading quote)
+  let m = rest.match(/^href\s+"([^"]*)"(?:\s+"([^"]*)")?(?:\s+(\S+))?\s*$/);
+  if (!m) m = rest.match(/^"([^"]*)"(?:\s+"([^"]*)")?(?:\s+(\S+))?\s*$/);
+  if (m) {
+    return {
+      kind: 'href',
+      target: m[1],
+      ...(m[2] && { tooltip: m[2] }),
+      ...(m[3] && { linkTarget: m[3] }),
+    };
+  }
+  // callback form: `call fn(args)` or bare `fn`
+  const callMatch = rest.match(/^call\s+(.+?)(?:\s+"([^"]*)")?\s*$/);
+  if (callMatch) {
+    return {
+      kind: 'callback',
+      target: callMatch[1].trim(),
+      explicitCall: true,
+      ...(callMatch[2] && { tooltip: callMatch[2] }),
+    };
+  }
+  const bareMatch = rest.match(/^(\S+)(?:\s+"([^"]*)")?\s*$/);
+  if (bareMatch) {
+    return {
+      kind: 'callback',
+      target: bareMatch[1],
+      ...(bareMatch[2] && { tooltip: bareMatch[2] }),
+    };
+  }
+  return undefined;
+}
+
 // --- Parser ---
 
 /**
@@ -238,7 +313,7 @@ function findEdge(line: string): {
  */
 export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
   validateInput(input, 'Mermaid flowchart');
-  const { lines } = prepareLines(input);
+  const { lines, directives } = prepareLines(input);
 
   // Parse header
   const header = lines[0]?.trim();
@@ -254,6 +329,10 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
   const edges: FlowchartEdge[] = [];
   const classDefs: Record<string, Record<string, string>> = {};
   const classAssignments: Record<string, string[]> = {};
+  // linkStyle lines collected during the pass, resolved against edges afterwards
+  // (a linkStyle may reference an edge index declared later in the source).
+  const linkStyles: { indices: number[] | 'default'; props: Record<string, string> }[] = [];
+  let defaultLinkStyle: Record<string, string> | undefined;
   let edgeCounter = 0;
 
   // Subgraph stack for tracking parentId
@@ -366,22 +445,44 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
       continue;
     }
 
-    // TODO: linkStyle N stroke:#fff — index-based, fragile after mutation
-    if (line.startsWith('linkStyle ')) {
+    // linkStyle <indices|default> prop:val,prop:val
+    // Resolved onto edges after the full pass so recomputed indices stay
+    // correct across later graph mutation.
+    const linkStyleMatch = line.match(/^linkStyle\s+(default|[\d,\s]+)\s+(.+)$/);
+    if (linkStyleMatch) {
+      const props: Record<string, string> = {};
+      for (const pair of linkStyleMatch[2].split(',')) {
+        const [k, v] = pair.split(':').map((s) => s.trim());
+        if (k && v) props[k] = v;
+      }
+      if (linkStyleMatch[1].trim() === 'default') {
+        linkStyles.push({ indices: 'default', props });
+      } else {
+        const indices = linkStyleMatch[1]
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !Number.isNaN(n));
+        linkStyles.push({ indices, props });
+      }
       continue;
     }
 
-    // TODO: click nodeId "url" "tooltip" — store in nodeData
-    const clickMatch = line.match(
-      /^click\s+(\S+)\s+"([^"]*)"(?:\s+"([^"]*)")?\s*$/,
-    );
+    // click <nodeId> ["url"|call fn()|fn] ["tooltip"] [_target]
+    // Two Mermaid forms: hyperlink and callback. Both captured structurally.
+    const clickMatch = line.match(/^click\s+(\S+)\s+(.+)$/);
     if (clickMatch) {
       const nodeId = clickMatch[1];
-      ensureNode(nodeId);
-      const node = nodeMap.get(nodeId)!;
-      node.data.link = clickMatch[2];
-      if (clickMatch[3]) node.data.tooltip = clickMatch[3];
-      continue;
+      const rest = clickMatch[2].trim();
+      const click = parseClick(rest);
+      if (click) {
+        ensureNode(nodeId);
+        const node = nodeMap.get(nodeId)!;
+        node.data.click = click;
+        if (click.tooltip) node.data.tooltip = click.tooltip;
+        // Populate legacy `link` field for href clicks (backward compatible).
+        if (click.kind === 'href') node.data.link = click.target;
+        continue;
+      }
     }
 
     // Try parsing as edge chain (A --> B --> C)
@@ -489,6 +590,20 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
     }
   }
 
+  // Resolve linkStyle lines onto edges. Index refers to edge declaration order.
+  for (const ls of linkStyles) {
+    if (ls.indices === 'default') {
+      defaultLinkStyle = { ...(defaultLinkStyle ?? {}), ...ls.props };
+      continue;
+    }
+    for (const idx of ls.indices) {
+      const edge = edges[idx];
+      if (edge) {
+        edge.data.linkStyle = { ...(edge.data.linkStyle ?? {}), ...ls.props };
+      }
+    }
+  }
+
   return {
     id: '',
     mode: 'directed',
@@ -498,6 +613,8 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
     data: {
       diagramType: 'flowchart',
       ...(Object.keys(classDefs).length > 0 && { classDefs }),
+      ...(defaultLinkStyle && { defaultLinkStyle }),
+      ...(directives.init && { init: directives.init }),
     },
     direction,
   };
@@ -514,9 +631,13 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
  */
 export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
   const dir = DIRECTION_TO_MERMAID[graph.direction ?? 'down'] ?? 'TD';
-  const lines: string[] = [`flowchart ${dir}`];
-
   const gd = graph.data;
+
+  const lines: string[] = [];
+  // Preserved %%{init}%% directives re-emitted at the very top.
+  const initLine = directiveToString('init', gd?.init);
+  if (initLine) lines.push(initLine);
+  lines.push(`flowchart ${dir}`);
 
   // Emit classDefs
   if (gd?.classDefs) {
@@ -622,9 +743,46 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
     lines.push(`    class ${nodeIds.join(',')} ${cls}`);
   }
 
-  // Emit click directives
+  // Emit linkStyle directives with recomputed indices. Group edges that share
+  // an identical style so multi-index `linkStyle 0,2 ...` lines round-trip.
+  if (gd?.defaultLinkStyle) {
+    const propsStr = Object.entries(gd.defaultLinkStyle)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(',');
+    lines.push(`    linkStyle default ${propsStr}`);
+  }
+  const styleGroups = new Map<string, number[]>();
+  graph.edges.forEach((edge, idx) => {
+    const ls = edge.data?.linkStyle;
+    if (ls && Object.keys(ls).length > 0) {
+      const key = Object.entries(ls)
+        .map(([k, v]) => `${k}:${v}`)
+        .join(',');
+      if (!styleGroups.has(key)) styleGroups.set(key, []);
+      styleGroups.get(key)!.push(idx);
+    }
+  });
+  for (const [propsStr, indices] of styleGroups) {
+    lines.push(`    linkStyle ${indices.join(',')} ${propsStr}`);
+  }
+
+  // Emit click directives (structured form; falls back to legacy `link` field).
   for (const node of graph.nodes) {
-    if (node.data?.link) {
+    const click = node.data?.click;
+    if (click) {
+      const tip = click.tooltip
+        ? ` "${escapeMermaidLabel(click.tooltip)}"`
+        : '';
+      if (click.kind === 'href') {
+        const target = click.linkTarget ? ` ${click.linkTarget}` : '';
+        lines.push(
+          `    click ${node.id} href "${escapeMermaidLabel(click.target)}"${tip}${target}`,
+        );
+      } else {
+        const kw = click.explicitCall ? 'call ' : '';
+        lines.push(`    click ${node.id} ${kw}${click.target}${tip}`);
+      }
+    } else if (node.data?.link) {
       const tip = node.data.tooltip ? ` "${escapeMermaidLabel(node.data.tooltip)}"` : '';
       lines.push(`    click ${node.id} "${escapeMermaidLabel(node.data.link)}"${tip}`);
     }

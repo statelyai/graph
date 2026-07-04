@@ -124,4 +124,54 @@ block-beta
       expect(graph2.edges).toHaveLength(graph.edges.length);
     });
   });
+
+  describe('edge type round-trip fidelity', () => {
+    const FIXTURE = `block-beta
+    columns 2
+    a["A"] b["B"]
+    c["C"] d["D"]
+    a --> b
+    b --- c
+    c ==> d
+    a -.-> d`;
+
+    it('preserves distinct edge arrow tokens', () => {
+      const g = fromMermaidBlock(FIXTURE);
+      const tokens = g.edges.map((e) => e.data.arrowToken);
+      expect(tokens).toEqual(['-->', '---', '==>', '-.->']);
+      const strokes = g.edges.map((e) => e.data.stroke);
+      expect(strokes).toEqual(['normal', 'normal', 'thick', 'dotted']);
+      expect(g.edges.map((e) => e.data.arrowType)).toEqual([
+        'arrow',
+        'none',
+        'arrow',
+        'arrow',
+      ]);
+    });
+
+    it('emits the exact original arrow token', () => {
+      const out = toMermaidBlock(fromMermaidBlock(FIXTURE));
+      expect(out).toContain('a --> b');
+      expect(out).toContain('b --- c');
+      expect(out).toContain('c ==> d');
+      expect(out).toContain('a -.-> d');
+    });
+
+    it('round-trips a pipe-labeled edge', () => {
+      const g = fromMermaidBlock('block-beta\n    a b\n    a -->|link| b');
+      expect(g.edges[0].label).toBe('link');
+      const out = toMermaidBlock(g);
+      expect(out).toContain('a --> |link| b');
+      const g2 = fromMermaidBlock(out);
+      expect(g2.edges[0].label).toBe('link');
+    });
+
+    it('is stable under parse → emit → parse', () => {
+      const g1 = fromMermaidBlock(FIXTURE);
+      const g2 = fromMermaidBlock(toMermaidBlock(g1));
+      expect(g2.edges.map((e) => e.data.arrowToken)).toEqual(
+        g1.edges.map((e) => e.data.arrowToken),
+      );
+    });
+  });
 });

@@ -18,7 +18,12 @@ export interface ClassNodeData {
     isMethod: boolean;
   }>;
   annotation?: string;
-  // TODO: generics (List~int~) stored as raw string, tilde syntax not fully parsed
+  /**
+   * Generic type parameter inside `~...~` (e.g. `List~int~` → `"int"`,
+   * `Map~K, V~` → `"K, V"`). Preserved as the raw inner string rather than a
+   * parsed structure: Mermaid treats the generic as opaque display text, so a
+   * verbatim round-trip is both simpler and lossless. Emit re-wraps in `~...~`.
+   */
   genericType?: string;
 }
 

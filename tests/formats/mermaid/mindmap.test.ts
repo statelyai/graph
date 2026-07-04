@@ -57,20 +57,27 @@ mindmap
       ]);
     });
 
-    it('parses ::icon() syntax', () => {
+    it('attaches a standalone ::icon() line to the preceding node', () => {
       const graph = fromMermaidMindmap(`
 mindmap
   Root
     A
       ::icon(fa fa-book)
       `);
-      // Icon line gets attached as a separate node — the implementation
-      // parses icons inline on the same content line
-      // For now, check icon is stored if on same conceptual node
-      const nodesWithIcon = graph.nodes.filter((n) => n.data.icon);
-      // Since icon is on a separate line, it creates its own node
-      // This is a known limitation of indentation-based parsing
-      expect(graph.nodes.length).toBeGreaterThanOrEqual(2);
+      // No extra node is created for the icon line; it decorates node A.
+      expect(graph.nodes).toHaveLength(2);
+      const a = graph.nodes.find((n) => n.label === 'A')!;
+      expect(a.data.icon).toBe('fa fa-book');
+    });
+
+    it('parses an inline ::icon() on the node line', () => {
+      const graph = fromMermaidMindmap(`
+mindmap
+  Root
+    A ::icon(fa fa-star)
+      `);
+      const a = graph.nodes.find((n) => n.label === 'A')!;
+      expect(a.data.icon).toBe('fa fa-star');
     });
 
     it('throws on empty input', () => {
@@ -148,6 +155,23 @@ mindmap
       expect(graph2.nodes.map((n) => n.label).sort()).toEqual(
         graph.nodes.map((n) => n.label).sort(),
       );
+    });
+
+    it('round-trips ::icon() decorations', () => {
+      const input = `mindmap
+  Root
+    A
+      ::icon(fa fa-book)
+    B`;
+      const g1 = fromMermaidMindmap(input);
+      const out = toMermaidMindmap(g1);
+      expect(out).toContain('::icon(fa fa-book)');
+      const g2 = fromMermaidMindmap(out);
+      expect(g2.nodes).toHaveLength(g1.nodes.length);
+      const a1 = g1.nodes.find((n) => n.label === 'A')!;
+      const a2 = g2.nodes.find((n) => n.label === 'A')!;
+      expect(a2.data.icon).toBe(a1.data.icon);
+      expect(a2.data.icon).toBe('fa fa-book');
     });
   });
 });

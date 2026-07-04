@@ -302,8 +302,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       continue;
     }
 
-    // Note
-    // TODO: notes stored on nodeData but not fully round-trippable
+    // Note — position + text + format all preserved for round-trip.
     const noteMatch = line.match(
       /^note\s+(left|right)\s+of\s+(\S+)\s*(?::\s*(.*))?$/i,
     );

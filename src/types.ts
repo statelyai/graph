@@ -420,6 +420,11 @@ export interface AllPairsShortestPathsOptions<TEdgeData = any> {
   algorithm?: 'floyd-warshall' | 'dijkstra' | 'bellman-ford';
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+  /**
+   * Abort signal, checked once per source node (dijkstra/bellman-ford) or per
+   * intermediate node `k` (floyd-warshall). Throws `signal.reason`.
+   */
+  signal?: AbortSignal;
 }
 
 // --- Diff types (read-only summary) ---

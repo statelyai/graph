@@ -217,5 +217,30 @@ classDiagram
       );
       expect(graph2.edges).toHaveLength(graph.edges.length);
     });
+
+    it('round-trips generic type parameters (raw ~...~ preservation)', () => {
+      const input = `classDiagram
+    class List~T~ {
+        +add(item T)
+    }
+    class Registry~K, V~
+    class Box~int~`;
+      const g1 = fromMermaidClass(input);
+      expect(g1.nodes.find((n) => n.id === 'List')!.data.genericType).toBe('T');
+      expect(g1.nodes.find((n) => n.id === 'Registry')!.data.genericType).toBe(
+        'K, V',
+      );
+      expect(g1.nodes.find((n) => n.id === 'Box')!.data.genericType).toBe('int');
+
+      const out = toMermaidClass(g1);
+      expect(out).toContain('class List~T~ {');
+      expect(out).toContain('class Registry~K, V~');
+      expect(out).toContain('class Box~int~');
+
+      const g2 = fromMermaidClass(out);
+      expect(g2.nodes.map((n) => n.data.genericType)).toEqual(
+        g1.nodes.map((n) => n.data.genericType),
+      );
+    });
   });
 });

@@ -67,17 +67,25 @@ export function stripComments(input: string): string {
     .join('\n');
 }
 
-/** Strip `%%{init: ...}%%` directives and return them separately. */
+/**
+ * Strip `%%{init: {...}}%%` directives and return them separately.
+ *
+ * Mermaid's real directive syntax embeds a full JSON object after the key, e.g.
+ * `%%{init: {"theme":"forest"}}%%`. The extracted object is stored under its key
+ * (`{ init: { theme: 'forest' } }`) so it can be re-emitted verbatim.
+ */
 export function stripDirectives(input: string): {
   directives: Record<string, any>;
   cleaned: string;
 } {
   const directives: Record<string, any> = {};
+  // Match `%%{ <key> : <json-object> }%%`. `\{[\s\S]*?\}` inside is greedy-safe
+  // because the whole directive is bounded by `}%%`.
   const cleaned = input.replace(
-    /%%\{[\s]*init[\s]*:[\s]*(.*?)[\s]*\}%%/gs,
-    (_match, json) => {
+    /%%\{\s*(\w+)\s*:\s*(\{[\s\S]*?\})\s*\}%%/g,
+    (_match, key, json) => {
       try {
-        Object.assign(directives, JSON.parse(`{${json}}`));
+        directives[key] = JSON.parse(json);
       } catch {
         // ignore malformed directives
       }
@@ -102,6 +110,19 @@ export function prepareLines(input: string): {
     .map((l) => l.trimEnd())
     .filter((l) => l.trim() !== '');
   return { lines, directives };
+}
+
+/**
+ * Serialize a single preserved directive object back to a Mermaid directive
+ * line, e.g. `directiveToString('init', {...})` → `%%{init: {...}}%%`.
+ * Returns `undefined` when the value is empty.
+ */
+export function directiveToString(
+  key: string,
+  value: Record<string, any> | undefined,
+): string | undefined {
+  if (!value || Object.keys(value).length === 0) return undefined;
+  return `%%{${key}: ${JSON.stringify(value)}}%%`;
 }
 
 /** Validate input is a non-empty string, throw with prefix if not. */

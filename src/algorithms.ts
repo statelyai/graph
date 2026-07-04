@@ -22,6 +22,7 @@ export {
   getCycles,
   genCycles,
   getAllPairsShortestPaths,
+  genAllPairsShortestPaths,
   getAStarPath,
   getJoinedPath,
   joinPaths,
@@ -100,3 +101,17 @@ export { getDominatorTree } from './algorithms/dominators';
 export type { DominatorTreeOptions } from './algorithms/dominators';
 
 export { getTransitiveReduction } from './algorithms/reduction';
+
+export { getGraphColoring, isValidColoring } from './algorithms/coloring';
+export type {
+  GraphColoring,
+  GraphColoringOptions,
+} from './algorithms/coloring';
+
+export { isPlanar } from './algorithms/planarity';
+
+export { getTSPTour } from './algorithms/tsp';
+export type { TSPTour, TSPOptions } from './algorithms/tsp';
+
+export { getSteinerTree } from './algorithms/steiner';
+export type { SteinerTreeOptions } from './algorithms/steiner';

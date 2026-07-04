@@ -194,7 +194,7 @@ const parsed = GraphSchema.parse(unknownValue);
 
 <!-- algorithm functions exported from src/algorithms.ts -->
 
-Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
+Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), graph coloring (`getGraphColoring`, `isValidColoring`), planarity testing (`isPlanar`), approximate TSP tours (`getTSPTour`) and Steiner trees (`getSteinerTree`), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`, `createWattsStrogatzGraph`, `createBarabasiAlbertGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
 
 Hot algorithm loops (centrality, components) run on an internal compressed-sparse-row snapshot — cached and invalidated transparently like the rest of the index — so they stay fast on large graphs without changing the plain-JSON model. Algorithm results are differential-tested against graphology on seeded random graphs.
 
@@ -243,6 +243,52 @@ getDominatorTree(graph, { from: 'a' }); // immediate dominators
 getTransitiveReduction(graph); // minimal equivalent DAG
 isIsomorphic(graph, otherGraph); // structural equivalence
 ```
+
+## Large graphs & cancellation
+
+JSON is the canonical representation; typed arrays are the compute layer. The `@statelyai/graph/kernel` subpath exposes the fast-path primitives the hot algorithms already use — the adjacency `getIndex(graph)`, the compressed-sparse-row snapshot `getCSR(graph)`, `invalidateIndex(graph)`, and `memoizeByGraph()`. All are cached in `WeakMap`s keyed on the graph, revalidated in O(1) via a version counter, and never serialized. Build on them to write plugins and inner loops without rebuilding adjacency from `graph.nodes`/`graph.edges` on every call.
+
+```ts
+import { getCSR, memoizeByGraph } from '@statelyai/graph/kernel';
+import { getBetweennessCentrality } from '@statelyai/graph';
+
+const csr = getCSR(graph); // flat Int32Array snapshot for inner loops
+
+// Version-keyed memoization: repeated queries on an unchanged graph are O(1);
+// any mutation bumps the index version and invalidates automatically.
+const betweenness = memoizeByGraph(getBetweennessCentrality);
+betweenness(graph); // computes
+betweenness(graph); // cached
+```
+
+Expensive algorithms (betweenness, closeness, PageRank, HITS, eigenvector, Katz, Louvain, label propagation, Girvan–Newman, greedy modularity, max-flow/min-cut, all-pairs shortest paths, isomorphism, dominator tree) accept an `AbortSignal`; on abort they throw `signal.reason`:
+
+```ts
+const controller = new AbortController();
+setTimeout(() => controller.abort(new Error('too slow')), 1000);
+getBetweennessCentrality(graph, { signal: controller.signal });
+```
+
+There is no bundled worker runtime — workers are a recipe, not a dependency. Because a `Graph` is plain JSON, `structuredClone`/`postMessage` it to a Worker and run the algorithm there with zero serialization layer:
+
+```ts
+// worker.ts
+import { getBetweennessCentrality } from '@statelyai/graph';
+self.onmessage = (e) => self.postMessage(getBetweennessCentrality(e.data));
+
+// main.ts
+const worker = new Worker(new URL('./worker.ts', import.meta.url), {
+  type: 'module',
+});
+worker.postMessage(graph); // graph survives postMessage as-is
+worker.onmessage = (e) => console.log(e.data);
+```
+
+`gen*` generators remain the cooperative-slicing story for main-thread work. See [docs/scaling-and-plugins.md](./docs/scaling-and-plugins.md) for the full design.
+
+### Writing plugins
+
+A plugin is just an npm package of standalone prefixed functions taking `graph` first — exactly like the built-ins — built on `@statelyai/graph/kernel` for the fast path and `memoizeByGraph` for caching. There is no registry and no method chaining: the standalone-function model _is_ the plugin model. Test against the JSON schema (`@statelyai/graph/schemas`), and publish with the npm keyword `statelyai-graph-plugin` for discoverability.
 
 ## Layout
 
@@ -392,6 +438,7 @@ Format-specific docs live alongside the source:
 - [Layout transitions](./docs/layout-transitions.md) — tween between engines; layouts are just data
 - [Algorithms reference](./docs/algorithms.md) — every algorithm with complexity and semantics notes
 - [Benchmarks](./docs/benchmarks.md) — measured against graphology, ngraph, graphlib, and cytoscape
+- [Scaling & plugins](./docs/scaling-and-plugins.md) — the public kernel, cancellation, worker recipe, and plugin authoring
 - [Migrating from graphlib](./docs/migrating-from-graphlib.md)
 - [React Flow + ELK pipeline](./docs/react-flow-elk-pipeline.md) — measured nodes, worker layout, live re-layout
 
@@ -411,7 +458,10 @@ The repo includes runnable examples under [`examples/`](./examples):
 ```bash
 pnpm install
 pnpm verify
-pnpm bench
+pnpm bench                # micro-benchmarks (vitest bench)
+pnpm bench:compare        # cross-library comparison run
+pnpm bench:compare:quick  # faster, smaller-sample comparison
+pnpm bench:report         # render the comparison results
 ```
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor conventions, format-module checklist, and release notes guidance.

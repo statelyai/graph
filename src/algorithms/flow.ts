@@ -1,6 +1,7 @@
 import type { Graph, GraphEdge } from '../types';
 import { getIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
+import { throwIfAborted } from './abort';
 
 export interface MaxFlowOptions<E = any> {
   /** Source node id. */
@@ -9,6 +10,8 @@ export interface MaxFlowOptions<E = any> {
   to: string;
   /** Edge capacity accessor. Defaults to `edge.weight ?? 1`. */
   getCapacity?: (edge: GraphEdge<E>) => number;
+  /** Abort signal, checked once per augmenting path. Throws `signal.reason`. */
+  signal?: AbortSignal;
 }
 
 export interface MaxFlowResult<E = any> {
@@ -27,6 +30,8 @@ export interface MinCutOptions<E = any> {
   sink: string;
   /** Edge capacity accessor. Defaults to `edge.weight ?? 1`. */
   getCapacity?: (edge: GraphEdge<E>) => number;
+  /** Abort signal, checked once per augmenting path. Throws `signal.reason`. */
+  signal?: AbortSignal;
 }
 
 export interface MinCutResult {
@@ -65,6 +70,7 @@ function solveMaxFlow<N, E>(
   from: string,
   to: string,
   getCapacity: (edge: GraphEdge<E>) => number,
+  signal?: AbortSignal,
 ): MaxFlowSolution<E> {
   const idx = getIndex(graph);
   if (!idx.nodeById.has(from)) {
@@ -122,6 +128,7 @@ function solveMaxFlow<N, E>(
   // --- Edmonds-Karp: BFS augmenting paths over the residual graph ---
   let value = 0;
   while (true) {
+    throwIfAborted(signal);
     const parentArc = new Map<string, number>();
     const queue: string[] = [from];
     const visited = new Set<string>([from]);
@@ -212,6 +219,9 @@ function solveMaxFlow<N, E>(
  * edges crossing from the source side to the sink side of the final
  * residual graph; the sum of their capacities equals `value`.
  *
+ * Pass `options.signal` to cancel: the abort is checked once per augmenting
+ * path and throws `signal.reason`.
+ *
  * @example
  * ```ts
  * const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' });
@@ -231,6 +241,7 @@ export function getMaxFlow<N, E>(
     options.from,
     options.to,
     getCapacity,
+    options.signal,
   );
   return { value, flows, cutEdges };
 }
@@ -244,6 +255,9 @@ export function getMaxFlow<N, E>(
  * residual graph; `partition.sink` holds the rest (both in `graph.nodes`
  * order). `cutEdges` are the ids of the edges crossing the cut, and their
  * total capacity equals `value` (the max-flow value).
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per augmenting
+ * path and throws `signal.reason`.
  *
  * @example
  * ```ts
@@ -267,6 +281,7 @@ export function getMinCut<N, E>(
     options.source,
     options.sink,
     getCapacity,
+    options.signal,
   );
 
   const sourcePartition: string[] = [];

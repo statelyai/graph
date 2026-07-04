@@ -1,36 +1,76 @@
 /**
  * Cross-library benchmark harness.
  *
- *   pnpm bench:compare              # default sizes (1k / 10k / 100k)
- *   pnpm bench:compare -- --quick   # 1k / 10k only
+ *   pnpm bench:compare              # 1k / 10k / 100k nodes (full, ~minutes)
+ *   pnpm bench:compare:quick       # 1k / 10k only (fast, for repro checks)
+ *   BENCH_SIZES=1000,5000 pnpm bench:compare   # custom sizes
+ *
+ * Flags / env:
+ *   --quick        1k / 10k only (equivalent to BENCH_QUICK=1)
+ *   BENCH_QUICK=1  same as --quick
+ *   BENCH_SIZES    comma-separated node counts; overrides the presets
  *
  * Seeded generators feed identical edge lists to every adapter; each
  * workload runs through the library's idiomatic public API. Timing: warmup,
  * then samples until ≥5 runs or ≥1.5 s, reporting the median. A library that
  * exceeds 10 s on a workload is skipped at larger sizes (reported as `>10s`).
- * Results land in bench/compare/results/<date>.{json,md}.
+ *
+ * Output lands in bench/compare/results/<date>.{json,md} and refreshes the
+ * tables in docs/benchmarks.md. The JSON is machine-readable and captures the
+ * environment (node, OS, CPU) so runs are comparable and reproducible.
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import { SHAPES, type BenchGraphData } from './generate';
 import { adapters, WORKLOAD_NAMES } from './adapters';
+import {
+  writeReports,
+  type BenchResults,
+  type Cell,
+} from './report';
 
-const QUICK = process.argv.includes('--quick');
-const SIZES = QUICK ? [1_000, 10_000] : [1_000, 10_000, 100_000];
+const require = createRequire(import.meta.url);
+
+const QUICK = process.argv.includes('--quick') || process.env.BENCH_QUICK === '1';
+const SIZES: number[] = process.env.BENCH_SIZES
+  ? process.env.BENCH_SIZES.split(',').map((s) => Number(s.trim())).filter((n) => n > 0)
+  : QUICK
+    ? [1_000, 10_000]
+    : [1_000, 10_000, 100_000];
 // Brandes is O(V·E): cap betweenness everywhere
 const WORKLOAD_MAX_SIZE: Record<string, number> = { betweenness: 1_000 };
 const SLOW_SKIP_MS = 10_000;
 
-interface Cell {
-  lib: string;
-  shape: string;
-  size: number;
-  workload: string;
-  medianMs: number | null; // null = unsupported / skipped / crashed
-  skipped?: 'too-slow' | 'error';
-  error?: string;
-  samples?: number;
+/** npm package to resolve a version for, per adapter name. */
+const LIB_PACKAGES: Record<string, string> = {
+  graphology: 'graphology',
+  ngraph: 'ngraph.graph',
+  '@dagrejs/graphlib': '@dagrejs/graphlib',
+  'cytoscape (headless)': 'cytoscape',
+};
+
+function resolveVersion(pkg: string): string | undefined {
+  // Read package.json off disk: `require('<pkg>/package.json')` fails for
+  // packages whose `exports` map does not expose ./package.json.
+  try {
+    const entry = require.resolve(pkg);
+    let dir = entry;
+    for (let i = 0; i < 8; i++) {
+      dir = join(dir, '..');
+      const candidate = join(dir, 'package.json');
+      try {
+        const meta = JSON.parse(readFileSync(candidate, 'utf8'));
+        if (meta.name === pkg) return meta.version;
+      } catch {
+        /* keep walking up */
+      }
+    }
+  } catch {
+    /* not resolvable */
+  }
+  return undefined;
 }
 
 function median(values: number[]): number {
@@ -121,59 +161,46 @@ for (const size of SIZES) {
   }
 }
 
-// --- Report ---
-
-function fmt(cell: Cell | undefined, best: number | null): string {
-  if (!cell || cell.medianMs === null) {
-    if (cell?.skipped === 'too-slow') return '>10s';
-    if (cell?.skipped === 'error') return 'crash';
-    return '—';
-  }
-  const ms =
-    cell.medianMs >= 100
-      ? cell.medianMs.toFixed(0)
-      : cell.medianMs >= 1
-        ? cell.medianMs.toFixed(1)
-        : cell.medianMs.toFixed(2);
-  if (best !== null && best > 0) {
-    const ratio = cell.medianMs / best;
-    return ratio <= 1.001 ? `**${ms}**` : `${ms} (${ratio.toFixed(1)}×)`;
-  }
-  return ms;
-}
+// --- Assemble machine-readable results (with environment capture) ---
 
 const libNames = adapters.map((a) => a.name);
-let md = `# Cross-library benchmark\n\n`;
-md += `- Date: ${new Date().toISOString()}\n`;
-md += `- Machine: ${os.cpus()[0]?.model ?? 'unknown'} · ${os.cpus().length} cores · node ${process.version} (${os.platform()}/${os.arch()})\n`;
-md += `- Method: identical seeded edge lists per cell; idiomatic public API per library; median of ≥5 runs (1.5 s budget) after warmup. Bold = fastest; (n.n×) = slower than fastest; — = no equivalent API; >10s = skipped after exceeding 10 s.\n`;
-md += `- graphlib's \`sssp\` is full single-source Dijkstra (its only shortest-path API).\n`;
-md += `- Betweenness capped at n=1,000 (Brandes is O(V·E) for every library).\n`;
-md += `- Sub-millisecond cells (e.g. scaleFree traversals, which reach few nodes from n0) are dominated by call overhead — treat their ratios as noise.\n`;
-
-for (const workload of WORKLOAD_NAMES) {
-  const rows = cells.filter((c) => c.workload === workload);
-  if (rows.length === 0) continue;
-  md += `\n## ${workload}\n\n| graph | ${libNames.join(' | ')} |\n|---|${libNames.map(() => '---').join('|')}|\n`;
-  for (const size of SIZES) {
-    for (const shapeName of Object.keys(SHAPES)) {
-      const rowCells = libNames.map((lib) =>
-        rows.find((c) => c.lib === lib && c.size === size && c.shape === shapeName),
-      );
-      if (rowCells.every((c) => c === undefined)) continue;
-      const best = Math.min(
-        ...rowCells.filter((c) => c?.medianMs != null).map((c) => c!.medianMs!),
-      );
-      md += `| ${shapeName} ${size.toLocaleString('en-US')} | ${rowCells
-        .map((c) => fmt(c, Number.isFinite(best) ? best : null))
-        .join(' | ')} |\n`;
-    }
-  }
+const libVersions: Record<string, string> = { '@statelyai/graph': pkgVersion() };
+for (const name of libNames) {
+  const pkg = LIB_PACKAGES[name];
+  const v = pkg ? resolveVersion(pkg) : undefined;
+  if (v) libVersions[name] = v;
 }
+
+const results: BenchResults = {
+  env: {
+    date: new Date().toISOString(),
+    node: process.version,
+    os: `${os.platform()}/${os.arch()}`,
+    cpu: os.cpus()[0]?.model ?? 'unknown',
+    cores: os.cpus().length,
+  },
+  libs: libNames,
+  libVersions,
+  sizes: SIZES,
+  shapes: Object.keys(SHAPES),
+  workloads: [...WORKLOAD_NAMES],
+  slowSkipMs: SLOW_SKIP_MS,
+  cells,
+};
 
 const outDir = join(import.meta.dirname, 'results');
 mkdirSync(outDir, { recursive: true });
-const stamp = new Date().toISOString().slice(0, 10);
-writeFileSync(join(outDir, `${stamp}.json`), JSON.stringify({ cells }, null, 2));
-writeFileSync(join(outDir, `${stamp}.md`), md);
-console.log(`\nWrote bench/compare/results/${stamp}.md and .json`);
+const stamp = results.env.date.slice(0, 10);
+writeFileSync(join(outDir, `${stamp}.json`), JSON.stringify(results, null, 2));
+writeReports(results);
+console.log(`\nWrote bench/compare/results/${stamp}.json`);
+
+function pkgVersion(): string {
+  try {
+    return JSON.parse(
+      readFileSync(join(import.meta.dirname, '..', '..', 'package.json'), 'utf8'),
+    ).version;
+  } catch {
+    return '';
+  }
+}

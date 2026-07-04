@@ -1,11 +1,20 @@
 import type { Graph, GraphEdge } from '../types';
 import { getDegree, getInDegree, getOutDegree } from '../queries';
 import { getCSR } from './csr';
+import { throwIfAborted } from './abort';
 
 export interface IterativeCentralityOptions {
   alpha?: number;
   maxIterations?: number;
   tolerance?: number;
+  /** Abort signal, checked once per power-iteration. Throws `signal.reason`. */
+  signal?: AbortSignal;
+}
+
+/** Options for the Brandes-based centrality measures (closeness, betweenness). */
+export interface TraversalCentralityOptions {
+  /** Abort signal, checked once per source node. Throws `signal.reason`. */
+  signal?: AbortSignal;
 }
 
 export interface EigenvectorCentralityOptions<E = any>
@@ -135,8 +144,14 @@ export function getOutDegreeCentrality(graph: Graph): Record<string, number> {
  *
  * Distances are computed over unweighted shortest paths using the graph's
  * existing directed or undirected edge semantics.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per source node
+ * and throws `signal.reason`.
  */
-export function getClosenessCentrality(graph: Graph): Record<string, number> {
+export function getClosenessCentrality(
+  graph: Graph,
+  options?: TraversalCentralityOptions,
+): Record<string, number> {
   const scores = createEmptyScoreMap(graph);
   const csr = getCSR(graph);
   const order = csr.ids.length;
@@ -144,6 +159,7 @@ export function getClosenessCentrality(graph: Graph): Record<string, number> {
   const queue = new Int32Array(order);
 
   for (let s = 0; s < order; s++) {
+    throwIfAborted(options?.signal);
     const visited = bfsDistances(csr, s, dist, queue);
     const reachable = visited - 1; // excluding the start node itself
     if (reachable === 0) continue;
@@ -165,8 +181,14 @@ export function getClosenessCentrality(graph: Graph): Record<string, number> {
  *
  * Uses Brandes' algorithm over unweighted shortest paths and returns
  * normalized scores.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per source node
+ * and throws `signal.reason`.
  */
-export function getBetweennessCentrality(graph: Graph): Record<string, number> {
+export function getBetweennessCentrality(
+  graph: Graph,
+  options?: TraversalCentralityOptions,
+): Record<string, number> {
   const csr = getCSR(graph);
   const n = csr.ids.length;
   const totals = new Float64Array(n);
@@ -177,6 +199,7 @@ export function getBetweennessCentrality(graph: Graph): Record<string, number> {
   const order_ = new Int32Array(n);
 
   for (let s = 0; s < n; s++) {
+    throwIfAborted(options?.signal);
     sigma.fill(0);
     dist.fill(-1);
     delta.fill(0);
@@ -247,6 +270,9 @@ export function getBetweennessCentrality(graph: Graph): Record<string, number> {
  * Returns PageRank scores for all nodes.
  *
  * Uses power iteration with damping factor `alpha`.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per iteration
+ * and throws `signal.reason`.
  */
 export function getPageRank(
   graph: Graph,
@@ -271,6 +297,7 @@ export function getPageRank(
   for (let i = 0; i < n; i++) current[i] = scores[csr.ids[i]];
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    throwIfAborted(options?.signal);
     const next = new Float64Array(n).fill((1 - alpha) / n);
 
     let danglingMass = 0;
@@ -315,6 +342,9 @@ export function getPageRank(
  * Returns HITS hub and authority scores for all nodes.
  *
  * Uses power iteration and L2 normalization per iteration.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per iteration
+ * and throws `signal.reason`.
  */
 export function getHITS(
   graph: Graph,
@@ -333,6 +363,7 @@ export function getHITS(
   let authorities = new Float64Array(n);
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    throwIfAborted(options?.signal);
     const nextAuthorities = new Float64Array(n);
     for (let w = 0; w < n; w++) {
       for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
@@ -382,6 +413,9 @@ export function getHITS(
  *
  * Throws when the iteration has not converged (L1 error < `n × tolerance`)
  * within `maxIterations`.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per iteration
+ * and throws `signal.reason`.
  */
 export function getEigenvectorCentrality<N, E>(
   graph: Graph<N, E>,
@@ -401,6 +435,7 @@ export function getEigenvectorCentrality<N, E>(
   let converged = false;
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    throwIfAborted(options?.signal);
     // Start from `current` (the implicit +I) so bipartite graphs converge.
     const next = Float64Array.from(current);
     for (let w = 0; w < n; w++) {
@@ -446,6 +481,9 @@ export function getEigenvectorCentrality<N, E>(
  * Converges only when `alpha` is below the reciprocal of the largest
  * eigenvalue of the adjacency matrix; throws when the iteration has not
  * converged (L1 error < `n × tolerance`) within `maxIterations`.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per iteration
+ * and throws `signal.reason`.
  */
 export function getKatzCentrality<N, E>(
   graph: Graph<N, E>,
@@ -467,6 +505,7 @@ export function getKatzCentrality<N, E>(
   let converged = false;
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
+    throwIfAborted(options?.signal);
     const next = new Float64Array(n).fill(beta);
     for (let w = 0; w < n; w++) {
       for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {

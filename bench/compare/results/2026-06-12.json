@@ -1,4 +1,46 @@
 {
+  "env": {
+    "date": "2026-06-12T01:02:37.434Z",
+    "node": "v25.9.0",
+    "os": "darwin/arm64",
+    "cpu": "Apple M1 Max",
+    "cores": 10
+  },
+  "libs": [
+    "@statelyai/graph",
+    "graphology",
+    "ngraph",
+    "@dagrejs/graphlib",
+    "cytoscape (headless)"
+  ],
+  "libVersions": {
+    "@statelyai/graph": "2.1.0",
+    "graphology": "0.26.0",
+    "ngraph": "20.1.2",
+    "@dagrejs/graphlib": "4.0.1",
+    "cytoscape (headless)": "3.34.0"
+  },
+  "sizes": [
+    1000,
+    10000,
+    100000
+  ],
+  "shapes": [
+    "random",
+    "scaleFree",
+    "grid",
+    "layeredDag"
+  ],
+  "workloads": [
+    "build",
+    "bfs",
+    "sssp",
+    "pagerank",
+    "components",
+    "betweenness",
+    "degreeSweep"
+  ],
+  "slowSkipMs": 10000,
   "cells": [
     {
       "lib": "@statelyai/graph",

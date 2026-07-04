@@ -542,4 +542,91 @@ describe('edge label escaping', () => {
     const g = fromMermaidFlowchart('flowchart TD\n    a -->|x#124;y| b');
     expect(g.edges[0].label).toBe('x|y');
   });
+
+  describe('round-trip fidelity', () => {
+    const FIXTURE = `%%{init: {"theme":"forest","flowchart":{"curve":"basis"}}}%%
+flowchart LR
+    A[Start] -->|go| B{Choice}
+    B -->|yes| C[Done]
+    B -->|no| A
+    linkStyle 0 stroke:#f00,stroke-width:4px
+    linkStyle 1,2 stroke:#0f0
+    linkStyle default stroke:#333
+    click A href "https://example.com" "Open" _blank
+    click C call handleDone() "Finish"`;
+
+    it('preserves %%{init}%% directives across round-trip', () => {
+      const g = fromMermaidFlowchart(FIXTURE);
+      expect(g.data.init).toEqual({
+        theme: 'forest',
+        flowchart: { curve: 'basis' },
+      });
+      const out = toMermaidFlowchart(g);
+      expect(out.split('\n')[0]).toBe(
+        '%%{init: {"theme":"forest","flowchart":{"curve":"basis"}}}%%',
+      );
+      const g2 = fromMermaidFlowchart(out);
+      expect(g2.data.init).toEqual(g.data.init);
+    });
+
+    it('preserves href and callback click handlers structurally', () => {
+      const g = fromMermaidFlowchart(FIXTURE);
+      const a = g.nodes.find((n) => n.id === 'A')!;
+      expect(a.data.click).toEqual({
+        kind: 'href',
+        target: 'https://example.com',
+        tooltip: 'Open',
+        linkTarget: '_blank',
+      });
+      const c = g.nodes.find((n) => n.id === 'C')!;
+      expect(c.data.click).toEqual({
+        kind: 'callback',
+        target: 'handleDone()',
+        explicitCall: true,
+        tooltip: 'Finish',
+      });
+      const out = toMermaidFlowchart(g);
+      expect(out).toContain('click A href "https://example.com" "Open" _blank');
+      expect(out).toContain('click C call handleDone() "Finish"');
+    });
+
+    it('stores linkStyle on the edge, not a positional index', () => {
+      const g = fromMermaidFlowchart(FIXTURE);
+      expect(g.edges[0].data.linkStyle).toEqual({
+        stroke: '#f00',
+        'stroke-width': '4px',
+      });
+      expect(g.edges[1].data.linkStyle).toEqual({ stroke: '#0f0' });
+      expect(g.data.defaultLinkStyle).toEqual({ stroke: '#333' });
+    });
+
+    it('recomputes linkStyle indices after edge reorder (mutation-robust)', () => {
+      const g = fromMermaidFlowchart(FIXTURE);
+      // Reverse edges: the styled edge moves from index 0 to index 2.
+      g.edges.reverse();
+      const out = toMermaidFlowchart(g);
+      const g2 = fromMermaidFlowchart(out);
+      // Style stays attached to the same logical edge (A->B, labeled "go").
+      const styled = g2.edges.find(
+        (e) => e.sourceId === 'A' && e.targetId === 'B',
+      )!;
+      expect(styled.data.linkStyle).toEqual({
+        stroke: '#f00',
+        'stroke-width': '4px',
+      });
+    });
+
+    it('is stable under parse → emit → parse', () => {
+      const g1 = fromMermaidFlowchart(FIXTURE);
+      const g2 = fromMermaidFlowchart(toMermaidFlowchart(g1));
+      expect(g2.data.init).toEqual(g1.data.init);
+      expect(g2.data.defaultLinkStyle).toEqual(g1.data.defaultLinkStyle);
+      expect(g2.nodes.map((n) => n.data.click)).toEqual(
+        g1.nodes.map((n) => n.data.click),
+      );
+      expect(g2.edges.map((e) => e.data.linkStyle)).toEqual(
+        g1.edges.map((e) => e.data.linkStyle),
+      );
+    });
+  });
 });

@@ -42,6 +42,7 @@
     "./mermaid": "./dist/formats/mermaid/index.mjs",
     "./tgf": "./dist/formats/tgf/index.mjs",
     "./xyflow": "./dist/formats/xyflow/index.mjs",
+    "./kernel": "./dist/kernel.mjs",
     "./layout": "./dist/layout/index.mjs",
     "./layout/cytoscape": "./dist/layout/cytoscape.mjs",
     "./layout/d3-force": "./dist/layout/d3-force.mjs",
@@ -79,7 +80,9 @@
     "version": "changeset version",
     "release": "pnpm run build && changeset publish",
     "prepublishOnly": "pnpm run build",
-    "bench:compare": "tsx bench/compare/run.ts"
+    "bench:compare": "tsx bench/compare/run.ts",
+    "bench:compare:quick": "tsx bench/compare/run.ts --quick",
+    "bench:report": "tsx bench/compare/report.ts"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",

@@ -1,10 +1,16 @@
 import type { Graph, GraphEdge, GraphNode } from '../types';
 import { getIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
+import { throwIfAborted } from './abort';
 
 export interface IsomorphismOptions<N = any, E = any> {
   nodeMatch?: (a: GraphNode<N>, b: GraphNode<N>) => boolean;
   edgeMatch?: (a: GraphEdge<E>, b: GraphEdge<E>) => boolean;
+  /**
+   * Abort signal, checked once per backtracking step (candidate mapping
+   * position). Throws `signal.reason`.
+   */
+  signal?: AbortSignal;
 }
 
 function getDegreeSignature(graph: Graph, nodeId: string): string {
@@ -82,6 +88,9 @@ function edgesAreCompatible<E>(
  *
  * Optional `nodeMatch` and `edgeMatch` predicates can refine the match using
  * node and edge payloads.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per backtracking
+ * step and throws `signal.reason`.
  */
 export function isIsomorphic<N, E>(
   graphA: Graph<N, E>,
@@ -115,7 +124,9 @@ export function isIsomorphic<N, E>(
   const mapping = new Map<string, string>();
   const usedB = new Set<string>();
 
+  const signal = options?.signal;
   const backtrack = (index: number): boolean => {
+    throwIfAborted(signal);
     if (index >= nodesA.length) {
       return true;
     }

@@ -19,6 +19,7 @@ import {
   resolveFrom,
 } from './shared';
 import { getCSR } from './csr';
+import { throwIfAborted } from './abort';
 
 /**
  * Flat binary min-heap of `(distance, node position)` entries in parallel
@@ -964,44 +965,54 @@ function* genCyclesMixed<N, E>(
   }
 }
 
+/**
+ * Yields every shortest path between all ordered pairs of nodes, lazily.
+ *
+ * "Every" includes ties: graphs with many equal-weight paths (grids are the
+ * extreme case) can have combinatorially many shortest paths per pair.
+ * Consume this generator with early exit for such graphs, or use
+ * {@link getShortestPath} per pair when one path per pair is enough.
+ *
+ * Pass `opts.signal` to cancel: the abort is checked once per source node
+ * (dijkstra/bellman-ford) or per intermediate node `k` (floyd-warshall), and
+ * throws `signal.reason`.
+ */
+export function* genAllPairsShortestPaths<N, E>(
+  graph: Graph<N, E>,
+  opts?: AllPairsShortestPathsOptions<E>,
+): Generator<GraphPath<N, E>> {
+  const algorithm = opts?.algorithm ?? 'dijkstra';
+  if (algorithm === 'floyd-warshall') {
+    yield* floydWarshallAllPaths(graph, opts?.getWeight, opts?.signal);
+    return;
+  }
+  for (const node of graph.nodes) {
+    throwIfAborted(opts?.signal);
+    yield* genShortestPaths(graph, {
+      from: node.id,
+      getWeight: opts?.getWeight,
+      ...(algorithm === 'bellman-ford' ? { algorithm } : {}),
+    });
+  }
+}
+
+/**
+ * Returns every shortest path between all ordered pairs of nodes.
+ *
+ * Materializes {@link genAllPairsShortestPaths} — see its caveat about
+ * tie-heavy graphs before calling this on grid-like topologies.
+ *
+ * Pass `opts.signal` to cancel: the abort is checked once per source node
+ * (dijkstra/bellman-ford) or per intermediate node `k` (floyd-warshall), and
+ * throws `signal.reason`.
+ */
 export function getAllPairsShortestPaths<N, E>(
   graph: Graph<N, E>,
   opts?: AllPairsShortestPathsOptions<E>,
 ): GraphPath<N, E>[] {
-  const algorithm = opts?.algorithm ?? 'dijkstra';
-  if (algorithm === 'floyd-warshall') {
-    return floydWarshallAllPaths(graph, opts?.getWeight);
-  }
-  if (algorithm === 'bellman-ford') {
-    return bellmanFordAllPaths(graph, opts?.getWeight);
-  }
-  return dijkstraAllPaths(graph, opts?.getWeight);
-}
-
-function bellmanFordAllPaths<N, E>(
-  graph: Graph<N, E>,
-  getWeight?: (edge: GraphEdge<E>) => number,
-): GraphPath<N, E>[] {
   const results: GraphPath<N, E>[] = [];
-  for (const node of graph.nodes) {
-    results.push(
-      ...getShortestPaths(graph, {
-        from: node.id,
-        getWeight,
-        algorithm: 'bellman-ford',
-      }),
-    );
-  }
-  return results;
-}
-
-function dijkstraAllPaths<N, E>(
-  graph: Graph<N, E>,
-  getWeight?: (edge: GraphEdge<E>) => number,
-): GraphPath<N, E>[] {
-  const results: GraphPath<N, E>[] = [];
-  for (const node of graph.nodes) {
-    results.push(...getShortestPaths(graph, { from: node.id, getWeight }));
+  for (const path of genAllPairsShortestPaths(graph, opts)) {
+    results.push(path);
   }
   return results;
 }
@@ -1009,6 +1020,7 @@ function dijkstraAllPaths<N, E>(
 function floydWarshallAllPaths<N, E>(
   graph: Graph<N, E>,
   getWeight?: (edge: GraphEdge<E>) => number,
+  signal?: AbortSignal,
 ): GraphPath<N, E>[] {
   const idx = getIndex(graph);
   const weight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
@@ -1051,6 +1063,7 @@ function floydWarshallAllPaths<N, E>(
   }
 
   for (let k = 0; k < nodeCount; k++) {
+    throwIfAborted(signal);
     for (let i = 0; i < nodeCount; i++) {
       for (let j = 0; j < nodeCount; j++) {
         if (dist[i][k] === INF || dist[k][j] === INF) continue;
