@@ -251,6 +251,23 @@ export function getPatches<N, E>(
 }
 
 /**
+ * Return a graph copy with patches applied in order.
+ * Unchanged nodes and edges are structurally shared with `graph`.
+ */
+export function getPatchedGraph<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  patches: GraphPatch<N, E>[],
+): Graph<N, E, G, P> {
+  const next: Graph<N, E, G, P> = {
+    ...graph,
+    nodes: [...graph.nodes],
+    edges: [...graph.edges],
+  };
+  updateGraphWithPatches(next, patches);
+  return next;
+}
+
+/**
  * **Mutable.** Apply patches to a graph in order.
  * Delegates to addNode/deleteNode/updateNode/addEdge/deleteEdge/updateEdge.
  *

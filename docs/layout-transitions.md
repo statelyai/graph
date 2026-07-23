@@ -51,7 +51,7 @@ From the `genLayoutTransition` JSDoc: *"Edge routes are not interpolated — fra
 
 ## Diff-driven transitions
 
-Layouts are plain graphs, so `getPatches` / `updateGraphWithPatches` (from `@statelyai/graph`) work on them directly. A patch set between two layouts tells you exactly which nodes moved — e.g. to skip tweening unmoved nodes:
+Layouts are plain graphs, so `getPatches` plus either immutable `getPatchedGraph` or mutable `updateGraphWithPatches` (from `@statelyai/graph`) work on them directly. A patch set between two layouts tells you exactly which nodes moved — e.g. to skip tweening unmoved nodes:
 
 ```ts
 import { getPatches } from '@statelyai/graph';
@@ -72,7 +72,7 @@ for (const frame of genLayoutTransition(before, after)) {
 }
 ```
 
-And because patches are first-class data, undo/redo falls out for free: keep the patch sets (or use `getDiff` + `getInvertedDiff`) and `updateGraphWithPatches` to step layout history in either direction.
+And because patches are first-class data, undo/redo falls out for free: keep the patch sets (or use `getDiff` + `getInvertedDiff`) and use `getPatchedGraph` or `updateGraphWithPatches` to step layout history in either direction.
 
 ## Physics handoff: the "tidy up" button
 

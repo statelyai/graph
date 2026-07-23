@@ -23,7 +23,7 @@ pnpm verify
 
 ## Project Layout
 
-- `src/graph.ts` - graph factories, lookups, and mutations
+- `src/graph.ts` - graph factories, lookups, and mutable/immutable updates
 - `src/queries.ts` - neighborhood, hierarchy, degree, and port queries
 - `src/algorithms.ts` - traversal, paths, components, cycles, ordering, MST
 - `src/transforms.ts` - flattening and graph transforms
@@ -42,12 +42,13 @@ This package is intentionally plain:
 - `graph` is always the first parameter, except for `create*` factories
 - Collection queries return `[]` when empty
 - Mutations happen in place and should be documented with `/** **Mutable.** */`
+- Applicable mutations have `get*` counterparts that return updated graph copies
 
 ### Function Naming
 
 All functions use a prefix:
 
-- `get*` - lookup/query returning a value, array, or `undefined`
+- `get*` - lookup/query/derived copy returning a value, array, or `undefined`
 - `gen*` - generator-based query
 - `is*` / `has*` - boolean checks
 - `create*` - factories

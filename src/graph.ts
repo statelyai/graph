@@ -929,6 +929,123 @@ export function updateEntities<N, E>(
   }
 }
 
+// Immutable operations — return a graph copy and leave the input untouched
+
+function getGraphMutationCopy<N, E, G, P>(
+  graph: Graph<N, E, G, P>,
+): Graph<N, E, G, P> {
+  return {
+    ...graph,
+    nodes: [...graph.nodes],
+    edges: [...graph.edges],
+  };
+}
+
+/** Return a graph copy with a node added. */
+export function getGraphWithNode<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  config: NodeConfig<N, P>,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  addNode(next, config);
+  return next;
+}
+
+/** Return a graph copy with an edge added. */
+export function getGraphWithEdge<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  config: EdgeConfig<E>,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  addEdge(next, config);
+  return next;
+}
+
+/** Return a graph copy without a node and its connected edges. */
+export function getGraphWithoutNode<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  id: string,
+  opts?: DeleteNodeOptions,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  if (opts?.reparent) {
+    next.nodes = graph.nodes.map((node) => ({ ...node }));
+  }
+  deleteNode(next, id, opts);
+  return next;
+}
+
+/** Return a graph copy without an edge. */
+export function getGraphWithoutEdge<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  id: string,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  deleteEdge(next, id);
+  return next;
+}
+
+/** Return a graph copy with a node updated. */
+export function getGraphWithUpdatedNode<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  id: string,
+  update: NodeUpdate<N, P>,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  updateNode(next, id, update);
+  return next;
+}
+
+/** Return a graph copy with an edge updated. */
+export function getGraphWithUpdatedEdge<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  id: string,
+  update: EdgeUpdate<E>,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  updateEdge(next, id, update);
+  return next;
+}
+
+/** Return a graph copy with multiple nodes and edges added. */
+export function getGraphWithEntities<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  entities: EntitiesConfig<N, E, P>,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  addEntities(next, entities);
+  return next;
+}
+
+/** Return a graph copy without the identified nodes and edges. */
+export function getGraphWithoutEntities<N = any, E = any, G = any, P = any>(
+  graph: Graph<N, E, G, P>,
+  ids: string | string[],
+  opts?: DeleteNodeOptions,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  if (opts?.reparent) {
+    next.nodes = graph.nodes.map((node) => ({ ...node }));
+  }
+  deleteEntities(next, ids, opts);
+  return next;
+}
+
+/** Return a graph copy with multiple nodes and edges updated. */
+export function getGraphWithUpdatedEntities<
+  N = any,
+  E = any,
+  G = any,
+  P = any,
+>(
+  graph: Graph<N, E, G, P>,
+  updates: EntitiesUpdate<N, E, P>,
+): Graph<N, E, G, P> {
+  const next = getGraphMutationCopy(graph);
+  updateEntities(next, updates);
+  return next;
+}
+
 // Class wrapper
 
 /**

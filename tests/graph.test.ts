@@ -15,6 +15,15 @@ import {
   addEntities,
   deleteEntities,
   updateEntities,
+  getGraphWithNode,
+  getGraphWithEdge,
+  getGraphWithoutNode,
+  getGraphWithoutEdge,
+  getGraphWithUpdatedNode,
+  getGraphWithUpdatedEdge,
+  getGraphWithEntities,
+  getGraphWithoutEntities,
+  getGraphWithUpdatedEntities,
   GraphInstance,
 } from '../src/graph';
 
@@ -146,6 +155,89 @@ describe('Lookup helpers', () => {
     expect(hasNode(g, 'a')).toBe(true);
     expect(hasNode(g, 'b')).toBe(false);
     expect(hasEdge(g, 'e1')).toBe(false);
+  });
+});
+
+describe('Immutable graph operations', () => {
+  it('adds nodes and edges without mutating the source', () => {
+    const source = createGraph({ nodes: [{ id: 'a' }] });
+    const withNode = getGraphWithNode(source, { id: 'b' });
+    const withEdge = getGraphWithEdge(withNode, {
+      id: 'e1',
+      sourceId: 'a',
+      targetId: 'b',
+    });
+
+    expect(source.nodes.map((node) => node.id)).toEqual(['a']);
+    expect(source.edges).toEqual([]);
+    expect(withNode.nodes.map((node) => node.id)).toEqual(['a', 'b']);
+    expect(withNode.edges).toEqual([]);
+    expect(withEdge.edges.map((edge) => edge.id)).toEqual(['e1']);
+    expect(withNode.nodes[0]).toBe(source.nodes[0]);
+  });
+
+  it('deletes nodes and edges without mutating the source', () => {
+    const source = createGraph({
+      nodes: [
+        { id: 'parent' },
+        { id: 'child', parentId: 'parent' },
+        { id: 'other' },
+      ],
+      edges: [{ id: 'e1', sourceId: 'child', targetId: 'other' }],
+    });
+    const withoutParent = getGraphWithoutNode(source, 'parent', {
+      reparent: true,
+    });
+    const withoutEdge = getGraphWithoutEdge(source, 'e1');
+
+    expect(source.nodes.map((node) => [node.id, node.parentId])).toEqual([
+      ['parent', undefined],
+      ['child', 'parent'],
+      ['other', undefined],
+    ]);
+    expect(source.edges).toHaveLength(1);
+    expect(withoutParent.nodes.map((node) => [node.id, node.parentId])).toEqual([
+      ['child', undefined],
+      ['other', undefined],
+    ]);
+    expect(withoutEdge.edges).toEqual([]);
+  });
+
+  it('updates nodes and edges without mutating the source', () => {
+    const source = createGraph({
+      nodes: [{ id: 'a', label: 'A' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b', label: 'E' }],
+    });
+    const withNodeUpdate = getGraphWithUpdatedNode(source, 'a', {
+      label: 'updated',
+    });
+    const withEdgeUpdate = getGraphWithUpdatedEdge(source, 'e1', {
+      label: 'updated',
+    });
+
+    expect(source.nodes[0].label).toBe('A');
+    expect(source.edges[0].label).toBe('E');
+    expect(withNodeUpdate.nodes[0].label).toBe('updated');
+    expect(withEdgeUpdate.edges[0].label).toBe('updated');
+    expect(withNodeUpdate.nodes[1]).toBe(source.nodes[1]);
+  });
+
+  it('supports immutable batch operations', () => {
+    const source = createGraph({
+      nodes: [{ id: 'a', label: 'A' }, { id: 'b' }],
+      edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
+    });
+    const added = getGraphWithEntities(source, { nodes: [{ id: 'c' }] });
+    const deleted = getGraphWithoutEntities(source, ['b']);
+    const updated = getGraphWithUpdatedEntities(source, {
+      nodes: [{ id: 'a', label: 'updated' }],
+    });
+
+    expect(source.nodes.map((node) => node.id)).toEqual(['a', 'b']);
+    expect(added.nodes.map((node) => node.id)).toEqual(['a', 'b', 'c']);
+    expect(deleted.nodes.map((node) => node.id)).toEqual(['a']);
+    expect(deleted.edges).toEqual([]);
+    expect(updated.nodes[0].label).toBe('updated');
   });
 });
 

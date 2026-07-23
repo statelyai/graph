@@ -5,6 +5,7 @@ import {
   isEmptyDiff,
   getInvertedDiff,
   getPatches,
+  getPatchedGraph,
   updateGraphWithPatches,
   toPatches,
   toDiff,
@@ -238,6 +239,37 @@ describe('updateGraphWithPatches', () => {
 
     expect(a.nodes).toHaveLength(0);
     expect(a.edges).toHaveLength(0);
+  });
+});
+
+describe('getPatchedGraph', () => {
+  it('applies patches without mutating the source graph', () => {
+    const source = makeGraphA();
+    const target = makeGraphB();
+    const result = getPatchedGraph(source, getPatches(source, target));
+
+    expect(isEmptyDiff(getDiff(result, target))).toBe(true);
+    expect(source.nodes.map((node) => node.id)).toEqual(['a', 'b', 'c']);
+    expect(source.edges.map((edge) => edge.id)).toEqual(['e1', 'e2']);
+    expect(result.nodes.find((node) => node.id === 'c')).toBe(
+      source.nodes.find((node) => node.id === 'c'),
+    );
+  });
+
+  it('leaves the source untouched when a patch fails', () => {
+    const source = createGraph({ nodes: [{ id: 'a' }] });
+
+    expect(() =>
+      getPatchedGraph(source, [
+        { op: 'addNode', node: { id: 'b' } },
+        {
+          op: 'addEdge',
+          edge: { id: 'e1', sourceId: 'b', targetId: 'missing' },
+        },
+      ]),
+    ).toThrow('Target node "missing" does not exist');
+    expect(source.nodes.map((node) => node.id)).toEqual(['a']);
+    expect(source.edges).toEqual([]);
   });
 });
 

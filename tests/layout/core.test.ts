@@ -5,8 +5,11 @@ import {
   applyLayoutFrame,
   centerGraph,
   genLayoutTransition,
+  getCenteredGraph,
+  getGraphWithLayoutFrame,
   getLayoutBounds,
   getNodeSize,
+  getTranslatedGraph,
   translateGraph,
 } from '../../src/layout';
 
@@ -43,6 +46,20 @@ describe('applyLayoutFrame', () => {
     });
     expect(g.nodes[0]).toMatchObject({ x: 10, y: 20 });
     expect(g.nodes[1]).toMatchObject({ x: 2, y: 2 });
+  });
+
+  it('has an immutable counterpart', () => {
+    const source = createGraph({
+      nodes: [{ id: 'a', x: 1, y: 1 }, { id: 'b', x: 2, y: 2 }],
+    });
+    const result = getGraphWithLayoutFrame(source, {
+      positions: { a: { x: 10, y: 20 } },
+      alpha: 0.5,
+    });
+
+    expect(source.nodes[0]).toMatchObject({ x: 1, y: 1 });
+    expect(result.nodes[0]).toMatchObject({ x: 10, y: 20 });
+    expect(result.nodes[1]).toBe(source.nodes[1]);
   });
 });
 
@@ -173,6 +190,26 @@ describe('translateGraph', () => {
     ]);
   });
 
+  it('has an immutable counterpart', () => {
+    const source = createGraph({
+      nodes: [{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 10, y: 10 }],
+      edges: [
+        {
+          id: 'e1',
+          sourceId: 'a',
+          targetId: 'b',
+          points: [{ x: 0, y: 0 }],
+        },
+      ],
+    });
+    const result = getTranslatedGraph(source, 5, 7);
+
+    expect(source.nodes[0]).toMatchObject({ x: 0, y: 0 });
+    expect(source.edges[0].points).toEqual([{ x: 0, y: 0 }]);
+    expect(result.nodes[0]).toMatchObject({ x: 5, y: 7 });
+    expect(result.edges[0].points).toEqual([{ x: 5, y: 7 }]);
+  });
+
   it('leaves parent-relative children and nested-edge geometry alone', () => {
     const g = createGraph({
       nodes: [
@@ -220,5 +257,20 @@ describe('centerGraph', () => {
     const g = createGraph({ nodes: [{ id: 'a' }] });
     centerGraph(g, { x: 0, y: 0, width: 500, height: 300 });
     expect(g.nodes[0].x).toBeUndefined();
+  });
+
+  it('has an immutable counterpart', () => {
+    const source = createGraph({
+      nodes: [{ id: 'a', x: 0, y: 0, width: 10, height: 10 }],
+    });
+    const result = getCenteredGraph(source, {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+    });
+
+    expect(source.nodes[0]).toMatchObject({ x: 0, y: 0 });
+    expect(result.nodes[0]).toMatchObject({ x: 45, y: 45 });
   });
 });

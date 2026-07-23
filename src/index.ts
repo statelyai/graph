@@ -81,6 +81,19 @@ export {
   hasEdge,
 } from './graph';
 
+// Immutable operations
+export {
+  getGraphWithNode,
+  getGraphWithEdge,
+  getGraphWithoutNode,
+  getGraphWithoutEdge,
+  getGraphWithUpdatedNode,
+  getGraphWithUpdatedEdge,
+  getGraphWithEntities,
+  getGraphWithoutEntities,
+  getGraphWithUpdatedEntities,
+} from './graph';
+
 // Mutable single operations
 export {
   addNode,
@@ -230,6 +243,7 @@ export {
   getInvertedDiff,
   invertDiff,
   getPatches,
+  getPatchedGraph,
   updateGraphWithPatches,
   applyPatches,
   toPatches,

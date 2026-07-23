@@ -13,7 +13,7 @@
 | WebCola | `@statelyai/graph/layout/webcola` | `getColaLayout` | sync | `webcola` | constraint-based, overlap-free |
 | Cytoscape | `@statelyai/graph/layout/cytoscape` | `getCytoscapeLayout` | async | `cytoscape` | the cytoscape layout ecosystem |
 
-Shared utilities and types live on `@statelyai/graph/layout`: `LayoutOptions`, `LayoutConstraints`, `LayoutFn`, `IterativeLayoutFn`, `LayoutFrame`, `DEFAULT_NODE_SIZE`, `getNodeSize`, `applyLayoutFrame`, `getLayoutBounds`, `genLayoutTransition`, `translateGraph`, `centerGraph`.
+Shared utilities and types live on `@statelyai/graph/layout`: `LayoutOptions`, `LayoutConstraints`, `LayoutFn`, `IterativeLayoutFn`, `LayoutFrame`, `DEFAULT_NODE_SIZE`, `getNodeSize`, `applyLayoutFrame`, `getGraphWithLayoutFrame`, `getLayoutBounds`, `genLayoutTransition`, `translateGraph`, `getTranslatedGraph`, `centerGraph`, `getCenteredGraph`.
 
 ## The contract
 
@@ -108,7 +108,7 @@ function tick() {
 requestAnimationFrame(tick);
 ```
 
-`applyLayoutFrame` writes positions onto the graph in place; positions are non-structural, so no `invalidateIndex()` is needed and it's cheap enough for per-frame use. Nodes absent from a frame are left untouched. `getForceLayout` runs the same generator to completion when you don't need animation.
+`applyLayoutFrame` writes positions onto the graph in place; positions are non-structural, so no `invalidateIndex()` is needed and it's cheap enough for per-frame use. `getGraphWithLayoutFrame` returns an updated graph instead. Nodes absent from a frame are left untouched. `getForceLayout` runs the same generator to completion when you don't need animation.
 
 ## Geometry utilities
 
@@ -123,7 +123,11 @@ svg.setAttribute('viewBox', `${b.x} ${b.y} ${b.width} ${b.height}`);
 
 **`translateGraph(graph, dx, dy)`** — mutable shift of node positions, edge `points`, and edge label rects. It is **hierarchy-aware**: children (`parentId` set) use parent-relative coordinates (the ELK/xyflow convention), so only top-level nodes are shifted — children ride along with their parents. Likewise an edge's geometry is shifted only when its containing coordinate system is the root (the LCA of its endpoints is no node).
 
+**`getTranslatedGraph(graph, dx, dy)`** — immutable counterpart returning the shifted graph.
+
 **`centerGraph(graph, rect)`** — translate in place so the layout bounds' center coincides with `rect`'s center; no-op for graphs without geometry.
+
+**`getCenteredGraph(graph, rect)`** — immutable counterpart returning the centered graph.
 
 ```ts
 import { centerGraph } from '@statelyai/graph/layout';

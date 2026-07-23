@@ -147,6 +147,23 @@ export function applyLayoutFrame(graph: Graph, frame: LayoutFrame): void {
   }
 }
 
+/** Return a graph copy with a {@link LayoutFrame}'s positions applied. */
+export function getGraphWithLayoutFrame<TGraph extends Graph>(
+  graph: TGraph,
+  frame: LayoutFrame,
+): TGraph {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((node) => {
+      const position = frame.positions[node.id];
+      return position === undefined
+        ? node
+        : { ...node, x: position.x, y: position.y };
+    }),
+    edges: [...graph.edges],
+  } as TGraph;
+}
+
 /**
  * Bounding rect of all positioned nodes (and edge route points, when
  * present). Returns a zero rect for graphs with no geometry.
@@ -276,6 +293,32 @@ export function translateGraph(graph: Graph, dx: number, dy: number): void {
   }
 }
 
+/** Return a graph copy with its root geometry shifted by `(dx, dy)`. */
+export function getTranslatedGraph<TGraph extends Graph>(
+  graph: TGraph,
+  dx: number,
+  dy: number,
+): TGraph {
+  const next = {
+    ...graph,
+    nodes: graph.nodes.map((node) =>
+      node.parentId == null ? { ...node } : node,
+    ),
+    edges: graph.edges.map((edge) =>
+      getLCA(graph, edge.sourceId, edge.targetId) === undefined
+        ? {
+            ...edge,
+            ...(edge.points !== undefined && {
+              points: edge.points.map((point) => ({ ...point })),
+            }),
+          }
+        : edge,
+    ),
+  } as TGraph;
+  translateGraph(next, dx, dy);
+  return next;
+}
+
 /**
  * **Mutable.** Translate the graph in place so its {@link getLayoutBounds}
  * center coincides with `rect`'s center — e.g. center a fresh layout in the
@@ -291,4 +334,15 @@ export function centerGraph(graph: Graph, rect: EntityRect): void {
   const dx = rect.x + rect.width / 2 - (bounds.x + bounds.width / 2);
   const dy = rect.y + rect.height / 2 - (bounds.y + bounds.height / 2);
   translateGraph(graph, dx, dy);
+}
+
+/** Return a graph copy centered within `rect`. */
+export function getCenteredGraph<TGraph extends Graph>(
+  graph: TGraph,
+  rect: EntityRect,
+): TGraph {
+  const bounds = getLayoutBounds(graph);
+  const dx = rect.x + rect.width / 2 - (bounds.x + bounds.width / 2);
+  const dy = rect.y + rect.height / 2 - (bounds.y + bounds.height / 2);
+  return getTranslatedGraph(graph, dx, dy);
 }
