@@ -214,6 +214,33 @@ describe('isTree', () => {
 // getShortestPaths
 
 describe('getShortestPaths', () => {
+  it('fans out from every node matching a source predicate', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'a', data: { entry: true } },
+        { id: 'b', data: { entry: true } },
+        { id: 'c', data: { entry: false } },
+      ],
+      edges: [
+        { id: 'ac', sourceId: 'a', targetId: 'c' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+
+    const paths = getShortestPaths(g, {
+      from: (node) => node.data.entry,
+      to: 'c',
+    });
+
+    expect(paths.map((path) => path.source.id)).toEqual(['a', 'b']);
+  });
+
+  it('returns no paths when a source predicate matches nothing', () => {
+    expect(
+      getShortestPaths(makeDAG(), { from: () => false, to: 'd' }),
+    ).toEqual([]);
+  });
+
   it('linear chain: returns paths to each node with increasing weight', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
@@ -587,6 +614,29 @@ describe('getSimplePaths', () => {
 });
 
 describe('genSimplePaths', () => {
+  it('fans out lazily from every node matching a source predicate', () => {
+    const graph = createGraph({
+      nodes: [
+        { id: 'a', data: 'entry' },
+        { id: 'b', data: 'entry' },
+        { id: 'c', data: 'target' },
+      ],
+      edges: [
+        { id: 'ac', sourceId: 'a', targetId: 'c' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+
+    const paths = [
+      ...genSimplePaths(graph, {
+        from: (node) => node.data === 'entry',
+        to: 'c',
+      }),
+    ];
+
+    expect(paths.map((path) => path.source.id)).toEqual(['a', 'b']);
+  });
+
   it('yields the first path lazily without enumerating all paths', () => {
     // Chain of 30 diamond gadgets → 2^30 simple paths. Eager enumeration
     // would never finish; a lazy generator yields the first path instantly.
@@ -619,6 +669,49 @@ describe('genSimplePaths', () => {
 });
 
 describe('single-target shortest path early exit', () => {
+  it('chooses the globally shortest predicate-matched source', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'far', data: { entry: true } },
+        { id: 'near', data: { entry: true } },
+        { id: 'middle', data: { entry: false } },
+        { id: 'target', data: { entry: false } },
+      ],
+      edges: [
+        { id: 'far-middle', sourceId: 'far', targetId: 'middle', weight: 1 },
+        { id: 'middle-target', sourceId: 'middle', targetId: 'target', weight: 1 },
+        { id: 'near-target', sourceId: 'near', targetId: 'target', weight: 1 },
+      ],
+    });
+
+    const path = getShortestPath(g, {
+      from: (node) => node.data.entry,
+      to: 'target',
+    });
+
+    expect(path?.source.id).toBe('near');
+    expect(path?.steps.map((step) => step.edge.id)).toEqual(['near-target']);
+  });
+
+  it('breaks equal predicate-source ties by graph order', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'first', data: true },
+        { id: 'second', data: true },
+        { id: 'target', data: false },
+      ],
+      edges: [
+        { id: 'first-target', sourceId: 'first', targetId: 'target' },
+        { id: 'second-target', sourceId: 'second', targetId: 'target' },
+      ],
+    });
+
+    expect(
+      getShortestPath(g, { from: (node) => node.data, to: 'target' })?.source
+        .id,
+    ).toBe('first');
+  });
+
   it('returns the same path and distance as a full search', () => {
     const g = createGraph({
       nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id })),

@@ -17,6 +17,7 @@ import {
   getNeighborEdgesAll,
   getNeighborIds,
   resolveFrom,
+  resolveFromIds,
 } from './shared';
 import { getCSR } from './csr';
 import { throwIfAborted } from './abort';
@@ -403,9 +404,18 @@ function* reconstructPathsAt<N, E>(
 
 export function* genShortestPaths<N, E>(
   graph: Graph<N, E>,
-  opts?: PathOptions<E>,
+  opts?: PathOptions<E, N>,
 ): Generator<GraphPath<N, E>> {
-  const sourceId = resolveFrom(graph, opts);
+  for (const sourceId of resolveFromIds(graph, opts?.from)) {
+    yield* genShortestPathsFrom(graph, sourceId, opts);
+  }
+}
+
+function* genShortestPathsFrom<N, E>(
+  graph: Graph<N, E>,
+  sourceId: string,
+  opts?: PathOptions<E, N>,
+): Generator<GraphPath<N, E>> {
   const { source, distArr, prevArr, stopDistance } = computeShortestDistances(
     graph,
     sourceId,
@@ -457,20 +467,41 @@ export function* genShortestPaths<N, E>(
 
 export function getShortestPaths<N, E>(
   graph: Graph<N, E>,
-  opts?: PathOptions<E>,
+  opts?: PathOptions<E, N>,
 ): GraphPath<N, E>[] {
   return [...genShortestPaths(graph, opts)];
 }
 
 export function getShortestPath<N, E>(
   graph: Graph<N, E>,
-  opts: SinglePathOptions<E>,
+  opts: SinglePathOptions<E, N>,
 ): GraphPath<N, E> | undefined {
+  if (typeof opts.from === 'function') {
+    let best: GraphPath<N, E> | undefined;
+    let bestWeight = Infinity;
+    const getWeight = opts.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+    for (const sourceId of resolveFromIds(graph, opts.from)) {
+      const candidate = getShortestPath(graph, { ...opts, from: sourceId });
+      if (!candidate) continue;
+      const weight = candidate.steps.reduce(
+        (total, step) => total + getWeight(step.edge),
+        0,
+      );
+      if (weight < bestWeight) {
+        best = candidate;
+        bestWeight = weight;
+      }
+    }
+    return best;
+  }
   // Single-pair queries use bidirectional Dijkstra — on random/small-world
   // graphs the two half-balls meet long before a unidirectional search would
   // reach the target. Bellman-Ford (negative weights) keeps the full search.
   if (opts.algorithm !== 'bellman-ford') {
-    const sourceId = resolveFrom(graph, opts);
+    const sourceId = resolveFrom(
+      graph,
+      typeof opts.from === 'string' ? { from: opts.from } : undefined,
+    );
     return bidirectionalShortestPath(graph, sourceId, opts.to, opts.getWeight);
   }
   for (const path of genShortestPaths(graph, opts)) {
@@ -667,17 +698,26 @@ function bidirectionalShortestPath<N, E>(
 
 export function getSimplePaths<N, E>(
   graph: Graph<N, E>,
-  opts?: PathOptions<E>,
+  opts?: PathOptions<E, N>,
 ): GraphPath<N, E>[] {
   return [...genSimplePaths(graph, opts)];
 }
 
 export function* genSimplePaths<N, E>(
   graph: Graph<N, E>,
-  opts?: PathOptions<E>,
+  opts?: PathOptions<E, N>,
+): Generator<GraphPath<N, E>> {
+  for (const sourceId of resolveFromIds(graph, opts?.from)) {
+    yield* genSimplePathsFrom(graph, sourceId, opts);
+  }
+}
+
+function* genSimplePathsFrom<N, E>(
+  graph: Graph<N, E>,
+  sourceId: string,
+  opts?: PathOptions<E, N>,
 ): Generator<GraphPath<N, E>> {
   const idx = getIndex(graph);
-  const sourceId = resolveFrom(graph, opts);
   const sourceNi = idx.nodeById.get(sourceId);
   const sourceNode =
     sourceNi !== undefined
@@ -721,7 +761,7 @@ export function* genSimplePaths<N, E>(
 
 export function getSimplePath<N, E>(
   graph: Graph<N, E>,
-  opts: SinglePathOptions<E>,
+  opts: SinglePathOptions<E, N>,
 ): GraphPath<N, E> | undefined {
   for (const path of genSimplePaths(graph, opts)) {
     return path;
@@ -1153,8 +1193,27 @@ function fwReconstruct<N, E>(
 
 export function getAStarPath<N, E>(
   graph: Graph<N, E>,
-  opts: AStarOptions<E>,
+  opts: AStarOptions<E, N>,
 ): GraphPath<N, E> | undefined {
+  if (typeof opts.from === 'function') {
+    let best: GraphPath<N, E> | undefined;
+    let bestWeight = Infinity;
+    const getWeight = opts.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+    for (const sourceId of resolveFromIds(graph, opts.from)) {
+      const candidate = getAStarPath(graph, { ...opts, from: sourceId });
+      if (!candidate) continue;
+      const weight = candidate.steps.reduce(
+        (total, step) => total + getWeight(step.edge),
+        0,
+      );
+      if (weight < bestWeight) {
+        best = candidate;
+        bestWeight = weight;
+      }
+    }
+    return best;
+  }
+
   const idx = getIndex(graph);
   const { from: sourceId, to: targetId, heuristic } = opts;
   const getWeight = opts.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);

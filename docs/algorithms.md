@@ -42,14 +42,45 @@ Conventions: `n` = nodes, `m` = edges, `k` = iterations. Default edge weight is 
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `getShortestPath(graph, { from, to, ... })` | One shortest path or `undefined` | sublinear in practice | Single-pair queries use **bidirectional Dijkstra** (frontiers meet long before a unidirectional search finishes); ties broken arbitrarily. Pass `algorithm: 'bellman-ford'` for negative weights (full search). |
-| `genShortestPaths(graph, opts?)` / `getShortestPaths(...)` | *All* tied shortest paths from `from` (to `to`, or to every reachable node) | Dijkstra O((n + m) log n) + lazy reconstruction | Tie predecessors are recorded, so equal-cost alternatives are all yielded. With `to`, the search **early-exits** once everything at distance ≤ dist(target) settles. Paths are reconstructed on demand — abandoning the generator never pays for paths it didn't yield. Zero-weight cycles are handled (no revisits during reconstruction). |
-| `getAStarPath(graph, { from, to, heuristic, ... })` | One heuristic-guided shortest path | O((n + m) log n), heuristic-dependent | Admissible heuristic ⇒ optimal path. |
+| `getShortestPath(graph, { from, to, ... })` | One shortest path or `undefined` | sublinear in practice | `from` accepts a node ID or predicate. A predicate matching multiple nodes returns the globally shortest path; graph order breaks ties. Single-pair ID queries use **bidirectional Dijkstra** (frontiers meet long before a unidirectional search finishes). Pass `algorithm: 'bellman-ford'` for negative weights (full search). |
+| `genShortestPaths(graph, opts?)` / `getShortestPaths(...)` | *All* tied shortest paths from `from` (to `to`, or to every reachable node) | Dijkstra O((n + m) log n) + lazy reconstruction | `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. Tie predecessors are recorded, so equal-cost alternatives are all yielded. With `to`, the search **early-exits** once everything at distance ≤ dist(target) settles. Paths are reconstructed on demand — abandoning the generator never pays for paths it didn't yield. Zero-weight cycles are handled (no revisits during reconstruction). |
+| `getAStarPath(graph, { from, to, heuristic, ... })` | One heuristic-guided shortest path | O((n + m) log n), heuristic-dependent | `from` accepts a node ID or predicate. Multiple matches return the globally shortest path; graph order breaks ties. Admissible heuristic ⇒ optimal path. |
 | `getAllPairsShortestPaths(graph, opts?)` | Shortest paths between all pairs | Dijkstra-per-source (default) O(n(n + m) log n); `'floyd-warshall'` O(n³); `'bellman-ford'` O(n²m) | Floyd-Warshall throws on a negative cycle (self-distance < 0). Eager — output can be huge. |
-| `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | DFS with backtracking; without `to`, every non-empty simple path is yielded. |
+| `genShortestSimplePaths(graph, opts)` / `getShortestSimplePaths(...)` | Loopless alternatives in nondecreasing weight order | Yen: O(K·n·(m + n log n)) for K results | `from` and `to` are required. `limit` bounds results; omitting it enumerates every simple path by cost. Non-negative weights only. |
+| `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. DFS with backtracking; without `to`, every non-empty simple path is yielded. |
 | `getJoinedPath(headPath, tailPath)` | Concatenated `GraphPath` | O(steps) | Throws unless head ends where tail starts. |
 
 **Negative-weight contract.** Dijkstra, A*, and the bidirectional/early-exit searches may legitimately finish without ever scanning a negative edge — so they assert "no negative weights" **up front**: O(1) via the CSR's cached `firstNegativeEdge` flag for the default weight, or one O(m) sweep when a custom `getWeight` is supplied. They throw with a pointer to `{ algorithm: 'bellman-ford' }` (O(n·m), handles negative edges; negative *cycles* still throw).
+
+## Path sets & coverage
+
+<!-- path-set and coverage functions exported from src/path-utils.ts and src/coverage.ts -->
+
+These operate on ordinary `GraphPath[]` values. Coverage targets remain graph
+concepts—nodes, edges, and contiguous edge sequences—not test or state-machine
+concepts.
+
+| Function | Computes | Complexity | Notes |
+|---|---|---|---|
+| `getPathNodes(path)` / `getPathEdges(path)` / `getPathWeight(path, getWeight?)` | Path projections and total weight | O(path length) | Default weight is `edge.weight ?? 1`. |
+| `isValidPath(graph, path)` | Whether every step follows an existing edge in an allowed direction | O(path length) | Uses indexed lookups; validates edge, reached node, and effective edge mode. |
+| `hasSubpath(path, candidate, opts?)` | Prefix or contiguous containment | O(path length · candidate length) | Contiguous by default; compares source/reached-node IDs and edge IDs. |
+| `getReducedPaths(paths, opts?)` | Removes duplicate and contained candidates | O(P²·L) | Contiguous containment by default; use `containment: 'prefix'` when every retained path must share the shorter path's source. Stable input order. |
+| `getCoverageTargets(graph, { kind })` | Node, edge, edge-pair, or maximal-simple-path targets | O(n + m) for nodes/edges; output-sensitive otherwise | `edge-pairs` respects effective edge direction. Maximal simple paths are exponential on dense graphs. |
+| `getPathCoverage(graph, paths, { targets? })` | Node/edge ratios plus covered and uncovered targets | O(P·T·L) | Defaults to all node and edge targets. Arbitrary subpath targets support higher-order transition coverage. |
+| `getCoveragePreservingPaths(paths, opts)` | A subset preserving all target coverage present in the input | greedy polynomial; exact exponential | Greedy by default. `strategy: 'exact'` minimizes path count and defaults to at most 24 candidates. |
+| `getEdgeCoveragePaths(graph, opts?)` | Shortest-access candidate paths covering reachable edges | repeated shortest paths; heuristic set reduction | Supports source/destination selectors, non-negative weights, and prefix/greedy/exact reduction. Returns explicit uncovered edge IDs and `optimal: false`. |
+
+`getLineGraph(graph)` is the structural dual: original edges become nodes;
+consecutively traversable edges become edges. Construction is O(n + m + output),
+whose output can itself be O(m²).
+
+## Eulerian paths
+
+| Function | Computes | Complexity | Notes |
+|---|---|---|---|
+| `getEulerianPath(graph, opts?)` | A path using every edge exactly once | O(n + m) | Hierholzer. Supports directed or non-directed multigraphs, loops, and an optional required start. Returns `undefined` for disconnected, degree-invalid, or genuinely mixed graphs. |
+| `getEulerianCircuit(graph, opts?)` | An edge-complete closed circuit | O(n + m) | Same semantics, with circuit degree constraints. |
 
 ## Spanning trees
 

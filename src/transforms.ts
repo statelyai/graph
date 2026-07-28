@@ -2,6 +2,7 @@ import type { Graph, GraphEdge, GraphNode, NodeConfig } from './types';
 import { getIndex } from './indexing';
 import { createGraph } from './graph';
 import { toNodeConfig, toEdgeConfig } from './config';
+import { getEdgeMode } from './mode';
 
 /**
  * Flattens a hierarchical graph into a flat graph with only leaf nodes.
@@ -158,6 +159,76 @@ export function getFlattenedGraph<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G
  */
 export function flatten<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G> {
   return getFlattenedGraph(graph);
+}
+
+/**
+ * Return the line graph: each original edge becomes a node, and adjacency
+ * means the original edges can be traversed consecutively.
+ */
+export function getLineGraph<N, E, G>(
+  graph: Graph<N, E, G>,
+): Graph<GraphEdge<E>, { viaNodeId: string }, G> {
+  const directed =
+    graph.edges.length === 0
+      ? graph.mode === 'directed'
+      : graph.edges.some(
+          (edge) => getEdgeMode(graph, edge) === 'directed',
+        );
+  const arcs = graph.edges.flatMap((edge) => {
+    const result = [
+      { fromId: edge.sourceId, toId: edge.targetId, edge },
+    ];
+    if (
+      getEdgeMode(graph, edge) !== 'directed' &&
+      edge.sourceId !== edge.targetId
+    ) {
+      result.push({ fromId: edge.targetId, toId: edge.sourceId, edge });
+    }
+    return result;
+  });
+  const arcsBySource = new Map<string, typeof arcs>();
+  for (const arc of arcs) {
+    const existing = arcsBySource.get(arc.fromId);
+    if (existing) existing.push(arc);
+    else arcsBySource.set(arc.fromId, [arc]);
+  }
+  const seen = new Set<string>();
+  const edges = [];
+
+  for (const first of arcs) {
+    for (const second of arcsBySource.get(first.toId) ?? []) {
+      if (
+        first.edge.id === second.edge.id &&
+        first.edge.sourceId !== first.edge.targetId
+      ) {
+        continue;
+      }
+      const endpoints = directed
+        ? [first.edge.id, second.edge.id]
+        : [first.edge.id, second.edge.id].sort();
+      const key = `${endpoints[0]}\u0000${endpoints[1]}\u0000${first.toId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({
+        id: `l${edges.length}`,
+        sourceId: endpoints[0],
+        targetId: endpoints[1],
+        data: { viaNodeId: first.toId },
+      });
+    }
+  }
+
+  return createGraph({
+    id: `${graph.id}:line`,
+    mode: directed ? 'directed' : 'undirected',
+    nodes: graph.edges.map((edge) => ({
+      id: edge.id,
+      label: edge.label,
+      data: edge,
+    })),
+    edges,
+    data: graph.data,
+  });
 }
 
 // Induced subgraph

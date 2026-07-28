@@ -365,9 +365,91 @@ export interface GraphPath<TNodeData = any, TEdgeData = any> {
   steps: GraphStep<TNodeData, TEdgeData>[];
 }
 
-export interface PathOptions<TEdgeData = any> {
-  /** Source node ID. Default: graph.initialNodeId, else sole inDegree-0 node */
+export type PathContainment = 'prefix' | 'contiguous';
+
+export type PathCoverageTarget =
+  | { type: 'node'; nodeId: string }
+  | { type: 'edge'; edgeId: string }
+  | { type: 'subpath'; edgeIds: string[]; sourceId?: string };
+
+export type PathCoverageKind =
+  | 'nodes'
+  | 'edges'
+  | 'edge-pairs'
+  | 'maximal-simple-paths';
+
+export interface PathCoverageStats {
+  nodeCoverage: number;
+  edgeCoverage: number;
+  coveredNodeIds: string[];
+  coveredEdgeIds: string[];
+  coveredTargets: PathCoverageTarget[];
+  uncoveredTargets: PathCoverageTarget[];
+  totalSteps: number;
+}
+
+export interface PathReductionOptions {
+  /** Default: `'contiguous'`. */
+  containment?: PathContainment;
+}
+
+export interface CoveragePreservingPathsOptions {
+  targets: PathCoverageTarget[];
+  /** Default: `'greedy'`. Exact selection is exponential in path count. */
+  strategy?: 'greedy' | 'exact';
+  /** Maximum candidate paths accepted by exact selection. Default: 24. */
+  exactLimit?: number;
+}
+
+export interface EdgeCoveragePathsOptions<
+  TEdgeData = any,
+  TNodeData = any,
+> {
+  /** Allowed path sources. Default: graph initial/root source. */
+  from?: NodeSelector<TNodeData>;
+  /** Optional allowed path destinations. Without this, paths end at the covered edge. */
+  to?: NodeSelector<TNodeData>;
+  /** Non-negative edge weight function. Default: `(e) => e.weight ?? 1`. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+  /** Candidate-set reduction. Default: `'greedy'`. */
+  reduce?: false | 'prefix' | 'greedy' | 'exact';
+  /** Maximum candidates accepted by exact reduction. Default: 24. */
+  exactLimit?: number;
+}
+
+export interface EdgeCoveragePathsResult<
+  TNodeData = any,
+  TEdgeData = any,
+> {
+  paths: GraphPath<TNodeData, TEdgeData>[];
+  coveredEdgeIds: string[];
+  uncoveredEdgeIds: string[];
+  totalWeight: number;
+  /** Individual access paths are shortest; the complete path set is heuristic. */
+  optimal: false;
+}
+
+export interface ShortestSimplePathsOptions<TEdgeData = any> {
+  from: string;
+  to: string;
+  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  getWeight?: (edge: GraphEdge<TEdgeData>) => number;
+  /** Maximum paths to yield/return. Omit to enumerate every simple path by cost. */
+  limit?: number;
+}
+
+export interface EulerianPathOptions {
+  /** Required start node. Otherwise inferred from graph degree and initial node. */
   from?: string;
+}
+
+export type NodeSelector<TNodeData = any> =
+  | string
+  | ((node: GraphNode<TNodeData>) => boolean);
+
+export interface PathOptions<TEdgeData = any, TNodeData = any> {
+  /** Source node ID or predicate. Predicates fan out from every matching node. Default: graph.initialNodeId, else sole inDegree-0 node. */
+  from?: NodeSelector<TNodeData>;
   /** Target node ID. If omitted → paths to all reachable nodes */
   to?: string;
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
@@ -376,9 +458,9 @@ export interface PathOptions<TEdgeData = any> {
   algorithm?: 'dijkstra' | 'bellman-ford';
 }
 
-export interface SinglePathOptions<TEdgeData = any> {
-  /** Source node ID. Default: graph.initialNodeId, else sole inDegree-0 node */
-  from?: string;
+export interface SinglePathOptions<TEdgeData = any, TNodeData = any> {
+  /** Source node ID or predicate. For multiple matches, returns the globally shortest path; graph order breaks ties. Default: graph.initialNodeId, else sole inDegree-0 node. */
+  from?: NodeSelector<TNodeData>;
   /** Target node ID. Required for single-path queries. */
   to: string;
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
@@ -387,9 +469,9 @@ export interface SinglePathOptions<TEdgeData = any> {
   algorithm?: 'dijkstra' | 'bellman-ford';
 }
 
-export interface AStarOptions<TEdgeData = any> {
-  /** Source node ID. */
-  from: string;
+export interface AStarOptions<TEdgeData = any, TNodeData = any> {
+  /** Source node ID or predicate. For multiple matches, returns the globally shortest path; graph order breaks ties. */
+  from: NodeSelector<TNodeData>;
   /** Target node ID. */
   to: string;
   /** Edge weight function. Default: `(e) => e.weight ?? 1`. */

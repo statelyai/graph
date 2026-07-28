@@ -27,6 +27,17 @@ export type {
   EdgeUpdate,
   GraphStep,
   GraphPath,
+  PathContainment,
+  PathCoverageTarget,
+  PathCoverageKind,
+  PathCoverageStats,
+  PathReductionOptions,
+  CoveragePreservingPathsOptions,
+  EdgeCoveragePathsOptions,
+  EdgeCoveragePathsResult,
+  ShortestSimplePathsOptions,
+  EulerianPathOptions,
+  NodeSelector,
   PathOptions,
   SinglePathOptions,
   AStarOptions,
@@ -185,6 +196,10 @@ export {
   getAllPairsShortestPaths,
   genAllPairsShortestPaths,
   getAStarPath,
+  genShortestSimplePaths,
+  getShortestSimplePaths,
+  getEulerianPath,
+  getEulerianCircuit,
   getDegreeCentrality,
   getInDegreeCentrality,
   getOutDegreeCentrality,
@@ -255,9 +270,26 @@ export {
   getFlattenedGraph,
   flatten,
   getSubgraph,
+  getLineGraph,
   getReversedGraph,
   reverseGraph,
 } from './transforms';
+
+// Paths & coverage
+export {
+  getPathNodes,
+  getPathEdges,
+  getPathWeight,
+  isValidPath,
+  hasSubpath,
+  getReducedPaths,
+} from './path-utils';
+export {
+  getCoverageTargets,
+  getPathCoverage,
+  getCoveragePreservingPaths,
+  getEdgeCoveragePaths,
+} from './coverage';
 
 // Walks (MBT)
 export {

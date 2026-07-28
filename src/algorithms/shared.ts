@@ -1,4 +1,4 @@
-import type { Graph, GraphEdge } from '../types';
+import type { Graph, GraphEdge, NodeSelector } from '../types';
 import { getIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
 
@@ -157,6 +157,16 @@ export function resolveFrom(
   throw new Error(
     'Cannot determine start node — provide opts.from or set graph.initialNodeId',
   );
+}
+
+export function resolveFromIds<N>(
+  graph: Graph<N>,
+  from?: NodeSelector<N>,
+): string[] {
+  if (typeof from === 'function') {
+    return graph.nodes.filter(from).map((node) => node.id);
+  }
+  return [resolveFrom(graph, from === undefined ? undefined : { from })];
 }
 
 export function getNeighborEdges(

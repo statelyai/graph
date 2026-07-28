@@ -107,6 +107,64 @@ describe('edge weight property', () => {
 // A* pathfinding
 
 describe('getAStarPath', () => {
+  it('chooses the globally shortest predicate-matched source', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'far', data: { entry: true } },
+        { id: 'near', data: { entry: true } },
+        { id: 'middle', data: { entry: false } },
+        { id: 'target', data: { entry: false } },
+      ],
+      edges: [
+        { id: 'far-middle', sourceId: 'far', targetId: 'middle', weight: 1 },
+        { id: 'middle-target', sourceId: 'middle', targetId: 'target', weight: 1 },
+        { id: 'near-target', sourceId: 'near', targetId: 'target', weight: 1 },
+      ],
+    });
+
+    const path = getAStarPath(g, {
+      from: (node) => node.data.entry,
+      to: 'target',
+      heuristic: () => 0,
+    });
+
+    expect(path?.source.id).toBe('near');
+    expect(path?.steps.map((step) => step.edge.id)).toEqual(['near-target']);
+  });
+
+  it('breaks equal predicate-source ties by graph order', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'first', data: true },
+        { id: 'second', data: true },
+        { id: 'target', data: false },
+      ],
+      edges: [
+        { id: 'first-target', sourceId: 'first', targetId: 'target' },
+        { id: 'second-target', sourceId: 'second', targetId: 'target' },
+      ],
+    });
+
+    expect(
+      getAStarPath(g, {
+        from: (node) => node.data,
+        to: 'target',
+        heuristic: () => 0,
+      })?.source.id,
+    ).toBe('first');
+  });
+
+  it('returns undefined when a source predicate matches nothing', () => {
+    const g = createGraph({ nodes: [{ id: 'a' }] });
+    expect(
+      getAStarPath(g, {
+        from: () => false,
+        to: 'a',
+        heuristic: () => 0,
+      }),
+    ).toBeUndefined();
+  });
+
   it('finds shortest path in a grid-like graph', () => {
     // Simple grid:  a(0,0) - b(1,0) - c(2,0)
     //                |                  |

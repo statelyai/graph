@@ -29,6 +29,13 @@ export {
 } from './algorithms/paths';
 
 export {
+  genShortestSimplePaths,
+  getShortestSimplePaths,
+} from './algorithms/k-shortest';
+
+export { getEulerianPath, getEulerianCircuit } from './algorithms/euler';
+
+export {
   getPreorder,
   getPostorder,
   getPreorders,

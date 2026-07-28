@@ -209,7 +209,7 @@ const parsed = GraphSchema.parse(unknownValue);
 
 <!-- algorithm functions exported from src/algorithms.ts -->
 
-Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), graph coloring (`getGraphColoring`, `isValidColoring`), planarity testing (`isPlanar`), approximate TSP tours (`getTSPTour`) and Steiner trees (`getSteinerTree`), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`, `createWattsStrogatzGraph`, `createBarabasiAlbertGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
+Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, ordered shortest simple paths, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), Eulerian paths/circuits, centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), graph coloring (`getGraphColoring`, `isValidColoring`), planarity testing (`isPlanar`), approximate TSP tours (`getTSPTour`) and Steiner trees (`getSteinerTree`), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`, `createWattsStrogatzGraph`, `createBarabasiAlbertGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
 
 Hot algorithm loops (centrality, components) run on an internal compressed-sparse-row snapshot — cached and invalidated transparently like the rest of the index — so they stay fast on large graphs without changing the plain-JSON model. Algorithm results are differential-tested against graphology on seeded random graphs.
 
@@ -245,6 +245,10 @@ for (const node of genDFS(graph, 'a')) {
 hasPath(graph, 'a', 'c'); // reachability
 isAcyclic(graph); // cycle check
 getShortestPath(graph, { from: 'a', to: 'c' }); // single shortest path
+getShortestPath(graph, {
+  from: (node) => node.data?.entry === true,
+  to: 'c',
+}); // shortest path from any matching source
 getTopologicalSort(graph); // topological order (or null)
 getConnectedComponents(graph); // connected components
 getMinimumSpanningTree(graph, { getWeight: (e) => e.weight ?? 1 }); // MST
@@ -258,6 +262,38 @@ getDominatorTree(graph, { from: 'a' }); // immediate dominators
 getTransitiveReduction(graph); // minimal equivalent DAG
 isIsomorphic(graph, otherGraph); // structural equivalence
 ```
+
+### Path sets & coverage
+
+<!-- path-set helpers exported from src/path-utils.ts and src/coverage.ts -->
+
+Path coverage is graph-generic: targets are nodes, edges, or contiguous edge
+sequences. Derive common target sets, measure arbitrary `GraphPath[]` values,
+or reduce candidates while preserving everything those candidates cover.
+
+```ts
+import {
+  getCoverageTargets,
+  getPathCoverage,
+  getCoveragePreservingPaths,
+  getEdgeCoveragePaths,
+  getReducedPaths,
+} from '@statelyai/graph';
+
+const targets = getCoverageTargets(graph, { kind: 'edge-pairs' });
+const reduced = getCoveragePreservingPaths(candidates, {
+  targets,
+  strategy: 'greedy', // use 'exact' for small candidate sets
+});
+getPathCoverage(graph, reduced, { targets });
+
+getReducedPaths(candidates); // remove duplicates/contained subpaths
+getEdgeCoveragePaths(graph); // heuristic shortest-access edge coverage plan
+```
+
+`getPathNodes()`, `getPathEdges()`, `getPathWeight()`, `isValidPath()`, and
+`hasSubpath()` provide lower-level composition. `getLineGraph()` converts edge
+adjacency into ordinary node adjacency.
 
 ## Large graphs & cancellation
 
@@ -354,7 +390,7 @@ Beyond classic graph algorithms, the library also includes utilities for evolvin
 
 - `getDiff()`, `getPatches()`, `getPatchedGraph()` (immutable), and `updateGraphWithPatches()` (mutable) for graph change tracking
 - `genRandomWalk()`, `genWeightedRandomWalk()`, and coverage helpers for model-based testing and simulation
-- `getSubgraph()` and `getReversedGraph()` for structural transforms
+- `getSubgraph()`, `getReversedGraph()`, and `getLineGraph()` for structural transforms
 
 ## Visual Graphs
 
