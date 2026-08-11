@@ -1,0 +1,13 @@
+{
+  "title": "Graph",
+  "pages": [
+    "index",
+    "algorithms",
+    "layout",
+    "react-flow-elk-pipeline",
+    "layout-transitions",
+    "migrating-from-graphlib",
+    "benchmarks",
+    "scaling-and-plugins"
+  ]
+}
