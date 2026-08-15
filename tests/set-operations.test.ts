@@ -184,6 +184,24 @@ describe('graph set operations', () => {
       label: 'a-b',
       data: 0,
     });
+
+    const defaultId = getGraphComplement(empty, {
+      createEdge: () => ({ id: undefined }),
+    });
+    expect(defaultId.edges[0].id).toBe('complement:["a","b"]');
+  });
+
+  it('treats reverse directed overrides as existing non-directed pairs', () => {
+    for (const mode of ['undirected', 'bidirectional'] as const) {
+      const graph = createGraph({
+        mode,
+        nodes: [{ id: 'a' }, { id: 'b' }],
+        edges: [
+          { id: 'ba', sourceId: 'b', targetId: 'a', mode: 'directed' },
+        ],
+      });
+      expect(getGraphComplement(graph).edges).toEqual([]);
+    }
   });
 
   it('rejects binary operations on different graph modes', () => {

@@ -263,16 +263,17 @@ export function getGraphComplement<N, E, G, P>(
       const target = graph.nodes[targetIndex];
       if (
         source.id === target.id ||
-        connections.get(source.id)?.has(target.id)
+        connections.get(source.id)?.has(target.id) ||
+        (!directed && connections.get(target.id)?.has(source.id))
       ) {
         continue;
       }
       const custom = options.createEdge?.(source, target, edges.length);
       const edge: EdgeConfig<E> = {
+        ...custom,
         id:
           custom?.id ??
           `complement:${JSON.stringify([source.id, target.id])}`,
-        ...custom,
         sourceId: source.id,
         targetId: target.id,
       };

@@ -55,25 +55,6 @@ function getStartPositions(
   return positions;
 }
 
-function getTraversalNeighbors(
-  csr: ReturnType<typeof getCSR>,
-  node: number,
-  direction: TraversalDirection,
-): number[] {
-  const neighbors: number[] = [];
-  if (direction !== 'incoming') {
-    for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
-      neighbors.push(csr.outTargets[i]);
-    }
-  }
-  if (direction !== 'outgoing') {
-    for (let i = csr.inOffsets[node]; i < csr.inOffsets[node + 1]; i++) {
-      neighbors.push(csr.inOrigins[i]);
-    }
-  }
-  return neighbors;
-}
-
 function getReachableWithinRadius(
   csr: ReturnType<typeof getCSR>,
   starts: readonly number[],
@@ -93,11 +74,23 @@ function getReachableWithinRadius(
   while (head < tail) {
     const node = queue[head++];
     if (depths[node] >= radius) continue;
-    for (const neighbor of getTraversalNeighbors(csr, node, direction)) {
-      if (reached[neighbor]) continue;
-      reached[neighbor] = 1;
-      depths[neighbor] = depths[node] + 1;
-      queue[tail++] = neighbor;
+    if (direction !== 'incoming') {
+      for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
+        const neighbor = csr.outTargets[i];
+        if (reached[neighbor]) continue;
+        reached[neighbor] = 1;
+        depths[neighbor] = depths[node] + 1;
+        queue[tail++] = neighbor;
+      }
+    }
+    if (direction !== 'outgoing') {
+      for (let i = csr.inOffsets[node]; i < csr.inOffsets[node + 1]; i++) {
+        const neighbor = csr.inOrigins[i];
+        if (reached[neighbor]) continue;
+        reached[neighbor] = 1;
+        depths[neighbor] = depths[node] + 1;
+        queue[tail++] = neighbor;
+      }
     }
   }
   return reached;
@@ -128,11 +121,24 @@ export function* genBFS<N>(
     yield graph.nodes[u];
     if (depths[u] >= options.radius) continue;
 
-    for (const v of getTraversalNeighbors(csr, u, options.direction)) {
-      if (!visited[v]) {
-        visited[v] = 1;
-        depths[v] = depths[u] + 1;
-        queue[tail++] = v;
+    if (options.direction !== 'incoming') {
+      for (let i = csr.outOffsets[u]; i < csr.outOffsets[u + 1]; i++) {
+        const v = csr.outTargets[i];
+        if (!visited[v]) {
+          visited[v] = 1;
+          depths[v] = depths[u] + 1;
+          queue[tail++] = v;
+        }
+      }
+    }
+    if (options.direction !== 'outgoing') {
+      for (let i = csr.inOffsets[u]; i < csr.inOffsets[u + 1]; i++) {
+        const v = csr.inOrigins[i];
+        if (!visited[v]) {
+          visited[v] = 1;
+          depths[v] = depths[u] + 1;
+          queue[tail++] = v;
+        }
       }
     }
   }
@@ -178,13 +184,20 @@ export function* genDFS<N>(
     visited[node] = 1;
     yield graph.nodes[node];
 
-    for (const neighbor of getTraversalNeighbors(
-      csr,
-      node,
-      options.direction,
-    )) {
-      if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
-        stack.push(neighbor);
+    if (options.direction !== 'incoming') {
+      for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
+        const neighbor = csr.outTargets[i];
+        if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
+          stack.push(neighbor);
+        }
+      }
+    }
+    if (options.direction !== 'outgoing') {
+      for (let i = csr.inOffsets[node]; i < csr.inOffsets[node + 1]; i++) {
+        const neighbor = csr.inOrigins[i];
+        if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
+          stack.push(neighbor);
+        }
       }
     }
   }
