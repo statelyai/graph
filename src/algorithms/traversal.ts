@@ -74,6 +74,35 @@ function getTraversalNeighbors(
   return neighbors;
 }
 
+function getReachableWithinRadius(
+  csr: ReturnType<typeof getCSR>,
+  starts: readonly number[],
+  direction: TraversalDirection,
+  radius: number,
+): Uint8Array {
+  const reached = new Uint8Array(csr.ids.length);
+  const depths = new Float64Array(csr.ids.length);
+  const queue = new Int32Array(csr.ids.length);
+  let head = 0;
+  let tail = 0;
+  for (const start of starts) {
+    reached[start] = 1;
+    queue[tail++] = start;
+  }
+
+  while (head < tail) {
+    const node = queue[head++];
+    if (depths[node] >= radius) continue;
+    for (const neighbor of getTraversalNeighbors(csr, node, direction)) {
+      if (reached[neighbor]) continue;
+      reached[neighbor] = 1;
+      depths[neighbor] = depths[node] + 1;
+      queue[tail++] = neighbor;
+    }
+  }
+  return reached;
+}
+
 export function* genBFS<N>(
   graph: Graph<N>,
   startOrOptions: string | TraversalSearchOptions,
@@ -128,33 +157,34 @@ export function* genDFS<N>(
   const starts = getStartPositions(csr.indexOf, options.from);
   if (starts.length === 0) return;
 
-  const yielded = new Uint8Array(csr.ids.length);
-  const bestDepth = new Float64Array(csr.ids.length);
-  bestDepth.fill(Infinity);
-  const stack: Array<readonly [number, number]> = [];
+  const reached =
+    options.radius === Infinity
+      ? undefined
+      : getReachableWithinRadius(
+          csr,
+          starts,
+          options.direction,
+          options.radius,
+        );
+  const visited = new Uint8Array(csr.ids.length);
+  const stack: number[] = [];
   for (let i = starts.length - 1; i >= 0; i--) {
-    bestDepth[starts[i]] = 0;
-    stack.push([starts[i], 0]);
+    stack.push(starts[i]);
   }
 
   while (stack.length > 0) {
-    const [u, depth] = stack.pop()!;
-    if (depth > bestDepth[u]) continue;
-    if (!yielded[u]) {
-      yielded[u] = 1;
-      yield graph.nodes[u];
-    }
-    if (depth >= options.radius) continue;
+    const node = stack.pop()!;
+    if (visited[node]) continue;
+    visited[node] = 1;
+    yield graph.nodes[node];
 
-    for (const v of getTraversalNeighbors(csr, u, options.direction)) {
-      const nextDepth = depth + 1;
-      const shouldVisit =
-        options.radius === Infinity
-          ? bestDepth[v] === Infinity
-          : nextDepth < bestDepth[v];
-      if (shouldVisit) {
-        bestDepth[v] = nextDepth;
-        stack.push([v, nextDepth]);
+    for (const neighbor of getTraversalNeighbors(
+      csr,
+      node,
+      options.direction,
+    )) {
+      if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
+        stack.push(neighbor);
       }
     }
   }

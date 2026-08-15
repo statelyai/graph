@@ -67,6 +67,31 @@ describe('BFS / DFS', () => {
     expect(visited).toHaveLength(4);
   });
 
+  it('genDFS re-pushes pending nodes to preserve depth-first order', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'p' }, { id: 'q' }, { id: 'r' }],
+      edges: [
+        { id: 'ap', sourceId: 'a', targetId: 'p' },
+        { id: 'aq', sourceId: 'a', targetId: 'q' },
+        { id: 'ar', sourceId: 'a', targetId: 'r' },
+        { id: 'rp', sourceId: 'r', targetId: 'p' },
+      ],
+    });
+
+    expect([...genDFS(g, 'a')].map((node) => node.id)).toEqual([
+      'a',
+      'r',
+      'p',
+      'q',
+    ]);
+    expect([...genDFS(g, { from: 'a' })].map((node) => node.id)).toEqual([
+      'a',
+      'r',
+      'p',
+      'q',
+    ]);
+  });
+
   it('genBFS follows undirected edge overrides in directed graphs', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
@@ -125,6 +150,29 @@ describe('BFS / DFS', () => {
     expect(
       [...genDFS(g, { from: 'a', radius: 0 })].map((node) => node.id),
     ).toEqual(['a']);
+  });
+
+  it('depth-first traverses the complete shortest-distance radius neighborhood', () => {
+    const g = createGraph({
+      nodes: [
+        { id: 'a' },
+        { id: 'hub' },
+        { id: 'deep' },
+        { id: 'child' },
+        { id: 'outside' },
+      ],
+      edges: [
+        { id: 'direct', sourceId: 'a', targetId: 'hub' },
+        { id: 'branch', sourceId: 'a', targetId: 'deep' },
+        { id: 'rejoin', sourceId: 'deep', targetId: 'hub' },
+        { id: 'child', sourceId: 'hub', targetId: 'child' },
+        { id: 'outside', sourceId: 'child', targetId: 'outside' },
+      ],
+    });
+
+    expect(
+      [...genDFS(g, { from: 'a', radius: 2 })].map((node) => node.id),
+    ).toEqual(['a', 'deep', 'hub', 'child']);
   });
 
   it('ignores unknown sources, deduplicates sources, and rejects invalid radii', () => {
