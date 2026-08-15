@@ -42,6 +42,8 @@ export type {
   SinglePathOptions,
   AStarOptions,
   TraversalOptions,
+  TraversalDirection,
+  TraversalSearchOptions,
   MSTOptions,
   AllPairsShortestPathsOptions,
   NodeChange,
@@ -77,6 +79,11 @@ export type {
   TSPOptions,
   SteinerTreeOptions,
 } from './algorithms';
+export type {
+  DisjointUnionOptions,
+  GraphComplementOptions,
+} from './set-operations';
+export type { NeighborhoodOptions } from './neighborhood';
 
 // Factory & helpers
 export {
@@ -274,6 +281,17 @@ export {
   getReversedGraph,
   reverseGraph,
 } from './transforms';
+export { getNeighborhood } from './neighborhood';
+
+// Set operations
+export {
+  getGraphUnion,
+  getGraphIntersection,
+  getGraphDifference,
+  getGraphSymmetricDifference,
+  getDisjointUnion,
+  getGraphComplement,
+} from './set-operations';
 
 // Paths & coverage
 export {

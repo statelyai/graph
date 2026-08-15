@@ -1,4 +1,9 @@
-import type { Graph, GraphEdge, GraphNode, NodeConfig } from './types';
+import type {
+  Graph,
+  GraphEdge,
+  GraphNode,
+  NodeConfig,
+} from './types';
 import { getIndex } from './indexing';
 import { createGraph } from './graph';
 import { toNodeConfig, toEdgeConfig } from './config';
@@ -237,10 +242,10 @@ export function getLineGraph<N, E, G>(
  * Convert a node to a config, stripping parentId/initialNodeId references
  * to nodes outside the given set.
  */
-function toScopedNodeConfig<N>(
-  node: GraphNode<N>,
+function toScopedNodeConfig<N, P>(
+  node: GraphNode<N, P>,
   nodeIdSet?: Set<string>,
-): NodeConfig<N> {
+): NodeConfig<N, P> {
   const config = toNodeConfig(node);
   if (nodeIdSet) {
     if (config.parentId != null && !nodeIdSet.has(config.parentId)) {
@@ -275,10 +280,10 @@ function toScopedNodeConfig<N>(
  * // sub.nodes: [a, b], sub.edges: [ab]
  * ```
  */
-export function getSubgraph<N, E, G>(
-  graph: Graph<N, E, G>,
-  nodeIds: string[],
-): Graph<N, E, G> {
+export function getSubgraph<N, E, G, P>(
+  graph: Graph<N, E, G, P>,
+  nodeIds: readonly string[],
+): Graph<N, E, G, P> {
   const nodeIdSet = new Set(nodeIds);
 
   return createGraph({

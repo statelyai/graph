@@ -1,4 +1,9 @@
-import type { Graph, GraphNode } from '../types';
+import type {
+  Graph,
+  GraphNode,
+  TraversalDirection,
+  TraversalSearchOptions,
+} from '../types';
 import { getIndex } from '../indexing';
 import {
   getEffectiveModeKind,
@@ -10,31 +15,130 @@ import { genCycles, getStronglyConnectedComponents } from './paths';
 import { getCSR } from './csr';
 import { getSubgraph } from '../transforms';
 
+function getTraversalOptions(
+  startOrOptions: string | TraversalSearchOptions,
+): Required<TraversalSearchOptions> {
+  const options =
+    typeof startOrOptions === 'string'
+      ? { from: startOrOptions }
+      : startOrOptions;
+  const radius = options.radius ?? Infinity;
+  if (
+    Number.isNaN(radius) ||
+    radius < 0 ||
+    (Number.isFinite(radius) && !Number.isInteger(radius))
+  ) {
+    throw new RangeError(
+      'Traversal radius must be a non-negative integer or Infinity',
+    );
+  }
+  return {
+    from: options.from,
+    direction: options.direction ?? 'outgoing',
+    radius,
+  };
+}
+
+function getStartPositions(
+  indexOf: Map<string, number>,
+  from: string | readonly string[],
+): number[] {
+  const positions: number[] = [];
+  const seen = new Set<number>();
+  for (const id of typeof from === 'string' ? [from] : from) {
+    const position = indexOf.get(id);
+    if (position !== undefined && !seen.has(position)) {
+      seen.add(position);
+      positions.push(position);
+    }
+  }
+  return positions;
+}
+
+function getReachableWithinRadius(
+  csr: ReturnType<typeof getCSR>,
+  starts: readonly number[],
+  direction: TraversalDirection,
+  radius: number,
+): Uint8Array {
+  const reached = new Uint8Array(csr.ids.length);
+  const depths = new Float64Array(csr.ids.length);
+  const queue = new Int32Array(csr.ids.length);
+  let head = 0;
+  let tail = 0;
+  for (const start of starts) {
+    reached[start] = 1;
+    queue[tail++] = start;
+  }
+
+  while (head < tail) {
+    const node = queue[head++];
+    if (depths[node] >= radius) continue;
+    if (direction !== 'incoming') {
+      for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
+        const neighbor = csr.outTargets[i];
+        if (reached[neighbor]) continue;
+        reached[neighbor] = 1;
+        depths[neighbor] = depths[node] + 1;
+        queue[tail++] = neighbor;
+      }
+    }
+    if (direction !== 'outgoing') {
+      for (let i = csr.inOffsets[node]; i < csr.inOffsets[node + 1]; i++) {
+        const neighbor = csr.inOrigins[i];
+        if (reached[neighbor]) continue;
+        reached[neighbor] = 1;
+        depths[neighbor] = depths[node] + 1;
+        queue[tail++] = neighbor;
+      }
+    }
+  }
+  return reached;
+}
+
 export function* genBFS<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
   const csr = getCSR(graph);
-  const start = csr.indexOf.get(startId);
-  if (start === undefined) return;
+  const options = getTraversalOptions(startOrOptions);
+  const starts = getStartPositions(csr.indexOf, options.from);
+  if (starts.length === 0) return;
 
   const n = csr.ids.length;
   const visited = new Uint8Array(n);
   const queue = new Int32Array(n);
-  visited[start] = 1;
-  queue[0] = start;
+  const depths = new Float64Array(n);
   let head = 0;
-  let tail = 1;
+  let tail = 0;
+  for (const start of starts) {
+    visited[start] = 1;
+    queue[tail++] = start;
+  }
 
   while (head < tail) {
     const u = queue[head++];
     yield graph.nodes[u];
+    if (depths[u] >= options.radius) continue;
 
-    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-      const v = csr.outTargets[a];
-      if (!visited[v]) {
-        visited[v] = 1;
-        queue[tail++] = v;
+    if (options.direction !== 'incoming') {
+      for (let i = csr.outOffsets[u]; i < csr.outOffsets[u + 1]; i++) {
+        const v = csr.outTargets[i];
+        if (!visited[v]) {
+          visited[v] = 1;
+          depths[v] = depths[u] + 1;
+          queue[tail++] = v;
+        }
+      }
+    }
+    if (options.direction !== 'outgoing') {
+      for (let i = csr.inOffsets[u]; i < csr.inOffsets[u + 1]; i++) {
+        const v = csr.inOrigins[i];
+        if (!visited[v]) {
+          visited[v] = 1;
+          depths[v] = depths[u] + 1;
+          queue[tail++] = v;
+        }
       }
     }
   }
@@ -45,33 +149,55 @@ export function* genBFS<N>(
  */
 export function* bfs<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
-  yield* genBFS(graph, startId);
+  yield* genBFS(graph, startOrOptions);
 }
 
 export function* genDFS<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
   const csr = getCSR(graph);
-  const start = csr.indexOf.get(startId);
-  if (start === undefined) return;
+  const options = getTraversalOptions(startOrOptions);
+  const starts = getStartPositions(csr.indexOf, options.from);
+  if (starts.length === 0) return;
 
-  const n = csr.ids.length;
-  const visited = new Uint8Array(n);
-  const stack: number[] = [start];
+  const reached =
+    options.radius === Infinity
+      ? undefined
+      : getReachableWithinRadius(
+          csr,
+          starts,
+          options.direction,
+          options.radius,
+        );
+  const visited = new Uint8Array(csr.ids.length);
+  const stack: number[] = [];
+  for (let i = starts.length - 1; i >= 0; i--) {
+    stack.push(starts[i]);
+  }
 
   while (stack.length > 0) {
-    const u = stack.pop()!;
-    if (visited[u]) continue;
-    visited[u] = 1;
-    yield graph.nodes[u];
+    const node = stack.pop()!;
+    if (visited[node]) continue;
+    visited[node] = 1;
+    yield graph.nodes[node];
 
-    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-      const v = csr.outTargets[a];
-      if (!visited[v]) {
-        stack.push(v);
+    if (options.direction !== 'incoming') {
+      for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
+        const neighbor = csr.outTargets[i];
+        if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
+          stack.push(neighbor);
+        }
+      }
+    }
+    if (options.direction !== 'outgoing') {
+      for (let i = csr.inOffsets[node]; i < csr.inOffsets[node + 1]; i++) {
+        const neighbor = csr.inOrigins[i];
+        if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
+          stack.push(neighbor);
+        }
       }
     }
   }
@@ -82,9 +208,9 @@ export function* genDFS<N>(
  */
 export function* dfs<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
-  yield* genDFS(graph, startId);
+  yield* genDFS(graph, startOrOptions);
 }
 
 export function isAcyclic(graph: Graph): boolean {
