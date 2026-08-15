@@ -242,6 +242,15 @@ for (const node of genDFS(graph, 'a')) {
   /* depth-first */
 }
 
+// Multi-source, bounded, reverse traversal
+for (const node of genBFS(graph, {
+  from: ['c', 'd'],
+  direction: 'incoming',
+  radius: 2,
+})) {
+  /* at most two edges from c or d */
+}
+
 hasPath(graph, 'a', 'c'); // reachability
 isAcyclic(graph); // cycle check
 getShortestPath(graph, { from: 'a', to: 'c' }); // single shortest path
@@ -384,13 +393,18 @@ for (const frame of genForceLayout(graph, { seed: 42 })) {
 
 Edge `x`/`y`/`width`/`height` are canonically the edge-label rect; routes live in `edge.points` (`routing` says how to interpret them). Layouts are plain JSON — tween between engines with `genLayoutTransition`, or diff them with `getPatches`. See [docs/layout.md](./docs/layout.md) and [docs/layout-transitions.md](./docs/layout-transitions.md).
 
-## Diff & Walks
+## Diff, transforms & walks
+
+<!-- diff helpers from src/diff.ts, structural transforms from src/transforms.ts and src/neighborhood.ts, set operations from src/set-operations.ts, and walk helpers from src/walks.ts -->
 
 Beyond classic graph algorithms, the library also includes utilities for evolving and exploring graph state:
 
 - `getDiff()`, `getPatches()`, `getPatchedGraph()` (immutable), and `updateGraphWithPatches()` (mutable) for graph change tracking
 - `genRandomWalk()`, `genWeightedRandomWalk()`, and coverage helpers for model-based testing and simulation
-- `getSubgraph()`, `getReversedGraph()`, and `getLineGraph()` for structural transforms
+- `getSubgraph()`, `getNeighborhood()`, `getReversedGraph()`, and `getLineGraph()` for structural transforms
+- `getGraphUnion()`, `getGraphIntersection()`, `getGraphDifference()`, `getGraphSymmetricDifference()`, `getDisjointUnion()`, and `getGraphComplement()` for graph set operations
+
+Binary set operations match nodes and edges by stable ID, require matching graph modes, and retain graph metadata from the left operand. Union and intersection use right-side entity data when IDs conflict. Disjoint union keeps left IDs and deterministically remaps right-side collisions.
 
 ## Visual Graphs
 

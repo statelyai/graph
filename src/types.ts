@@ -490,6 +490,18 @@ export interface TraversalOptions {
   from?: string;
 }
 
+export type TraversalDirection = 'outgoing' | 'incoming' | 'undirected';
+
+/** Options for lazy breadth-first and depth-first graph traversal. */
+export interface TraversalSearchOptions {
+  /** One or more source node IDs. Unknown IDs are ignored. */
+  from: string | readonly string[];
+  /** Edge direction to follow. Default: `'outgoing'`. */
+  direction?: TraversalDirection;
+  /** Maximum edge distance from a source. Default: `Infinity`. */
+  radius?: number;
+}
+
 export interface MSTOptions<TEdgeData = any> {
   /** Algorithm to use. Default: 'prim'. */
   algorithm?: 'prim' | 'kruskal';

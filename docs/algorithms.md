@@ -10,8 +10,8 @@ Conventions: `n` = nodes, `m` = edges, `k` = iterations. Default edge weight is 
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `genBFS(graph, startId)` | Lazy breadth-first node visit | O(n + m) | CSR-backed generator. Mode-aware: non-directed edges traversable both ways. Unknown start yields nothing. |
-| `genDFS(graph, startId)` | Lazy depth-first node visit | O(n + m) | Iterative (no recursion limit), CSR-backed. |
+| `genBFS(graph, startOrOptions)` | Lazy breadth-first node visit | O(n + m) | Accepts a node ID or `{ from, direction, radius }`; `from` may contain multiple IDs. CSR-backed. Unknown sources yield nothing. |
+| `genDFS(graph, startOrOptions)` | Lazy depth-first node visit | O(n + m) | Same traversal options as BFS. Iterative (no recursion limit), CSR-backed. |
 | `getPreorder(graph, opts?)` / `getPostorder(graph, opts?)` | One DFS pre/post ordering from `from` | O(n + m) | Deterministic: neighbors in index order. |
 | `genPreorders(graph, opts?)` / `genPostorders(graph, opts?)` | All possible DFS pre/post orderings | exponential (output-sensitive) | Lazy; branches on every neighbor choice. `getPreorders`/`getPostorders` are the eager forms. |
 

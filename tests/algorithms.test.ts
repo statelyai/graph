@@ -88,6 +88,59 @@ describe('BFS / DFS', () => {
 
     expect([...genBFS(g, 'b')].map((n) => n.id)).toEqual(['b']);
   });
+
+  it('supports multiple BFS sources in source order', () => {
+    const g = makeDAG();
+    expect(
+      [...genBFS(g, { from: ['a', 'c'] })].map((node) => node.id),
+    ).toEqual(['a', 'c', 'b', 'd']);
+  });
+
+  it('supports incoming and undirected traversal', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+
+    expect(
+      [...genBFS(g, { from: 'c', direction: 'incoming' })].map(
+        (node) => node.id,
+      ),
+    ).toEqual(['c', 'b', 'a']);
+    expect(
+      [...genDFS(g, { from: 'c', direction: 'undirected' })].map(
+        (node) => node.id,
+      ),
+    ).toEqual(['c', 'b', 'a']);
+  });
+
+  it('limits BFS and DFS by radius', () => {
+    const g = makeDAG();
+    expect(
+      [...genBFS(g, { from: 'a', radius: 1 })].map((node) => node.id),
+    ).toEqual(['a', 'b', 'c']);
+    expect(
+      [...genDFS(g, { from: 'a', radius: 0 })].map((node) => node.id),
+    ).toEqual(['a']);
+  });
+
+  it('ignores unknown sources, deduplicates sources, and rejects invalid radii', () => {
+    const g = makeDAG();
+    expect(
+      [...genBFS(g, { from: ['missing', 'a', 'a'] })].map(
+        (node) => node.id,
+      ),
+    ).toEqual(['a', 'b', 'c', 'd']);
+    expect(() => [...genBFS(g, { from: 'a', radius: -1 })]).toThrow(
+      /non-negative integer/,
+    );
+    expect(() => [...genBFS(g, { from: 'a', radius: 1.5 })]).toThrow(
+      /non-negative integer/,
+    );
+  });
 });
 
 describe('isAcyclic', () => {

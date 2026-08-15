@@ -1,4 +1,9 @@
-import type { Graph, GraphNode } from '../types';
+import type {
+  Graph,
+  GraphNode,
+  TraversalDirection,
+  TraversalSearchOptions,
+} from '../types';
 import { getIndex } from '../indexing';
 import {
   getEffectiveModeKind,
@@ -10,30 +15,94 @@ import { genCycles, getStronglyConnectedComponents } from './paths';
 import { getCSR } from './csr';
 import { getSubgraph } from '../transforms';
 
+function getTraversalOptions(
+  startOrOptions: string | TraversalSearchOptions,
+): Required<TraversalSearchOptions> {
+  const options =
+    typeof startOrOptions === 'string'
+      ? { from: startOrOptions }
+      : startOrOptions;
+  const radius = options.radius ?? Infinity;
+  if (
+    Number.isNaN(radius) ||
+    radius < 0 ||
+    (Number.isFinite(radius) && !Number.isInteger(radius))
+  ) {
+    throw new RangeError(
+      'Traversal radius must be a non-negative integer or Infinity',
+    );
+  }
+  return {
+    from: options.from,
+    direction: options.direction ?? 'outgoing',
+    radius,
+  };
+}
+
+function getStartPositions(
+  indexOf: Map<string, number>,
+  from: string | readonly string[],
+): number[] {
+  const positions: number[] = [];
+  const seen = new Set<number>();
+  for (const id of typeof from === 'string' ? [from] : from) {
+    const position = indexOf.get(id);
+    if (position !== undefined && !seen.has(position)) {
+      seen.add(position);
+      positions.push(position);
+    }
+  }
+  return positions;
+}
+
+function getTraversalNeighbors(
+  csr: ReturnType<typeof getCSR>,
+  node: number,
+  direction: TraversalDirection,
+): number[] {
+  const neighbors: number[] = [];
+  if (direction !== 'incoming') {
+    for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
+      neighbors.push(csr.outTargets[i]);
+    }
+  }
+  if (direction !== 'outgoing') {
+    for (let i = csr.inOffsets[node]; i < csr.inOffsets[node + 1]; i++) {
+      neighbors.push(csr.inOrigins[i]);
+    }
+  }
+  return neighbors;
+}
+
 export function* genBFS<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
   const csr = getCSR(graph);
-  const start = csr.indexOf.get(startId);
-  if (start === undefined) return;
+  const options = getTraversalOptions(startOrOptions);
+  const starts = getStartPositions(csr.indexOf, options.from);
+  if (starts.length === 0) return;
 
   const n = csr.ids.length;
   const visited = new Uint8Array(n);
   const queue = new Int32Array(n);
-  visited[start] = 1;
-  queue[0] = start;
+  const depths = new Float64Array(n);
   let head = 0;
-  let tail = 1;
+  let tail = 0;
+  for (const start of starts) {
+    visited[start] = 1;
+    queue[tail++] = start;
+  }
 
   while (head < tail) {
     const u = queue[head++];
     yield graph.nodes[u];
+    if (depths[u] >= options.radius) continue;
 
-    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-      const v = csr.outTargets[a];
+    for (const v of getTraversalNeighbors(csr, u, options.direction)) {
       if (!visited[v]) {
         visited[v] = 1;
+        depths[v] = depths[u] + 1;
         queue[tail++] = v;
       }
     }
@@ -45,33 +114,47 @@ export function* genBFS<N>(
  */
 export function* bfs<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
-  yield* genBFS(graph, startId);
+  yield* genBFS(graph, startOrOptions);
 }
 
 export function* genDFS<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
   const csr = getCSR(graph);
-  const start = csr.indexOf.get(startId);
-  if (start === undefined) return;
+  const options = getTraversalOptions(startOrOptions);
+  const starts = getStartPositions(csr.indexOf, options.from);
+  if (starts.length === 0) return;
 
-  const n = csr.ids.length;
-  const visited = new Uint8Array(n);
-  const stack: number[] = [start];
+  const yielded = new Uint8Array(csr.ids.length);
+  const bestDepth = new Float64Array(csr.ids.length);
+  bestDepth.fill(Infinity);
+  const stack: Array<readonly [number, number]> = [];
+  for (let i = starts.length - 1; i >= 0; i--) {
+    bestDepth[starts[i]] = 0;
+    stack.push([starts[i], 0]);
+  }
 
   while (stack.length > 0) {
-    const u = stack.pop()!;
-    if (visited[u]) continue;
-    visited[u] = 1;
-    yield graph.nodes[u];
+    const [u, depth] = stack.pop()!;
+    if (depth > bestDepth[u]) continue;
+    if (!yielded[u]) {
+      yielded[u] = 1;
+      yield graph.nodes[u];
+    }
+    if (depth >= options.radius) continue;
 
-    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-      const v = csr.outTargets[a];
-      if (!visited[v]) {
-        stack.push(v);
+    for (const v of getTraversalNeighbors(csr, u, options.direction)) {
+      const nextDepth = depth + 1;
+      const shouldVisit =
+        options.radius === Infinity
+          ? bestDepth[v] === Infinity
+          : nextDepth < bestDepth[v];
+      if (shouldVisit) {
+        bestDepth[v] = nextDepth;
+        stack.push([v, nextDepth]);
       }
     }
   }
@@ -82,9 +165,9 @@ export function* genDFS<N>(
  */
 export function* dfs<N>(
   graph: Graph<N>,
-  startId: string,
+  startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
-  yield* genDFS(graph, startId);
+  yield* genDFS(graph, startOrOptions);
 }
 
 export function isAcyclic(graph: Graph): boolean {
