@@ -217,6 +217,7 @@ Hot algorithm loops (centrality, components) run on an internal compressed-spars
 import {
   genBFS,
   genDFS,
+  genPostorder,
   hasPath,
   isAcyclic,
   getShortestPath,
@@ -241,6 +242,9 @@ for (const node of genBFS(graph, 'a')) {
 for (const node of genDFS(graph, 'a')) {
   /* depth-first */
 }
+for (const node of genPostorder(graph, 'a')) {
+  /* descendants before parents */
+}
 
 // Multi-source, bounded, reverse traversal
 for (const node of genBFS(graph, {
@@ -250,6 +254,9 @@ for (const node of genBFS(graph, {
 })) {
   /* at most two edges from c or d */
 }
+
+// Active traversal structure is stable even if graph mutation APIs run before
+// iteration completes. A fresh generator sees the updated graph.
 
 hasPath(graph, 'a', 'c'); // reachability
 isAcyclic(graph); // cycle check

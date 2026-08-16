@@ -107,6 +107,27 @@ describe('edge weight property', () => {
 // A* pathfinding
 
 describe('getAStarPath', () => {
+  it('rejects non-finite heuristic values before they corrupt heap ordering', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 10 },
+        { id: 'ac', sourceId: 'a', targetId: 'c', weight: 1 },
+        { id: 'cb', sourceId: 'c', targetId: 'b', weight: 1 },
+      ],
+    });
+
+    for (const value of [NaN, Infinity, -Infinity]) {
+      expect(() =>
+        getAStarPath(g, {
+          from: 'a',
+          to: 'b',
+          heuristic: () => value,
+        }),
+      ).toThrow(/finite/);
+    }
+  });
+
   it('chooses the globally shortest predicate-matched source', () => {
     const g = createGraph({
       nodes: [

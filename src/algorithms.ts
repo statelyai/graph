@@ -1,6 +1,7 @@
 export {
   genBFS,
   genDFS,
+  genPostorder,
   bfs,
   dfs,
   isAcyclic,

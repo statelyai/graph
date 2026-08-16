@@ -1,6 +1,12 @@
-import type { Graph, GraphNode, TraversalOptions } from '../types';
+import type {
+  Graph,
+  GraphNode,
+  PostorderOptions,
+  TraversalOptions,
+} from '../types';
 import { getIndex } from '../indexing';
 import { getNeighborIds, resolveFrom } from './shared';
+import { genPostorder } from './traversal';
 
 export function getPreorder<N>(
   graph: Graph<N>,
@@ -35,33 +41,13 @@ export function getPreorder<N>(
 
 export function getPostorder<N>(
   graph: Graph<N>,
-  opts?: TraversalOptions,
+  startOrOptions?: string | PostorderOptions,
 ): GraphNode<N>[] {
-  const idx = getIndex(graph);
-  const startId = resolveFrom(graph, opts);
-  const startNi = idx.nodeById.get(startId);
-  if (startNi === undefined) return [];
-
-  const visited = new Set<string>([startId]);
-  const result: GraphNode<N>[] = [];
-  const stack = [startId];
-
-  while (stack.length > 0) {
-    const top = stack[stack.length - 1];
-    const next = getNeighborIds(graph, top).find((id) => !visited.has(id));
-
-    if (next === undefined) {
-      stack.pop();
-      const ni = idx.nodeById.get(top);
-      if (ni !== undefined) result.push(graph.nodes[ni]);
-      continue;
-    }
-
-    visited.add(next);
-    stack.push(next);
+  if (typeof startOrOptions === 'string') {
+    return [...genPostorder(graph, startOrOptions)];
   }
-
-  return result;
+  const from = startOrOptions?.from ?? resolveFrom(graph);
+  return [...genPostorder(graph, { ...startOrOptions, from })];
 }
 
 export function getPreorders<N>(
