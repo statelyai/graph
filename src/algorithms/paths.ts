@@ -15,12 +15,25 @@ import {
   getEffectiveModeKind,
   getNeighborEdges,
   getNeighborEdgesAll,
-  getNeighborIds,
   resolveFrom,
   resolveFromIds,
 } from './shared';
-import { getCSR } from './csr';
+import { getArcWeights, getCSR, getEdgeOrderArcs } from './csr';
 import { throwIfAborted } from './abort';
+
+/** Cold path: load the offending edge and throw the negative-weight error. */
+function throwNegativeWeight(
+  graph: Graph<any, any>,
+  edgeIndex: number,
+  weight: number,
+  algorithmName: string,
+  remedy: string,
+): never {
+  const edge = graph.edges[edgeIndex];
+  throw new Error(
+    `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): ${algorithmName} requires non-negative weights. ${remedy}`,
+  );
+}
 
 /**
  * Flat binary min-heap of `(distance, node position)` entries in parallel
@@ -197,7 +210,9 @@ function computeShortestDistances<N, E>(
       }
     }
   } else {
-    const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+    // Default weights come from the CSR's cached per-arc Float64Array — no
+    // edge-object loads in the hot loop. Custom getWeight loads the edge.
+    const arcWeights = getWeight ? undefined : getArcWeights(graph, csr).out;
     const visited = new Uint8Array(n);
     const pq = new TypedMinHeap(n);
     pq.push(0, source);
@@ -213,11 +228,16 @@ function computeShortestDistances<N, E>(
       visited[u] = 1;
 
       for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-        const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
-        const weight = effectiveWeight(edge);
+        const weight = arcWeights
+          ? arcWeights[a]
+          : getWeight!(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>);
         if (weight < 0) {
-          throw new Error(
-            `Negative edge weight ${weight} on edge "${edge.sourceId}->${edge.targetId}" (id "${edge.id}"): Dijkstra requires non-negative weights. Use { algorithm: 'bellman-ford' } instead.`,
+          throwNegativeWeight(
+            graph,
+            csr.outEdgeIndex[a],
+            weight,
+            'Dijkstra',
+            "Use { algorithm: 'bellman-ford' } instead.",
           );
         }
         const v = csr.outTargets[a];
@@ -238,124 +258,87 @@ function computeShortestDistances<N, E>(
 }
 
 /**
- * Bellman-Ford adapted to the typed-array result shape. The O(VE) relaxation
- * dominates, so the id→position conversion here is noise — and it keeps a
- * single reconstruction path for both algorithms.
+ * Bellman-Ford over compact typed arc arrays. Arcs are laid out in edge
+ * order (forward, then the reverse arc for non-directed edges) so the
+ * relaxation order — and therefore tie-predecessor order — matches the
+ * classic edge-list formulation. Weights are evaluated once per arc.
  */
 function bellmanFordTyped<N, E>(
   graph: Graph<N, E>,
   sourceId: string,
   getWeight?: (edge: GraphEdge<E>) => number,
 ): ShortestDistancesResult {
-  const { dist, prev } = bellmanFord(graph, sourceId, getWeight);
   const csr = getCSR(graph);
-  const idx = getIndex(graph);
   const n = csr.ids.length;
+  const source = csr.indexOf.get(sourceId);
+  if (source === undefined) {
+    return {
+      source: -1,
+      distArr: new Float64Array(0),
+      prevArr: [],
+      stopDistance: Infinity,
+    };
+  }
+
+  // Cached compact arcs in edge order; custom weights overlay the endpoints
+  const arcs = getEdgeOrderArcs(graph, csr);
+  const arcCount = arcs.count;
+  const arcFrom = arcs.from;
+  const arcTo = arcs.to;
+  const arcEdge = arcs.edge;
+  let arcWeight = arcs.weight;
+  if (getWeight) {
+    arcWeight = new Float64Array(arcCount);
+    for (let a = 0; a < arcCount; a++) {
+      arcWeight[a] = getWeight(graph.edges[arcEdge[a]] as GraphEdge<E>);
+    }
+  }
+
   const distArr = new Float64Array(n).fill(Infinity);
   const prevArr: Array<number[] | undefined> = new Array(n);
+  distArr[source] = 0;
+  prevArr[source] = [];
 
-  for (const [id, distance] of dist) {
-    const pos = csr.indexOf.get(id);
-    if (pos === undefined) continue;
-    distArr[pos] = distance;
-    const pairs: number[] = [];
-    for (const { from, edge } of prev.get(id) ?? []) {
-      const fromPos = csr.indexOf.get(from);
-      const edgeIndex = idx.edgeById.get(edge.id);
-      if (fromPos === undefined || edgeIndex === undefined) continue;
-      pairs.push(fromPos, edgeIndex);
-    }
-    prevArr[pos] = pairs;
-  }
-
-  return {
-    source: csr.indexOf.get(sourceId) ?? -1,
-    distArr,
-    prevArr,
-    stopDistance: Infinity,
-  };
-}
-
-function bellmanFord<N, E>(
-  graph: Graph<N, E>,
-  sourceId: string,
-  getWeight?: (edge: GraphEdge<E>) => number,
-): {
-  dist: Map<string, number>;
-  prev: Map<string, Array<{ from: string; edge: GraphEdge<E> }>>;
-} {
-  const dist = new Map<string, number>();
-  const prev = new Map<string, Array<{ from: string; edge: GraphEdge<E> }>>();
-  const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-
-  for (const node of graph.nodes) {
-    dist.set(node.id, Infinity);
-    prev.set(node.id, []);
-  }
-  dist.set(sourceId, 0);
-
-  const directedEdges: Array<{
-    fromId: string;
-    toId: string;
-    edge: GraphEdge<E>;
-  }> = [];
-  for (const edge of graph.edges) {
-    directedEdges.push({
-      fromId: edge.sourceId,
-      toId: edge.targetId,
-      edge: edge as GraphEdge<E>,
-    });
-    if (getEdgeMode(graph, edge) !== 'directed') {
-      directedEdges.push({
-        fromId: edge.targetId,
-        toId: edge.sourceId,
-        edge: edge as GraphEdge<E>,
-      });
-    }
-  }
-
-  for (let i = 0; i < graph.nodes.length - 1; i++) {
+  for (let round = 1; round < n; round++) {
     let changed = false;
-    for (const { fromId, toId, edge } of directedEdges) {
-      const distance = dist.get(fromId)!;
-      if (distance === Infinity) continue;
-      const weight = effectiveWeight(edge);
-      const nextDistance = distance + weight;
-      const existing = dist.get(toId)!;
-
+    for (let a = 0; a < arcCount; a++) {
+      const du = distArr[arcFrom[a]];
+      if (du === Infinity) continue;
+      const nextDistance = du + arcWeight[a];
+      const t = arcTo[a];
+      const existing = distArr[t];
       if (nextDistance < existing) {
-        dist.set(toId, nextDistance);
-        prev.set(toId, [{ from: fromId, edge }]);
+        distArr[t] = nextDistance;
+        prevArr[t] = [arcFrom[a], arcEdge[a]];
         changed = true;
       } else if (nextDistance === existing && existing !== Infinity) {
-        const predecessors = prev.get(toId)!;
-        if (!predecessors.some((entry) => entry.from === fromId && entry.edge === edge)) {
-          predecessors.push({ from: fromId, edge });
+        const pairs = prevArr[t]!;
+        const from = arcFrom[a];
+        const edgeIndex = arcEdge[a];
+        let seen = false;
+        for (let k = 0; k < pairs.length; k += 2) {
+          if (pairs[k] === from && pairs[k + 1] === edgeIndex) {
+            seen = true;
+            break;
+          }
         }
+        if (!seen) pairs.push(from, edgeIndex);
       }
     }
     if (!changed) break;
   }
 
-  for (const { fromId, toId, edge } of directedEdges) {
-    const distance = dist.get(fromId)!;
-    if (distance === Infinity) continue;
-    const weight = effectiveWeight(edge);
-    if (distance + weight < dist.get(toId)!) {
+  for (let a = 0; a < arcCount; a++) {
+    const du = distArr[arcFrom[a]];
+    if (du === Infinity) continue;
+    if (du + arcWeight[a] < distArr[arcTo[a]]) {
       throw new Error(
         'Graph contains a negative-weight cycle reachable from the source node',
       );
     }
   }
 
-  for (const [id, distance] of dist) {
-    if (distance === Infinity) {
-      dist.delete(id);
-      prev.delete(id);
-    }
-  }
-
-  return { dist, prev };
+  return { source, distArr, prevArr, stopDistance: Infinity };
 }
 
 function* reconstructPathsAt<N, E>(
@@ -364,42 +347,47 @@ function* reconstructPathsAt<N, E>(
   sourceNode: GraphNode<N>,
   sourcePos: number,
   targetPos: number,
-  onPath: Set<number> = new Set(),
 ): Generator<GraphPath<N, E>> {
-  if (targetPos === sourcePos) {
-    yield { source: sourceNode, steps: [] };
-    return;
-  }
+  // Walk the predecessor pairs backward from the target with one shared step
+  // buffer; each complete path is materialized exactly once (one O(length)
+  // reversed copy), instead of re-spreading the prefix at every recursion
+  // level. Track nodes on the current partial path — zero-weight cycles can
+  // make the predecessor structure cyclic via equal-distance tie
+  // predecessors, so never revisit a node already on the path being built.
+  const stepsBackward: GraphStep<N, E>[] = [];
+  const onPath = new Set<number>();
 
-  const pairs = prevArr[targetPos];
-  if (!pairs || pairs.length === 0) return;
-
-  // CSR positions are `graph.nodes` positions, so no id lookup is needed.
-  const targetNode = graph.nodes[targetPos] as GraphNode<N>;
-
-  // Track nodes on the current partial path — zero-weight cycles can make
-  // the predecessor structure cyclic via equal-distance tie predecessors,
-  // so never revisit a node already on the path being reconstructed.
-  onPath.add(targetPos);
-  for (let k = 0; k < pairs.length; k += 2) {
-    const fromPos = pairs[k];
-    if (onPath.has(fromPos)) continue;
-    const edge = graph.edges[pairs[k + 1]] as GraphEdge<E>;
-    for (const prefix of reconstructPathsAt(
-      graph,
-      prevArr,
-      sourceNode,
-      sourcePos,
-      fromPos,
-      onPath,
-    )) {
-      yield {
-        source: sourceNode,
-        steps: [...prefix.steps, { edge, node: targetNode }],
-      };
+  function* walk(pos: number): Generator<GraphPath<N, E>> {
+    if (pos === sourcePos) {
+      const length = stepsBackward.length;
+      const steps = new Array<GraphStep<N, E>>(length);
+      for (let s = 0; s < length; s++) {
+        steps[s] = stepsBackward[length - 1 - s];
+      }
+      yield { source: sourceNode, steps };
+      return;
     }
+
+    const pairs = prevArr[pos];
+    if (!pairs || pairs.length === 0) return;
+
+    // CSR positions are `graph.nodes` positions, so no id lookup is needed.
+    const node = graph.nodes[pos] as GraphNode<N>;
+    onPath.add(pos);
+    for (let k = 0; k < pairs.length; k += 2) {
+      const fromPos = pairs[k];
+      if (onPath.has(fromPos)) continue;
+      stepsBackward.push({
+        edge: graph.edges[pairs[k + 1]] as GraphEdge<E>,
+        node,
+      });
+      yield* walk(fromPos);
+      stepsBackward.pop();
+    }
+    onPath.delete(pos);
   }
-  onPath.delete(targetPos);
+
+  yield* walk(targetPos);
 }
 
 export function* genShortestPaths<N, E>(
@@ -496,18 +484,102 @@ export function getShortestPath<N, E>(
   }
   // Single-pair queries use bidirectional Dijkstra — on random/small-world
   // graphs the two half-balls meet long before a unidirectional search would
-  // reach the target. Bellman-Ford (negative weights) keeps the full search.
+  // reach the target. Bellman-Ford (negative weights) keeps the full
+  // relaxation but skips tie-predecessor bookkeeping for the one path.
+  const sourceId = resolveFrom(
+    graph,
+    typeof opts.from === 'string' ? { from: opts.from } : undefined,
+  );
   if (opts.algorithm !== 'bellman-ford') {
-    const sourceId = resolveFrom(
-      graph,
-      typeof opts.from === 'string' ? { from: opts.from } : undefined,
-    );
     return bidirectionalShortestPath(graph, sourceId, opts.to, opts.getWeight);
   }
-  for (const path of genShortestPaths(graph, opts)) {
-    return path;
+  return bellmanFordSinglePath(graph, sourceId, opts.to, opts.getWeight);
+}
+
+/**
+ * Single-pair Bellman-Ford: same relaxation (and negative-cycle contract) as
+ * the all-targets search, but with scalar predecessors — the returned path
+ * matches the first path {@link genShortestPaths} would yield, because that
+ * enumeration follows the predecessor recorded by the last strict improvement.
+ */
+function bellmanFordSinglePath<N, E>(
+  graph: Graph<N, E>,
+  sourceId: string,
+  targetId: string,
+  getWeight?: (edge: GraphEdge<E>) => number,
+): GraphPath<N, E> | undefined {
+  const csr = getCSR(graph);
+  const source = csr.indexOf.get(sourceId);
+  const target = csr.indexOf.get(targetId);
+  if (source === undefined) {
+    // Unknown source: only the explicit self-path exists
+    return sourceId === targetId
+      ? {
+          source: graph.nodes.find((node) => node.id === sourceId)!,
+          steps: [],
+        }
+      : undefined;
   }
-  return undefined;
+  if (target === undefined) return undefined;
+
+  const n = csr.ids.length;
+  const arcs = getEdgeOrderArcs(graph, csr);
+  const arcCount = arcs.count;
+  const arcFrom = arcs.from;
+  const arcTo = arcs.to;
+  const arcEdge = arcs.edge;
+  let arcWeight = arcs.weight;
+  if (getWeight) {
+    arcWeight = new Float64Array(arcCount);
+    for (let a = 0; a < arcCount; a++) {
+      arcWeight[a] = getWeight(graph.edges[arcEdge[a]] as GraphEdge<E>);
+    }
+  }
+
+  const distArr = new Float64Array(n).fill(Infinity);
+  const prevNode = new Int32Array(n).fill(-1);
+  const prevEdge = new Int32Array(n).fill(-1);
+  distArr[source] = 0;
+
+  for (let round = 1; round < n; round++) {
+    let changed = false;
+    for (let a = 0; a < arcCount; a++) {
+      const du = distArr[arcFrom[a]];
+      if (du === Infinity) continue;
+      const nextDistance = du + arcWeight[a];
+      const t = arcTo[a];
+      if (nextDistance < distArr[t]) {
+        distArr[t] = nextDistance;
+        prevNode[t] = arcFrom[a];
+        prevEdge[t] = arcEdge[a];
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  for (let a = 0; a < arcCount; a++) {
+    const du = distArr[arcFrom[a]];
+    if (du === Infinity) continue;
+    if (du + arcWeight[a] < distArr[arcTo[a]]) {
+      throw new Error(
+        'Graph contains a negative-weight cycle reachable from the source node',
+      );
+    }
+  }
+
+  if (distArr[target] === Infinity) return undefined;
+
+  const sourceNode = graph.nodes[source] as GraphNode<N>;
+  const steps: GraphStep<N, E>[] = [];
+  for (let v = target; v !== source; v = prevNode[v]) {
+    steps.push({
+      edge: graph.edges[prevEdge[v]] as GraphEdge<E>,
+      node: graph.nodes[v] as GraphNode<N>,
+    });
+  }
+  steps.reverse();
+  return { source: sourceNode, steps };
 }
 
 /**
@@ -576,7 +648,7 @@ function bidirectionalShortestPath<N, E>(
     "Use { algorithm: 'bellman-ford' } instead.",
   );
 
-  const effectiveWeight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const arcWeights = getWeight ? undefined : getArcWeights(graph, csr);
   const n = csr.ids.length;
   const distF = new Float64Array(n).fill(Infinity);
   const distB = new Float64Array(n).fill(Infinity);
@@ -621,8 +693,9 @@ function bidirectionalShortestPath<N, E>(
     pqF.pop();
     settledF[u] = 1;
     for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-      const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
-      const weight = effectiveWeight(edge);
+      const weight = arcWeights
+        ? arcWeights.out[a]
+        : getWeight!(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>);
       const v = csr.outTargets[a];
       const next = d + weight;
       if (next < distF[v]) {
@@ -646,8 +719,9 @@ function bidirectionalShortestPath<N, E>(
     pqB.pop();
     settledB[u] = 1;
     for (let a = csr.inOffsets[u]; a < csr.inOffsets[u + 1]; a++) {
-      const edge = graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>;
-      const weight = effectiveWeight(edge);
+      const weight = arcWeights
+        ? arcWeights.in[a]
+        : getWeight!(graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>);
       const v = csr.inOrigins[a];
       const next = d + weight;
       if (next < distB[v]) {
@@ -772,47 +846,68 @@ export function getSimplePath<N, E>(
 export function getStronglyConnectedComponents<N>(
   graph: Graph<N>,
 ): GraphNode<N>[][] {
-  const idx = getIndex(graph);
-  let indexCounter = 0;
-  const nodeIndex = new Map<string, number>();
-  const lowlink = new Map<string, number>();
-  const onStack = new Set<string>();
-  const stack: string[] = [];
+  // Iterative Tarjan over the CSR out-arcs (non-directed edges contribute
+  // arcs both ways there, i.e. mutual reachability). One pass, typed-array
+  // state, no recursion — stack-safe on deep graphs.
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const nodes = graph.nodes;
+  const outOffsets = csr.outOffsets;
+  const outTargets = csr.outTargets;
   const result: GraphNode<N>[][] = [];
 
-  function strongconnect(id: string): void {
-    nodeIndex.set(id, indexCounter);
-    lowlink.set(id, indexCounter);
-    indexCounter++;
-    stack.push(id);
-    onStack.add(id);
+  const order = new Int32Array(n).fill(-1); // discovery index; -1 = unvisited
+  const lowlink = new Int32Array(n);
+  const onStack = new Uint8Array(n);
+  const sccStack = new Int32Array(n);
+  let sccTop = 0;
+  // Explicit DFS call stack: node + its next-arc cursor per frame
+  const frameNodes = new Int32Array(n);
+  const frameArcs = new Int32Array(n);
+  let counter = 0;
 
-    // getNeighborIds traverses non-directed (undirected/bidirectional) edges
-    // in both directions — such edges imply mutual reachability.
-    for (const neighborId of getNeighborIds(graph, id)) {
-      if (!nodeIndex.has(neighborId)) {
-        strongconnect(neighborId);
-        lowlink.set(id, Math.min(lowlink.get(id)!, lowlink.get(neighborId)!));
-      } else if (onStack.has(neighborId)) {
-        lowlink.set(id, Math.min(lowlink.get(id)!, nodeIndex.get(neighborId)!));
+  for (let root = 0; root < n; root++) {
+    if (order[root] !== -1) continue;
+    let top = 0;
+    frameNodes[0] = root;
+    frameArcs[0] = outOffsets[root];
+    order[root] = lowlink[root] = counter++;
+    sccStack[sccTop++] = root;
+    onStack[root] = 1;
+
+    while (top >= 0) {
+      const u = frameNodes[top];
+      const a = frameArcs[top];
+      if (a < outOffsets[u + 1]) {
+        frameArcs[top] = a + 1;
+        const v = outTargets[a];
+        if (order[v] === -1) {
+          order[v] = lowlink[v] = counter++;
+          sccStack[sccTop++] = v;
+          onStack[v] = 1;
+          top++;
+          frameNodes[top] = v;
+          frameArcs[top] = outOffsets[v];
+        } else if (onStack[v] && order[v] < lowlink[u]) {
+          lowlink[u] = order[v];
+        }
+      } else {
+        if (lowlink[u] === order[u]) {
+          const component: GraphNode<N>[] = [];
+          for (;;) {
+            const w = sccStack[--sccTop];
+            onStack[w] = 0;
+            component.push(nodes[w]);
+            if (w === u) break;
+          }
+          result.push(component);
+        }
+        top--;
+        if (top >= 0 && lowlink[u] < lowlink[frameNodes[top]]) {
+          lowlink[frameNodes[top]] = lowlink[u];
+        }
       }
     }
-
-    if (lowlink.get(id) === nodeIndex.get(id)) {
-      const component: GraphNode<N>[] = [];
-      let neighborId: string;
-      do {
-        neighborId = stack.pop()!;
-        onStack.delete(neighborId);
-        const ni = idx.nodeById.get(neighborId);
-        if (ni !== undefined) component.push(graph.nodes[ni]);
-      } while (neighborId !== id);
-      result.push(component);
-    }
-  }
-
-  for (const node of graph.nodes) {
-    if (!nodeIndex.has(node.id)) strongconnect(node.id);
   }
 
   return result;
@@ -1062,59 +1157,92 @@ function floydWarshallAllPaths<N, E>(
   getWeight?: (edge: GraphEdge<E>) => number,
   signal?: AbortSignal,
 ): GraphPath<N, E>[] {
-  const idx = getIndex(graph);
   const weight = getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-  const nodeIds = graph.nodes.map((node) => node.id);
-  const nodeCount = nodeIds.length;
-
-  const indexOf = new Map<string, number>();
-  for (let i = 0; i < nodeCount; i++) indexOf.set(nodeIds[i], i);
-
+  const nodes = graph.nodes;
+  const nodeCount = nodes.length;
+  const csr = getCSR(graph); // positions match graph.nodes order
   const INF = Infinity;
-  const dist: number[][] = Array.from({ length: nodeCount }, () =>
-    Array(nodeCount).fill(INF),
-  );
-  const prev: Array<Array<Array<{ from: number; edge: GraphEdge<E> }>>> =
-    Array.from({ length: nodeCount }, () =>
-      Array.from({ length: nodeCount }, () => []),
-    );
 
-  for (let i = 0; i < nodeCount; i++) dist[i][i] = 0;
+  // Flat n×n distance matrix; tie predecessors as flat (fromPos, edgeIndex)
+  // pair lists. On a strict improvement the winning list is *shared* (not
+  // cloned); `owned` tracks which slots may be appended to in place, and a
+  // shared list is cloned on first write (copy-on-write).
+  const dist = new Float64Array(nodeCount * nodeCount).fill(INF);
+  const prev: Array<number[] | undefined> = new Array(nodeCount * nodeCount);
+  const owned = new Uint8Array(nodeCount * nodeCount);
+  for (let i = 0; i < nodeCount; i++) dist[i * nodeCount + i] = 0;
 
-  for (const edge of graph.edges) {
-    const source = indexOf.get(edge.sourceId)!;
-    const target = indexOf.get(edge.targetId)!;
-    const edgeWeight = weight(edge as GraphEdge<E>);
-    if (edgeWeight < dist[source][target]) {
-      dist[source][target] = edgeWeight;
-      prev[source][target] = [{ from: source, edge: edge as GraphEdge<E> }];
-    } else if (edgeWeight === dist[source][target] && edgeWeight < INF) {
-      prev[source][target].push({ from: source, edge: edge as GraphEdge<E> });
+  for (let e = 0; e < graph.edges.length; e++) {
+    const edge = graph.edges[e] as GraphEdge<E>;
+    const s = csr.indexOf.get(edge.sourceId);
+    const t = csr.indexOf.get(edge.targetId);
+    if (s === undefined || t === undefined) continue;
+    const edgeWeight = weight(edge);
+    const forward = s * nodeCount + t;
+    if (edgeWeight < dist[forward]) {
+      dist[forward] = edgeWeight;
+      prev[forward] = [s, e];
+      owned[forward] = 1;
+    } else if (edgeWeight === dist[forward] && edgeWeight < INF) {
+      prev[forward]!.push(s, e);
     }
 
     if (getEdgeMode(graph, edge) !== 'directed') {
-      if (edgeWeight < dist[target][source]) {
-        dist[target][source] = edgeWeight;
-        prev[target][source] = [{ from: target, edge: edge as GraphEdge<E> }];
-      } else if (edgeWeight === dist[target][source] && edgeWeight < INF) {
-        prev[target][source].push({ from: target, edge: edge as GraphEdge<E> });
+      const backward = t * nodeCount + s;
+      if (edgeWeight < dist[backward]) {
+        dist[backward] = edgeWeight;
+        prev[backward] = [t, e];
+        owned[backward] = 1;
+      } else if (edgeWeight === dist[backward] && edgeWeight < INF) {
+        prev[backward]!.push(t, e);
       }
     }
   }
 
   for (let k = 0; k < nodeCount; k++) {
     throwIfAborted(signal);
+    const rowK = k * nodeCount;
     for (let i = 0; i < nodeCount; i++) {
+      const dik = dist[i * nodeCount + k];
+      if (dik === INF) continue;
+      const rowI = i * nodeCount;
       for (let j = 0; j < nodeCount; j++) {
-        if (dist[i][k] === INF || dist[k][j] === INF) continue;
-        const nextDistance = dist[i][k] + dist[k][j];
-        if (nextDistance < dist[i][j]) {
-          dist[i][j] = nextDistance;
-          prev[i][j] = prev[k][j].map((entry) => ({ ...entry }));
-        } else if (nextDistance === dist[i][j] && nextDistance < INF) {
-          for (const entry of prev[k][j]) {
-            if (!prev[i][j].some((existing) => existing.edge.id === entry.edge.id)) {
-              prev[i][j].push({ ...entry });
+        const dkj = dist[rowK + j];
+        if (dkj === INF) continue;
+        const nextDistance = dik + dkj;
+        const cell = rowI + j;
+        const current = dist[cell];
+        if (nextDistance < current) {
+          dist[cell] = nextDistance;
+          prev[cell] = prev[rowK + j];
+          owned[cell] = 0; // shared with row k — clone before any append
+        } else if (nextDistance === current && nextDistance < INF) {
+          const incoming = prev[rowK + j];
+          if (incoming === undefined || incoming.length === 0) continue;
+          // Shared reference (a prior strict improvement copied row k's
+          // list): contents are identical, merging is a no-op
+          if (incoming === prev[cell]) continue;
+          let pairs = prev[cell];
+          if (pairs === undefined) {
+            prev[cell] = pairs = [];
+            owned[cell] = 1;
+          }
+          // Merge with dedup by edge index (matches the previous
+          // edge-id-based dedup; edge indices are unique per edge)
+          for (let p = 1; p < incoming.length; p += 2) {
+            let seen = false;
+            for (let q = 1; q < pairs.length; q += 2) {
+              if (pairs[q] === incoming[p]) {
+                seen = true;
+                break;
+              }
+            }
+            if (!seen) {
+              if (!owned[cell]) {
+                prev[cell] = pairs = pairs.slice();
+                owned[cell] = 1;
+              }
+              pairs.push(incoming[p - 1], incoming[p]);
             }
           }
         }
@@ -1125,66 +1253,53 @@ function floydWarshallAllPaths<N, E>(
   // A negative self-distance means a negative cycle: all-pairs shortest
   // paths are undefined and reconstruction would loop forever.
   for (let i = 0; i < nodeCount; i++) {
-    if (dist[i][i] < 0) {
+    if (dist[i * nodeCount + i] < 0) {
       throw new Error(
-        `Negative cycle detected through node "${nodeIds[i]}": all-pairs shortest paths are undefined. ` +
+        `Negative cycle detected through node "${nodes[i].id}": all-pairs shortest paths are undefined. ` +
           `Remove the negative cycle, or use getShortestPaths with { algorithm: 'bellman-ford' } per source to locate it.`,
       );
     }
   }
 
+  // Enumerate every tie path per pair by walking the predecessor lists
+  // backward from the target with one shared step buffer — each emitted path
+  // costs a single O(length) copy, not a spread per recursion level.
   const results: GraphPath<N, E>[] = [];
-  for (let i = 0; i < nodeCount; i++) {
-    const sourceNi = idx.nodeById.get(nodeIds[i]);
-    if (sourceNi === undefined) continue;
-    const sourceNode = graph.nodes[sourceNi];
+  const edges = graph.edges;
+  const stepsBackward: GraphStep<N, E>[] = [];
+  let sourceIdx = 0;
+  let sourceNode = nodes[0] as GraphNode<N>;
 
-    for (let j = 0; j < nodeCount; j++) {
-      if (i === j || dist[i][j] === INF) continue;
-      results.push(
-        ...fwReconstruct(graph, prev, nodeIds, sourceNode, i, j),
-      );
+  const collect = (j: number): void => {
+    if (j === sourceIdx) {
+      const length = stepsBackward.length;
+      const steps = new Array<GraphStep<N, E>>(length);
+      for (let s = 0; s < length; s++) {
+        steps[s] = stepsBackward[length - 1 - s];
+      }
+      results.push({ source: sourceNode, steps });
+      return;
     }
-  }
-
-  return results;
-}
-
-function fwReconstruct<N, E>(
-  graph: Graph<N, E>,
-  prev: Array<Array<Array<{ from: number; edge: GraphEdge<E> }>>>,
-  nodeIds: string[],
-  sourceNode: GraphNode<N>,
-  sourceIdx: number,
-  targetIdx: number,
-): GraphPath<N, E>[] {
-  if (sourceIdx === targetIdx) {
-    return [{ source: sourceNode, steps: [] }];
-  }
-
-  const predecessors = prev[sourceIdx][targetIdx];
-  if (predecessors.length === 0) return [];
-
-  const idx = getIndex(graph);
-  const targetNi = idx.nodeById.get(nodeIds[targetIdx]);
-  if (targetNi === undefined) return [];
-  const targetNode = graph.nodes[targetNi];
-
-  const results: GraphPath<N, E>[] = [];
-  for (const { from, edge } of predecessors) {
-    const prefixPaths = fwReconstruct(
-      graph,
-      prev,
-      nodeIds,
-      sourceNode,
-      sourceIdx,
-      from,
-    );
-    for (const prefix of prefixPaths) {
-      results.push({
-        source: sourceNode,
-        steps: [...prefix.steps, { edge, node: targetNode }],
+    const pairs = prev[sourceIdx * nodeCount + j];
+    if (pairs === undefined || pairs.length === 0) return;
+    const targetNode = nodes[j] as GraphNode<N>;
+    for (let p = 0; p < pairs.length; p += 2) {
+      stepsBackward.push({
+        edge: edges[pairs[p + 1]] as GraphEdge<E>,
+        node: targetNode,
       });
+      collect(pairs[p]);
+      stepsBackward.pop();
+    }
+  };
+
+  for (let i = 0; i < nodeCount; i++) {
+    sourceIdx = i;
+    sourceNode = nodes[i] as GraphNode<N>;
+    const rowI = i * nodeCount;
+    for (let j = 0; j < nodeCount; j++) {
+      if (i === j || dist[rowI + j] === INF) continue;
+      collect(j);
     }
   }
 
@@ -1237,6 +1352,7 @@ export function getAStarPath<N, E>(
   const n = csr.ids.length;
   const source = csr.indexOf.get(sourceId)!;
   const target = csr.indexOf.get(targetId)!;
+  const arcWeights = opts.getWeight ? undefined : getArcWeights(graph, csr);
 
   const gScore = new Float64Array(n).fill(Infinity);
   // Predecessor as (fromPos, edgeIndex); -1 = none
@@ -1280,8 +1396,9 @@ export function getAStarPath<N, E>(
     closed[current] = 1;
 
     for (let a = csr.outOffsets[current]; a < csr.outOffsets[current + 1]; a++) {
-      const edge = graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>;
-      const weight = getWeight(edge);
+      const weight = arcWeights
+        ? arcWeights.out[a]
+        : getWeight(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>);
       const neighbor = csr.outTargets[a];
       if (closed[neighbor]) continue;
 

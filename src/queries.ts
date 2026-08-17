@@ -45,6 +45,29 @@ function getNonDirectedSelfLoopCounts(
   return counts;
 }
 
+/**
+ * Per-node degree map, cached on the index per version so a degree sweep over
+ * all nodes costs a single hashed lookup per call instead of re-deriving
+ * adjacency-list lengths (and self-loop corrections) each time.
+ */
+function getDegrees(graph: Graph, idx: GraphIndex): Map<string, number> {
+  const cached = idx.degrees;
+  if (cached && cached.version === idx.version && cached.mode === graph.mode) {
+    return cached.byId;
+  }
+  const byId = new Map<string, number>();
+  // outEdges/inEdges are seeded together per node, so their key order matches
+  for (const [id, outList] of idx.outEdges) {
+    byId.set(id, outList.length + (idx.inEdges.get(id)?.length ?? 0));
+  }
+  for (const [id, count] of getNonDirectedSelfLoopCounts(graph, idx)) {
+    const existing = byId.get(id);
+    if (existing !== undefined) byId.set(id, existing - count);
+  }
+  idx.degrees = { version: idx.version, mode: graph.mode, byId };
+  return byId;
+}
+
 // --- Edge queries ---
 
 /**
@@ -306,7 +329,11 @@ export function getDegree(graph: Graph, nodeId: string): number {
   // O(1) per call (amortized): an incident non-self-loop edge contributes
   // exactly one entry across the two lists regardless of mode, a directed
   // self-loop both entries (counts twice, intended), and a non-directed
-  // self-loop both entries but should count once — subtract the cached count.
+  // self-loop both entries but should count once — the cached per-node
+  // degree array folds all of that in.
+  const degree = getDegrees(graph, idx).get(nodeId);
+  if (degree !== undefined) return degree;
+  // Unknown node id: preserve the adjacency-list formula
   const out = idx.outEdges.get(nodeId);
   const inE = idx.inEdges.get(nodeId);
   const selfLoops = getNonDirectedSelfLoopCounts(graph, idx);

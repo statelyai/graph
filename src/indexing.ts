@@ -24,11 +24,30 @@ export interface GraphIndex {
    * index object identity + this version to revalidate in O(1).
    */
   version: number;
+  /**
+   * Lazy per-node degree cache (see `getDegree` in queries.ts). Stored on the
+   * index itself so a degree sweep pays one property load, not an extra
+   * WeakMap lookup, per call. Revalidated against `version` + `graph.mode`.
+   */
+  degrees?: {
+    version: number;
+    mode: Graph['mode'];
+    /** node id → degree; one hashed lookup per getDegree call */
+    byId: Map<string, number>;
+  };
 }
 
 // WeakMap cache
 
 const indexes = new WeakMap<Graph, GraphIndex>();
+
+// One-entry memo in front of the WeakMap: point queries (getDegree,
+// getNode, …) are typically issued in bursts against one graph, and a
+// pointer compare is measurably cheaper than a WeakMap lookup in such
+// sweeps. Holds a strong ref to the most recently indexed graph only —
+// cleared by invalidateIndex, replaced by the next graph queried.
+let lastGraph: Graph | undefined;
+let lastIdx: GraphIndex | undefined;
 
 // Public API
 
@@ -58,7 +77,7 @@ const indexes = new WeakMap<Graph, GraphIndex>();
  * ```
  */
 export function getIndex(graph: Graph): GraphIndex {
-  let idx = indexes.get(graph);
+  let idx = graph === lastGraph ? lastIdx : indexes.get(graph);
   // Rebuild when the arrays were replaced (immutable-style update) or
   // counts changed — the cached index describes different arrays.
   if (
@@ -71,6 +90,8 @@ export function getIndex(graph: Graph): GraphIndex {
     idx = buildIndex(graph);
     indexes.set(graph, idx);
   }
+  lastGraph = graph;
+  lastIdx = idx;
   return idx;
 }
 
@@ -94,6 +115,10 @@ export function getIndex(graph: Graph): GraphIndex {
  */
 export function invalidateIndex(graph: Graph): void {
   indexes.delete(graph);
+  if (graph === lastGraph) {
+    lastGraph = undefined;
+    lastIdx = undefined;
+  }
 }
 
 // Full rebuild
