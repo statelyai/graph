@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   createGraph,
   getFlattenedGraph,
+  getMappedGraph,
+  getFilteredGraph,
   getShortestPaths,
   getTopologicalSort,
   isAcyclic,
@@ -530,5 +532,116 @@ describe('getFlattenedGraph', () => {
     expect(edges).toContain('a2->end');
     expect(edges).toContain('b1->end');
     expect(edges).toContain('b2->end');
+  });
+});
+
+describe('getMappedGraph', () => {
+  it('maps node and edge data while preserving structure', () => {
+    const g = createGraph({
+      id: 'g',
+      initialNodeId: 'a',
+      nodes: [
+        { id: 'a', data: 1, x: 5, y: 6 },
+        { id: 'b', data: 2, parentId: 'a' },
+      ],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', data: 'x', weight: 3 },
+      ],
+      data: { name: 'meta' },
+    });
+
+    const mapped = getMappedGraph(g, {
+      node: (n) => n.data * 10,
+      edge: (e) => e.data.toUpperCase(),
+    });
+
+    expect(mapped.nodes.map((n) => n.data)).toEqual([10, 20]);
+    expect(mapped.edges[0].data).toBe('X');
+    // structure and metadata preserved
+    expect(mapped.id).toBe('g');
+    expect(mapped.initialNodeId).toBe('a');
+    expect(mapped.nodes[0].x).toBe(5);
+    expect(mapped.nodes[1].parentId).toBe('a');
+    expect(mapped.edges[0].weight).toBe(3);
+    expect(mapped.data).toEqual({ name: 'meta' });
+    // original untouched
+    expect(g.nodes[0].data).toBe(1);
+    expect(g.edges[0].data).toBe('x');
+  });
+
+  it('mapping only one entity kind leaves the other unchanged', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a', data: 1 }],
+      edges: [],
+    });
+    const mapped = getMappedGraph(g, {});
+    expect(mapped.nodes[0].data).toBe(1);
+  });
+
+  it('returning undefined clears data', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a', data: 1 }],
+      edges: [],
+    });
+    const mapped = getMappedGraph(g, { node: () => undefined });
+    expect(mapped.nodes[0].data).toBeNull();
+  });
+});
+
+describe('getFilteredGraph', () => {
+  const make = () =>
+    createGraph({
+      id: 'g',
+      initialNodeId: 'a',
+      nodes: [
+        { id: 'a', data: 1 },
+        { id: 'b', data: 2, parentId: 'a', initialNodeId: 'a' },
+        { id: 'c', data: 3, parentId: 'b' },
+      ],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
+        { id: 'bc', sourceId: 'b', targetId: 'c', weight: 2 },
+        { id: 'ca', sourceId: 'c', targetId: 'a', weight: 3 },
+      ],
+    });
+
+  it('filters nodes and drops incident edges', () => {
+    const filtered = getFilteredGraph(make(), { node: (n) => n.data < 3 });
+    expect(filtered.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(filtered.edges.map((e) => e.id)).toEqual(['ab']);
+    expect(filtered.initialNodeId).toBe('a');
+  });
+
+  it('filters edges without touching nodes', () => {
+    const filtered = getFilteredGraph(make(), { edge: (e) => e.weight! < 3 });
+    expect(filtered.nodes).toHaveLength(3);
+    expect(filtered.edges.map((e) => e.id)).toEqual(['ab', 'bc']);
+  });
+
+  it('combines node and edge predicates', () => {
+    const filtered = getFilteredGraph(make(), {
+      node: (n) => n.id !== 'c',
+      edge: (e) => e.weight! > 100,
+    });
+    expect(filtered.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(filtered.edges).toEqual([]);
+  });
+
+  it('strips dangling parent/initial references and graph initialNodeId', () => {
+    const filtered = getFilteredGraph(make(), { node: (n) => n.id !== 'a' });
+    expect(filtered.initialNodeId).toBeNull();
+    const b = filtered.nodes.find((n) => n.id === 'b')!;
+    expect(b.parentId).toBeUndefined();
+    expect(b.initialNodeId).toBeUndefined();
+    const c = filtered.nodes.find((n) => n.id === 'c')!;
+    expect(c.parentId).toBe('b');
+    expect(filtered.edges.map((e) => e.id)).toEqual(['bc']);
+  });
+
+  it('no predicates returns an equivalent copy', () => {
+    const g = make();
+    const filtered = getFilteredGraph(g, {});
+    expect(filtered.nodes).toHaveLength(3);
+    expect(filtered.edges).toHaveLength(3);
   });
 });

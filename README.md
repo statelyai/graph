@@ -408,7 +408,7 @@ Beyond classic graph algorithms, the library also includes utilities for evolvin
 
 - `getDiff()`, `getPatches()`, `getPatchedGraph()` (immutable), and `updateGraphWithPatches()` (mutable) for graph change tracking
 - `genRandomWalk()`, `genWeightedRandomWalk()`, and coverage helpers for model-based testing and simulation
-- `getSubgraph()`, `getNeighborhood()`, `getReversedGraph()`, and `getLineGraph()` for structural transforms
+- `getSubgraph()`, `getFilteredGraph()`, `getMappedGraph()`, `getNeighborhood()`, `getReversedGraph()`, and `getLineGraph()` for structural transforms
 - `getGraphUnion()`, `getGraphIntersection()`, `getGraphDifference()`, `getGraphSymmetricDifference()`, `getDisjointUnion()`, and `getGraphComplement()` for graph set operations
 
 Binary set operations match nodes and edges by stable ID, require matching graph modes, and retain graph metadata from the left operand. Union and intersection use right-side entity data when IDs conflict. Disjoint union keeps left IDs and deterministically remaps right-side collisions.

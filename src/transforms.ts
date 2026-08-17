@@ -1,4 +1,5 @@
 import type {
+  EdgeConfig,
   Graph,
   GraphEdge,
   GraphNode,
@@ -350,6 +351,126 @@ export function getReversedGraph<N, E, G>(
       if (e.sourcePort !== undefined) config.targetPort = e.sourcePort;
       return config;
     }),
+    data: graph.data,
+  });
+}
+
+// Map & filter transforms
+
+export interface MappedGraphOptions<N, E, P, N2, E2> {
+  /** Map each node's `data`. All other fields and the structure are preserved. */
+  node?: (node: GraphNode<N, P>) => N2;
+  /** Map each edge's `data`. All other fields and the structure are preserved. */
+  edge?: (edge: GraphEdge<E>) => E2;
+}
+
+export interface FilteredGraphOptions<N, E, P> {
+  /** Keep only nodes passing this predicate. Incident edges of dropped nodes are removed. */
+  node?: (node: GraphNode<N, P>) => boolean;
+  /** Keep only edges passing this predicate. Endpoints are unaffected. */
+  edge?: (edge: GraphEdge<E>) => boolean;
+}
+
+/**
+ * Returns a new graph with node and/or edge `data` transformed by the given
+ * mapping functions. Structure (IDs, endpoints, hierarchy, ports, layout) is
+ * preserved; only `data` changes. Returning `undefined` clears `data`.
+ *
+ * Keep mapped data JSON-serializable — no functions, classes, or symbols.
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getMappedGraph } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a', data: 1 }, { id: 'b', data: 2 }],
+ *   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b', data: 'x' }],
+ * });
+ *
+ * const doubled = getMappedGraph(graph, {
+ *   node: (n) => n.data * 2,
+ *   edge: (e) => e.data.toUpperCase(),
+ * });
+ * // doubled node data: 2, 4; edge data: 'X'
+ * ```
+ */
+export function getMappedGraph<N, E, G, P, N2 = N, E2 = E>(
+  graph: Graph<N, E, G, P>,
+  options: MappedGraphOptions<N, E, P, N2, E2>,
+): Graph<N2, E2, G, P> {
+  return createGraph({
+    id: graph.id,
+    mode: graph.mode,
+    initialNodeId: graph.initialNodeId ?? undefined,
+    nodes: graph.nodes.map((n) => {
+      const config = toNodeConfig(n) as NodeConfig<unknown, P>;
+      if (options.node) {
+        const data = options.node(n);
+        if (data === undefined) delete config.data;
+        else config.data = data;
+      }
+      return config as NodeConfig<N2, P>;
+    }),
+    edges: graph.edges.map((e) => {
+      const config = toEdgeConfig(e) as EdgeConfig<unknown>;
+      if (options.edge) {
+        const data = options.edge(e);
+        if (data === undefined) delete config.data;
+        else config.data = data;
+      }
+      return config as EdgeConfig<E2>;
+    }),
+    data: graph.data,
+  });
+}
+
+/**
+ * Returns a new graph keeping only nodes and edges that pass the given
+ * predicates. Dropping a node also drops its incident edges; parent and
+ * initial-node references to dropped nodes are removed (as in
+ * {@link getSubgraph}).
+ *
+ * @example
+ * ```ts
+ * import { createGraph, getFilteredGraph } from '@statelyai/graph';
+ *
+ * const graph = createGraph({
+ *   nodes: [{ id: 'a', data: 1 }, { id: 'b', data: 2 }, { id: 'c', data: 3 }],
+ *   edges: [
+ *     { id: 'ab', sourceId: 'a', targetId: 'b' },
+ *     { id: 'bc', sourceId: 'b', targetId: 'c' },
+ *   ],
+ * });
+ *
+ * const filtered = getFilteredGraph(graph, { node: (n) => n.data < 3 });
+ * // filtered.nodes: [a, b], filtered.edges: [ab]
+ * ```
+ */
+export function getFilteredGraph<N, E, G, P>(
+  graph: Graph<N, E, G, P>,
+  options: FilteredGraphOptions<N, E, P>,
+): Graph<N, E, G, P> {
+  const nodes = options.node
+    ? graph.nodes.filter((n) => options.node!(n))
+    : graph.nodes;
+  const nodeIdSet = new Set(nodes.map((n) => n.id));
+
+  return createGraph({
+    id: graph.id,
+    mode: graph.mode,
+    initialNodeId:
+      graph.initialNodeId && nodeIdSet.has(graph.initialNodeId)
+        ? graph.initialNodeId
+        : undefined,
+    nodes: nodes.map((n) => toScopedNodeConfig(n, nodeIdSet)),
+    edges: graph.edges
+      .filter(
+        (e) =>
+          nodeIdSet.has(e.sourceId) &&
+          nodeIdSet.has(e.targetId) &&
+          (options.edge ? options.edge(e) : true),
+      )
+      .map(toEdgeConfig),
     data: graph.data,
   });
 }

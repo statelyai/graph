@@ -279,9 +279,15 @@ export {
   getFlattenedGraph,
   flatten,
   getSubgraph,
+  getMappedGraph,
+  getFilteredGraph,
   getLineGraph,
   getReversedGraph,
   reverseGraph,
+} from './transforms';
+export type {
+  MappedGraphOptions,
+  FilteredGraphOptions,
 } from './transforms';
 export { getNeighborhood } from './neighborhood';
 
