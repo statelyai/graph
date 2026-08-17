@@ -1217,6 +1217,13 @@ export function getAStarPath<N, E>(
   const idx = getIndex(graph);
   const { from: sourceId, to: targetId, heuristic } = opts;
   const getWeight = opts.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const getHeuristic = (nodeId: string): number => {
+    const value = heuristic(nodeId);
+    if (!Number.isFinite(value)) {
+      throw new Error('A* heuristic must return a finite number');
+    }
+    return value;
+  };
 
   const sourceNi = idx.nodeById.get(sourceId);
   if (sourceNi === undefined) return undefined;
@@ -1250,7 +1257,7 @@ export function getAStarPath<N, E>(
   );
 
   gScore[source] = 0;
-  openSet.push(heuristic(sourceId), source);
+  openSet.push(getHeuristic(sourceId), source);
 
   while (openSet.size > 0) {
     const current = openSet.peekVal();
@@ -1283,7 +1290,10 @@ export function getAStarPath<N, E>(
         cameFromPos[neighbor] = current;
         cameFromEdge[neighbor] = csr.outEdgeIndex[a];
         gScore[neighbor] = tentativeScore;
-        openSet.push(tentativeScore + heuristic(csr.ids[neighbor]), neighbor);
+        openSet.push(
+          tentativeScore + getHeuristic(csr.ids[neighbor]),
+          neighbor,
+        );
       }
     }
   }

@@ -44,6 +44,7 @@ export type {
   TraversalOptions,
   TraversalDirection,
   TraversalSearchOptions,
+  PostorderOptions,
   MSTOptions,
   AllPairsShortestPathsOptions,
   NodeChange,
@@ -174,6 +175,7 @@ export {
 export {
   genBFS,
   genDFS,
+  genPostorder,
   bfs,
   dfs,
   isAcyclic,

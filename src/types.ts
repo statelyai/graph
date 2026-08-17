@@ -478,7 +478,8 @@ export interface AStarOptions<TEdgeData = any, TNodeData = any> {
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
   /**
    * Heuristic function estimating cost from a node to the target.
-   * Must be admissible (never overestimates the actual cost).
+   * Must return a finite number and be admissible (never overestimates the
+   * actual cost).
    */
   heuristic: (nodeId: string) => number;
 }
@@ -500,6 +501,13 @@ export interface TraversalSearchOptions {
   direction?: TraversalDirection;
   /** Maximum edge distance from a source. Default: `Infinity`. */
   radius?: number;
+}
+
+/** Options for eager postorder traversal with optional start-node inference. */
+export interface PostorderOptions
+  extends Omit<TraversalSearchOptions, 'from'> {
+  /** One or more source node IDs. Defaults to the graph's inferred source. */
+  from?: TraversalSearchOptions['from'];
 }
 
 export interface MSTOptions<TEdgeData = any> {

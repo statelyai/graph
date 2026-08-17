@@ -505,6 +505,25 @@ describe('getPostorder', () => {
     const order = getPostorder(g);
     expect(order.map((n) => n.id)).toEqual(['b', 'a']);
   });
+
+  it('supports traversal search options with an inferred source', () => {
+    const g = createGraph({
+      initialNodeId: 'c',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+        { id: 'dc', sourceId: 'd', targetId: 'c' },
+      ],
+    });
+
+    expect(
+      getPostorder(g, {
+        direction: 'incoming',
+        radius: 1,
+      }).map((node) => node.id),
+    ).toEqual(['b', 'd', 'c']);
+  });
 });
 
 // getPreorders / getPostorders (generator — all possible orderings)

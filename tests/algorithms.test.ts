@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createGraph } from '../src/graph';
+import { createGraph, deleteNode } from '../src/graph';
 import {
   genBFS,
   genDFS,
+  genPostorder,
   isAcyclic,
   getConnectedComponents,
   getTopologicalSort,
@@ -188,6 +189,94 @@ describe('BFS / DFS', () => {
     expect(() => [...genBFS(g, { from: 'a', radius: 1.5 })]).toThrow(
       /non-negative integer/,
     );
+  });
+
+  it('isolates active BFS and DFS traversals from structural mutations', () => {
+    for (const traverse of [genBFS, genDFS]) {
+      const g = createGraph({
+        nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+        edges: [
+          { id: 'ab', sourceId: 'a', targetId: 'b' },
+          { id: 'bc', sourceId: 'b', targetId: 'c' },
+        ],
+      });
+      const iterator = traverse(g, 'a');
+
+      expect(iterator.next().value?.id).toBe('a');
+      deleteNode(g, 'b');
+
+      expect([...iterator].map((node) => node.id)).toEqual(['b', 'c']);
+      expect([...traverse(g, 'a')].map((node) => node.id)).toEqual(['a']);
+    }
+  });
+});
+
+describe('genPostorder', () => {
+  it('lazily yields a canonical postorder', () => {
+    expect([...genPostorder(makeDAG(), 'a')].map((node) => node.id)).toEqual([
+      'd',
+      'b',
+      'c',
+      'a',
+    ]);
+  });
+
+  it('supports multiple sources, direction, and radius', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+        { id: 'dc', sourceId: 'd', targetId: 'c' },
+      ],
+    });
+
+    expect(
+      [
+        ...genPostorder(g, {
+          from: ['c', 'c'],
+          direction: 'incoming',
+          radius: 1,
+        }),
+      ].map((node) => node.id),
+    ).toEqual(['b', 'd', 'c']);
+    expect(
+      [...genPostorder(g, { from: ['a', 'd'], radius: 1 })].map(
+        (node) => node.id,
+      ),
+    ).toEqual(['c', 'b', 'a', 'd']);
+    expect([...genPostorder(g, { from: 'missing' })]).toEqual([]);
+    expect(() => [...genPostorder(g, { from: 'a', radius: -1 })]).toThrow(
+      /non-negative integer/,
+    );
+
+    const mixed = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', mode: 'undirected' },
+      ],
+    });
+    expect([...genPostorder(mixed, 'b')].map((node) => node.id)).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  it('isolates active traversal from structural mutations', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+    const iterator = genPostorder(g, 'a');
+
+    expect(iterator.next().value?.id).toBe('c');
+    deleteNode(g, 'b');
+
+    expect([...iterator].map((node) => node.id)).toEqual(['b', 'a']);
+    expect([...genPostorder(g, 'a')].map((node) => node.id)).toEqual(['a']);
   });
 });
 

@@ -55,6 +55,10 @@ function getStartPositions(
   return positions;
 }
 
+function getTraversalNodes<N>(graph: Graph<N>): GraphNode<N>[] {
+  return [...graph.nodes];
+}
+
 function getReachableWithinRadius(
   csr: ReturnType<typeof getCSR>,
   starts: readonly number[],
@@ -101,6 +105,7 @@ export function* genBFS<N>(
   startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
   const csr = getCSR(graph);
+  const nodes = getTraversalNodes(graph);
   const options = getTraversalOptions(startOrOptions);
   const starts = getStartPositions(csr.indexOf, options.from);
   if (starts.length === 0) return;
@@ -118,7 +123,7 @@ export function* genBFS<N>(
 
   while (head < tail) {
     const u = queue[head++];
-    yield graph.nodes[u];
+    yield nodes[u];
     if (depths[u] >= options.radius) continue;
 
     if (options.direction !== 'incoming') {
@@ -159,6 +164,7 @@ export function* genDFS<N>(
   startOrOptions: string | TraversalSearchOptions,
 ): Generator<GraphNode<N>> {
   const csr = getCSR(graph);
+  const nodes = getTraversalNodes(graph);
   const options = getTraversalOptions(startOrOptions);
   const starts = getStartPositions(csr.indexOf, options.from);
   if (starts.length === 0) return;
@@ -182,7 +188,7 @@ export function* genDFS<N>(
     const node = stack.pop()!;
     if (visited[node]) continue;
     visited[node] = 1;
-    yield graph.nodes[node];
+    yield nodes[node];
 
     if (options.direction !== 'incoming') {
       for (let i = csr.outOffsets[node]; i < csr.outOffsets[node + 1]; i++) {
@@ -198,6 +204,89 @@ export function* genDFS<N>(
         if (!visited[neighbor] && (reached === undefined || reached[neighbor])) {
           stack.push(neighbor);
         }
+      }
+    }
+  }
+}
+
+/**
+ * Lazily yields nodes after their reachable descendants.
+ *
+ * The active traversal retains its CSR and node-position snapshots, so later
+ * structural mutations are visible only to fresh generators.
+ */
+export function* genPostorder<N>(
+  graph: Graph<N>,
+  startOrOptions: string | TraversalSearchOptions,
+): Generator<GraphNode<N>> {
+  const csr = getCSR(graph);
+  const nodes = getTraversalNodes(graph);
+  const options = getTraversalOptions(startOrOptions);
+  const starts = getStartPositions(csr.indexOf, options.from);
+  if (starts.length === 0) return;
+
+  const reached =
+    options.radius === Infinity
+      ? undefined
+      : getReachableWithinRadius(
+          csr,
+          starts,
+          options.direction,
+          options.radius,
+        );
+  const discovered = new Uint8Array(csr.ids.length);
+  const stackNodes = new Int32Array(csr.ids.length);
+  const stackOutCursors = new Int32Array(csr.ids.length);
+  const stackInCursors = new Int32Array(csr.ids.length);
+  let stackSize = 0;
+
+  const addStackNode = (node: number) => {
+    const top = stackSize++;
+    discovered[node] = 1;
+    stackNodes[top] = node;
+    stackOutCursors[top] = csr.outOffsets[node];
+    stackInCursors[top] = csr.inOffsets[node];
+  };
+
+  for (const start of starts) {
+    if (discovered[start]) continue;
+    addStackNode(start);
+
+    while (stackSize > 0) {
+      const top = stackSize - 1;
+      const node = stackNodes[top];
+      let neighbor = -1;
+
+      if (options.direction !== 'incoming') {
+        while (stackOutCursors[top] < csr.outOffsets[node + 1]) {
+          const candidate = csr.outTargets[stackOutCursors[top]++];
+          if (
+            !discovered[candidate] &&
+            (reached === undefined || reached[candidate])
+          ) {
+            neighbor = candidate;
+            break;
+          }
+        }
+      }
+      if (neighbor === -1 && options.direction !== 'outgoing') {
+        while (stackInCursors[top] < csr.inOffsets[node + 1]) {
+          const candidate = csr.inOrigins[stackInCursors[top]++];
+          if (
+            !discovered[candidate] &&
+            (reached === undefined || reached[candidate])
+          ) {
+            neighbor = candidate;
+            break;
+          }
+        }
+      }
+
+      if (neighbor !== -1) {
+        addStackNode(neighbor);
+      } else {
+        stackSize--;
+        yield nodes[node];
       }
     }
   }

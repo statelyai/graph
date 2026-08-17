@@ -8,12 +8,17 @@ Conventions: `n` = nodes, `m` = edges, `k` = iterations. Default edge weight is 
 
 ## Traversal & ordering
 
+<!-- traversal and ordering functions exported from src/algorithms.ts -->
+
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
 | `genBFS(graph, startOrOptions)` | Lazy breadth-first node visit | O(n + m) | Accepts a node ID or `{ from, direction, radius }`; `from` may contain multiple IDs. CSR-backed. Unknown sources yield nothing. |
 | `genDFS(graph, startOrOptions)` | Lazy depth-first node visit | O(n + m) | Same traversal options as BFS. Iterative (no recursion limit), CSR-backed. |
-| `getPreorder(graph, opts?)` / `getPostorder(graph, opts?)` | One DFS pre/post ordering from `from` | O(n + m) | Deterministic: neighbors in index order. |
+| `genPostorder(graph, startOrOptions)` / `getPostorder(...)` | Lazy/eager DFS postorder | O(n + m) | Same options as BFS/DFS. Deterministic; descendants finish before parents. Omitting options from `getPostorder` retains initial/root inference. |
+| `getPreorder(graph, opts?)` | One DFS preorder from `from` | O(n + m) | Deterministic: neighbors in index order. |
 | `genPreorders(graph, opts?)` / `genPostorders(graph, opts?)` | All possible DFS pre/post orderings | exponential (output-sensitive) | Lazy; branches on every neighbor choice. `getPreorders`/`getPostorders` are the eager forms. |
+
+Active BFS, DFS, and postorder generators snapshot graph structure when iteration begins. Later structural mutations are not observed by that iterator; a fresh generator sees the updated graph.
 
 ## Connectivity & components
 
@@ -40,11 +45,13 @@ Conventions: `n` = nodes, `m` = edges, `k` = iterations. Default edge weight is 
 
 ## Shortest paths
 
+<!-- shortest-path functions and options exported from src/algorithms.ts and src/types.ts -->
+
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
 | `getShortestPath(graph, { from, to, ... })` | One shortest path or `undefined` | sublinear in practice | `from` accepts a node ID or predicate. A predicate matching multiple nodes returns the globally shortest path; graph order breaks ties. Single-pair ID queries use **bidirectional Dijkstra** (frontiers meet long before a unidirectional search finishes). Pass `algorithm: 'bellman-ford'` for negative weights (full search). |
 | `genShortestPaths(graph, opts?)` / `getShortestPaths(...)` | *All* tied shortest paths from `from` (to `to`, or to every reachable node) | Dijkstra O((n + m) log n) + lazy reconstruction | `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. Tie predecessors are recorded, so equal-cost alternatives are all yielded. With `to`, the search **early-exits** once everything at distance ≤ dist(target) settles. Paths are reconstructed on demand — abandoning the generator never pays for paths it didn't yield. Zero-weight cycles are handled (no revisits during reconstruction). |
-| `getAStarPath(graph, { from, to, heuristic, ... })` | One heuristic-guided shortest path | O((n + m) log n), heuristic-dependent | `from` accepts a node ID or predicate. Multiple matches return the globally shortest path; graph order breaks ties. Admissible heuristic ⇒ optimal path. |
+| `getAStarPath(graph, { from, to, heuristic, ... })` | One heuristic-guided shortest path | O((n + m) log n), heuristic-dependent | `from` accepts a node ID or predicate. Multiple matches return the globally shortest path; graph order breaks ties. Heuristics must be finite; admissible heuristic ⇒ optimal path. |
 | `getAllPairsShortestPaths(graph, opts?)` | Shortest paths between all pairs | Dijkstra-per-source (default) O(n(n + m) log n); `'floyd-warshall'` O(n³); `'bellman-ford'` O(n²m) | Floyd-Warshall throws on a negative cycle (self-distance < 0). Eager — output can be huge. |
 | `genShortestSimplePaths(graph, opts)` / `getShortestSimplePaths(...)` | Loopless alternatives in nondecreasing weight order | Yen: O(K·n·(m + n log n)) for K results | `from` and `to` are required. `limit` bounds results; omitting it enumerates every simple path by cost. Non-negative weights only. |
 | `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. DFS with backtracking; without `to`, every non-empty simple path is yielded. |
