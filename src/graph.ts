@@ -25,6 +25,7 @@ import {
   indexAddNode,
   indexAddEdge,
   indexReparentNode,
+  indexReplaceNode,
   indexUpdateEdgeEndpoints,
   touchIndex,
 } from './indexing';
@@ -697,6 +698,8 @@ export function updateNode<N, P = any>(
   }
   applyOptionalUpdates(updated, update, NODE_OPTIONAL_KEYS);
   graph.nodes[arrayIdx] = updated;
+  // Derived caches holding node objects (CSR snapshot) patch this slot
+  indexReplaceNode(idx, arrayIdx, updated);
 
   // Update hierarchy index if parentId changed
   if (update.parentId !== undefined && updated.parentId !== oldParentId) {

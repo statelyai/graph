@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGraph, deleteNode } from '../src/graph';
+import { createGraph, deleteNode, updateNode } from '../src/graph';
 import {
   genBFS,
   genDFS,
@@ -208,6 +208,23 @@ describe('BFS / DFS', () => {
       expect([...iterator].map((node) => node.id)).toEqual(['b', 'c']);
       expect([...traverse(g, 'a')].map((node) => node.id)).toEqual(['a']);
     }
+  });
+});
+
+describe('traversal after updateNode', () => {
+  it('fresh traversals see the replaced node object', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }],
+    });
+    // Warm the cached CSR (and its node snapshot) before the update
+    expect([...genBFS(g, 'a')][0].label).toBe(null);
+
+    updateNode(g, 'a', { label: 'new' });
+
+    expect([...genBFS(g, 'a')][0].label).toBe('new');
+    expect([...genDFS(g, 'a')][0].label).toBe('new');
+    expect([...genPostorder(g, 'a')][1].label).toBe('new');
   });
 });
 

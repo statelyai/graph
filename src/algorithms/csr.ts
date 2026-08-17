@@ -1,5 +1,5 @@
 import type { Graph, GraphMode, GraphNode } from '../types';
-import { getIndex, type GraphIndex } from '../indexing';
+import { getIndex, onIndexNodeReplaced, type GraphIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
 
 /**
@@ -61,6 +61,18 @@ interface CsrCacheEntry {
 }
 
 const csrCache = new WeakMap<GraphIndex, CsrCacheEntry>();
+
+// updateNode replaces the node object without touching the arrays, so no
+// version/staleness check can catch it — patch the cached snapshot slot
+// directly (positions are stable while node count is unchanged).
+onIndexNodeReplaced((idx, arrayIndex, node) => {
+  const cached = csrCache.get(idx);
+  if (cached === undefined) return;
+  const nodes = cached.csr.nodes;
+  if (arrayIndex < nodes.length && nodes[arrayIndex].id === node.id) {
+    nodes[arrayIndex] = node;
+  }
+});
 
 /** Get or lazily (re)build the CSR snapshot for a graph. */
 export function getCSR(graph: Graph): GraphCSR {

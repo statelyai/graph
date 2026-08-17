@@ -169,6 +169,35 @@ function buildIndex(graph: Graph): GraphIndex {
   };
 }
 
+// Node-replacement notifications — updateNode swaps the node object in
+// place (same id, same position, arrays untouched), which no staleness
+// check can see. Derived caches that captured node *objects* (the CSR's
+// node snapshot) subscribe here and patch the one slot in O(1) instead of
+// rebuilding or serving the stale object.
+
+type NodeReplacedListener = (
+  idx: GraphIndex,
+  arrayIndex: number,
+  node: GraphNode,
+) => void;
+
+const nodeReplacedListeners: NodeReplacedListener[] = [];
+
+export function onIndexNodeReplaced(listener: NodeReplacedListener): void {
+  nodeReplacedListeners.push(listener);
+}
+
+/** Notify derived caches that `graph.nodes[arrayIndex]` was replaced. */
+export function indexReplaceNode(
+  idx: GraphIndex,
+  arrayIndex: number,
+  node: GraphNode,
+): void {
+  for (const listener of nodeReplacedListeners) {
+    listener(idx, arrayIndex, node);
+  }
+}
+
 // Incremental updates — used by mutation functions in graph.ts
 
 export function indexAddNode(
