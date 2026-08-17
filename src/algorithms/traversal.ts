@@ -142,6 +142,22 @@ abstract class LazyTraversalIterator<N> extends IteratorBase {
     super();
   }
 
+  /**
+   * Run one-time setup, matching generator error semantics: if setup throws
+   * (e.g. radius validation), the error surfaces on this `next()` call and
+   * the iterator is permanently exhausted — a later `next()` returns done
+   * instead of touching half-initialized state.
+   */
+  protected ensureStarted(): void {
+    this.started = true;
+    try {
+      this.setup();
+    } catch (error) {
+      this.finished = true;
+      throw error;
+    }
+  }
+
   protected setup(): void {
     this.csr = getCSR(this.graph);
     this.nodes = getTraversalNodes(this.graph);
@@ -280,10 +296,7 @@ class BfsIterator<N> extends LazyTraversalIterator<N> {
 
   private nextSlow(): IteratorResult<GraphNode<N>, undefined> {
     if (this.finished) return DONE;
-    if (!this.started) {
-      this.started = true;
-      this.setup();
-    }
+    if (!this.started) this.ensureStarted();
     while (this.expandCursor <= this.head && this.expandCursor < this.tail) {
       this.expandChunk();
     }
@@ -429,10 +442,7 @@ class DfsIterator<N> extends LazyTraversalIterator<N> {
 
   private nextSlow(): IteratorResult<GraphNode<N>, undefined> {
     if (this.finished) return DONE;
-    if (!this.started) {
-      this.started = true;
-      this.setup();
-    }
+    if (!this.started) this.ensureStarted();
     this.fillBuffer();
     if (this.bufferLength === 0) {
       this.finished = true;
@@ -494,10 +504,7 @@ class PostorderIterator<N> extends LazyTraversalIterator<N> {
 
   next(): IteratorResult<GraphNode<N>, undefined> {
     if (this.finished) return DONE;
-    if (!this.started) {
-      this.started = true;
-      this.setup();
-    }
+    if (!this.started) this.ensureStarted();
     const discovered = this.discovered;
     const reached = this.reached;
     const stackNodes = this.stackNodes;

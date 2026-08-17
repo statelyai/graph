@@ -232,6 +232,18 @@ describe('traversal iterator closing', () => {
       expect(returned.next().done).toBe(true);
     }
   });
+
+  it('iterators are exhausted after a setup error, like generators', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+    });
+    for (const traverse of [genBFS, genDFS, genPostorder]) {
+      const it = traverse(g, { from: 'a', radius: -1 });
+      expect(() => it.next()).toThrow(RangeError);
+      expect(it.next().done).toBe(true);
+    }
+  });
 });
 
 describe('traversal after updateNode', () => {
