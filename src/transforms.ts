@@ -301,6 +301,8 @@ export function getSubgraph<N, E, G, P>(
       .filter((e) => nodeIdSet.has(e.sourceId) && nodeIdSet.has(e.targetId))
       .map(toEdgeConfig),
     data: graph.data,
+    direction: graph.direction,
+    style: graph.style,
   });
 }
 
@@ -352,6 +354,8 @@ export function getReversedGraph<N, E, G>(
       return config;
     }),
     data: graph.data,
+    direction: graph.direction,
+    style: graph.style,
   });
 }
 
@@ -421,6 +425,8 @@ export function getMappedGraph<N, E, G, P, N2 = N, E2 = E>(
       return config as EdgeConfig<E2>;
     }),
     data: graph.data,
+    direction: graph.direction,
+    style: graph.style,
   });
 }
 
@@ -472,6 +478,8 @@ export function getFilteredGraph<N, E, G, P>(
       )
       .map(toEdgeConfig),
     data: graph.data,
+    direction: graph.direction,
+    style: graph.style,
   });
 }
 

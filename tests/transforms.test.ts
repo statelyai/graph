@@ -645,3 +645,22 @@ describe('getFilteredGraph', () => {
     expect(filtered.edges).toHaveLength(3);
   });
 });
+
+describe('transform metadata preservation', () => {
+  it('getMappedGraph and getFilteredGraph keep graph direction and style', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a', data: 1 }, { id: 'b', data: 2 }],
+      edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+      direction: 'right',
+      style: { stroke: 'red' },
+    });
+
+    const mapped = getMappedGraph(g, { node: (n) => n.data * 2 });
+    expect(mapped.direction).toBe('right');
+    expect(mapped.style).toEqual({ stroke: 'red' });
+
+    const filtered = getFilteredGraph(g, { node: (n) => n.data < 2 });
+    expect(filtered.direction).toBe('right');
+    expect(filtered.style).toEqual({ stroke: 'red' });
+  });
+});
