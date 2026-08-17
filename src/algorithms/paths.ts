@@ -1183,7 +1183,12 @@ function floydWarshallAllPaths<N, E>(
       dist[forward] = edgeWeight;
       prev[forward] = [s, e];
       owned[forward] = 1;
-    } else if (edgeWeight === dist[forward] && edgeWeight < INF) {
+    } else if (edgeWeight === dist[forward] && edgeWeight < INF && s !== t) {
+      // A tying self-loop (zero-weight, s === t) is never recorded: it can't
+      // extend any enumerated path — only cycle it — and a recorded diagonal
+      // predecessor would propagate through tie merging into self-referential
+      // lists. (Negative self-loops still take the strict-improvement branch
+      // above and surface via the negative-cycle check.)
       prev[forward]!.push(s, e);
     }
 
@@ -1193,7 +1198,7 @@ function floydWarshallAllPaths<N, E>(
         dist[backward] = edgeWeight;
         prev[backward] = [t, e];
         owned[backward] = 1;
-      } else if (edgeWeight === dist[backward] && edgeWeight < INF) {
+      } else if (edgeWeight === dist[backward] && edgeWeight < INF && s !== t) {
         prev[backward]!.push(t, e);
       }
     }
@@ -1267,6 +1272,9 @@ function floydWarshallAllPaths<N, E>(
   const results: GraphPath<N, E>[] = [];
   const edges = graph.edges;
   const stepsBackward: GraphStep<N, E>[] = [];
+  // Zero-weight cycles can make tie-predecessor lists cyclic; never revisit
+  // a node already on the path being built (same guard as reconstructPathsAt)
+  const onPath = new Set<number>();
   let sourceIdx = 0;
   let sourceNode = nodes[0] as GraphNode<N>;
 
@@ -1283,14 +1291,18 @@ function floydWarshallAllPaths<N, E>(
     const pairs = prev[sourceIdx * nodeCount + j];
     if (pairs === undefined || pairs.length === 0) return;
     const targetNode = nodes[j] as GraphNode<N>;
+    onPath.add(j);
     for (let p = 0; p < pairs.length; p += 2) {
+      const from = pairs[p];
+      if (onPath.has(from)) continue;
       stepsBackward.push({
         edge: edges[pairs[p + 1]] as GraphEdge<E>,
         node: targetNode,
       });
-      collect(pairs[p]);
+      collect(from);
       stepsBackward.pop();
     }
+    onPath.delete(j);
   };
 
   for (let i = 0; i < nodeCount; i++) {

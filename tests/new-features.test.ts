@@ -716,4 +716,39 @@ describe('getAllPairsShortestPaths (additional)', () => {
     });
     expect(dPaths.length).toBe(fwPaths.length);
   });
+
+  it('floyd-warshall tolerates zero-weight self-loops', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [
+        { id: 'loop', sourceId: 'a', targetId: 'a', weight: 0 },
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 1 },
+      ],
+    });
+    const paths = getAllPairsShortestPaths(g, { algorithm: 'floyd-warshall' });
+    // One a→b path; the zero-weight self-loop never appears in any path
+    expect(paths).toHaveLength(1);
+    expect(paths[0].steps.map((s) => s.edge.id)).toEqual(['ab']);
+  });
+
+  it('floyd-warshall terminates on zero-weight directed cycles', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b', weight: 0 },
+        { id: 'ba', sourceId: 'b', targetId: 'a', weight: 0 },
+        { id: 'bc', sourceId: 'b', targetId: 'c', weight: 1 },
+      ],
+    });
+    const paths = getAllPairsShortestPaths(g, { algorithm: 'floyd-warshall' });
+    // Every path is simple: no node repeats within a single path
+    for (const path of paths) {
+      const seen = new Set<string>([path.source.id]);
+      for (const step of path.steps) {
+        expect(seen.has(step.node.id)).toBe(false);
+        seen.add(step.node.id);
+      }
+    }
+    expect(paths.length).toBeGreaterThanOrEqual(4); // a↔b, a→c, b→c at minimum
+  });
 });
