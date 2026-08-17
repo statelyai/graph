@@ -177,12 +177,15 @@ abstract class LazyTraversalIterator<N> extends IteratorBase {
 }
 
 /**
- * How many queued nodes a BFS iterator expands per batch. Batching keeps the
- * per-`next()` cost to a queue read while an abandoned iterator wastes at
- * most one chunk of neighbor expansion — the yield sequence is unchanged
- * (expansion happens in queue order either way).
+ * Traversal iterators batch work in chunks so a full traversal pays no
+ * per-yield overhead, while the chunk *ramps up* (INITIAL_CHUNK, doubling to
+ * MAX_CHUNK) so an early-exiting consumer stays effectively lazy: the first
+ * `next()` does ~8 nodes of work, not a full batch. The yield sequence is
+ * unchanged either way — batching only moves *when* neighbor expansion runs,
+ * never its order.
  */
-const BFS_CHUNK = 1024;
+const INITIAL_CHUNK = 8;
+const MAX_CHUNK = 1024;
 
 class BfsIterator<N> extends LazyTraversalIterator<N> {
   private visited!: Uint8Array;
@@ -191,6 +194,7 @@ class BfsIterator<N> extends LazyTraversalIterator<N> {
   private head = 0;
   private tail = 0;
   private expandCursor = 0;
+  private chunk = INITIAL_CHUNK;
 
   protected onSetup(): void {
     const n = this.csr.ids.length;
@@ -217,7 +221,8 @@ class BfsIterator<N> extends LazyTraversalIterator<N> {
     const radius = this.radius;
     let cursor = this.expandCursor;
     let tail = this.tail;
-    const limit = Math.min(cursor + BFS_CHUNK, tail);
+    const limit = Math.min(cursor + this.chunk, tail);
+    if (this.chunk < MAX_CHUNK) this.chunk *= 2;
 
     while (cursor < limit) {
       const u = queue[cursor++];
@@ -310,14 +315,12 @@ export function* bfs<N>(
 }
 
 /**
- * How many nodes a DFS iterator resolves per batch. The classic
- * duplicate-push stack loop runs with pure local state filling a small yield
- * buffer; `next()` then serves from the buffer. Same sequence as yielding
- * from inside the loop, but the hot loop carries no per-yield overhead, and
- * an abandoned iterator wastes at most one chunk of traversal.
+ * The classic duplicate-push stack DFS loop runs with pure local state
+ * filling a yield buffer; `next()` then serves from the buffer. Same
+ * sequence as yielding from inside the loop, but the hot loop carries no
+ * per-yield overhead, and the chunk ramp keeps early-exiting consumers
+ * effectively lazy (see INITIAL_CHUNK/MAX_CHUNK above).
  */
-const DFS_CHUNK = 1024;
-
 class DfsIterator<N> extends LazyTraversalIterator<N> {
   private visited!: Uint8Array;
   private reached: Uint8Array | undefined;
@@ -327,9 +330,10 @@ class DfsIterator<N> extends LazyTraversalIterator<N> {
   private stackSize = 0;
   // Resolved node objects, filled by the traversal loop (where the deref is
   // cache-adjacent) and served by next() with minimal work
-  private buffer: Array<GraphNode<N>> = new Array(DFS_CHUNK);
+  private buffer: Array<GraphNode<N>> = new Array(MAX_CHUNK);
   private bufferLength = 0;
   private bufferPos = 0;
+  private chunk = INITIAL_CHUNK;
 
   protected onSetup(): void {
     const csr = this.csr;
@@ -361,8 +365,10 @@ class DfsIterator<N> extends LazyTraversalIterator<N> {
     const inOrigins = this.inOrigins;
     let top = this.stackSize;
     let produced = 0;
+    const chunk = this.chunk;
+    if (chunk < MAX_CHUNK) this.chunk = chunk * 2;
 
-    while (produced < DFS_CHUNK && top > 0) {
+    while (produced < chunk && top > 0) {
       const node = stack[--top];
       if (visited[node]) continue;
       visited[node] = 1;
