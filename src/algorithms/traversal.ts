@@ -161,12 +161,21 @@ abstract class LazyTraversalIterator<N> extends IteratorBase {
   protected abstract onSetup(): void;
   abstract next(): IteratorResult<GraphNode<N>, undefined>;
 
+  /**
+   * Drop any buffered output. Subclasses with fast serve paths that bypass
+   * the `finished` flag override this so a closed iterator (via `return()`
+   * or `throw()`) cannot keep serving, matching generator semantics.
+   */
+  protected close(): void {}
+
   return(value?: undefined): IteratorResult<GraphNode<N>, undefined> {
+    this.close();
     this.finished = true;
     return { value, done: true };
   }
 
   throw(error?: unknown): IteratorResult<GraphNode<N>, undefined> {
+    this.close();
     this.finished = true;
     throw error;
   }
@@ -285,13 +294,11 @@ class BfsIterator<N> extends LazyTraversalIterator<N> {
     return { value: this.nodes[this.queue[this.head++]], done: false };
   }
 
-  override return(value?: undefined): IteratorResult<GraphNode<N>, undefined> {
+  protected override close(): void {
     // Neutralize the hot serve path for a closed iterator
     this.head = 0;
     this.expandCursor = 0;
     this.tail = 0;
-    this.finished = true;
-    return { value, done: true };
   }
 }
 
@@ -435,12 +442,10 @@ class DfsIterator<N> extends LazyTraversalIterator<N> {
     return { value: this.buffer[0], done: false };
   }
 
-  override return(value?: undefined): IteratorResult<GraphNode<N>, undefined> {
+  protected override close(): void {
     // Drop buffered nodes so a closed iterator cannot keep serving
     this.bufferPos = 0;
     this.bufferLength = 0;
-    this.finished = true;
-    return { value, done: true };
   }
 }
 

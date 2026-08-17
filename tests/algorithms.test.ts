@@ -211,6 +211,29 @@ describe('BFS / DFS', () => {
   });
 });
 
+describe('traversal iterator closing', () => {
+  it('iterators are exhausted after throw() and return(), like generators', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+    for (const traverse of [genBFS, genDFS, genPostorder]) {
+      const thrown = traverse(g, 'a');
+      thrown.next();
+      expect(() => thrown.throw(new Error('boom'))).toThrow('boom');
+      expect(thrown.next().done).toBe(true);
+
+      const returned = traverse(g, 'a');
+      returned.next();
+      expect(returned.return(undefined).done).toBe(true);
+      expect(returned.next().done).toBe(true);
+    }
+  });
+});
+
 describe('traversal after updateNode', () => {
   it('fresh traversals see the replaced node object', () => {
     const g = createGraph({
