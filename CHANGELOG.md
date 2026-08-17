@@ -1,5 +1,47 @@
 # @statelyai/graph
 
+## 2.2.0
+
+### Minor Changes
+
+- [#32](https://github.com/statelyai/graph/pull/32) [`3baa78c`](https://github.com/statelyai/graph/commit/3baa78c00487a847f317b2a33d0ac2201f395cda) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add lazy, multi-source, directional, radius-limited postorder traversal. Keep
+  active traversal structure stable across graph mutations and reject non-finite
+  A-star heuristic values.
+
+- [`e4a800e`](https://github.com/statelyai/graph/commit/e4a800ed5855778297a6ba61993376677c8d5449) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add immutable counterparts for graph CRUD, patch application, and layout geometry updates. These helpers return updated graph copies while leaving their input graphs untouched.
+
+- [`7b5ac38`](https://github.com/statelyai/graph/commit/7b5ac385d7d6fb7f5c2458dff9cc4440c523f268) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add graph-generic path-set and coverage utilities: path inspection and
+  containment, coverage targets and coverage-preserving reduction, edge-covering
+  path planning, ordered shortest simple paths, Eulerian paths/circuits, and line
+  graph construction.
+
+- [#31](https://github.com/statelyai/graph/pull/31) [`0bd1016`](https://github.com/statelyai/graph/commit/0bd10163ddce5820bf295da04f13cf54fd14877d) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add multi-source, directional, radius-limited BFS and DFS; induced neighborhood subgraphs; and graph union, intersection, difference, symmetric difference, disjoint union, and complement operations.
+
+- [`97622b1`](https://github.com/statelyai/graph/commit/97622b193462a1ae67f485d934a4efafe0921e9c) Thanks [@davidkpiano](https://github.com/davidkpiano)! - New algorithms, public kernel, cancellation, and format fidelity:
+
+  - **New algorithms**: `isPlanar` (left-right planarity test), `getTSPTour`
+    (nearest-neighbor + 2-opt), `getSteinerTree` (metric-closure
+    2-approximation), `getGraphColoring`/`isValidColoring` (Welsh–Powell and
+    DSatur), `genAllPairsShortestPaths` (lazy gen twin of
+    `getAllPairsShortestPaths`).
+  - **New generators**: `createWattsStrogatzGraph`, `createBarabasiAlbertGraph`.
+  - **New `@statelyai/graph/kernel` subpath**: `getIndex`, `getCSR`,
+    `invalidateIndex`, and `memoizeByGraph` — the fast-path primitives for
+    large graphs and third-party algorithm plugins.
+  - **Cancellation**: expensive algorithms (centrality, community detection,
+    max-flow, all-pairs paths, isomorphism, dominators) accept
+    `options.signal: AbortSignal`.
+  - **Round-trip fidelity**: DOT preserves graph attributes, node/edge
+    defaults, `rank=same`, HTML labels, and compass points; Mermaid preserves
+    `%%{init}%%` directives, click handlers, linkStyle (now index-stable),
+    state notes, mindmap `::icon()`, and block arrow tokens.
+  - **Fix**: `getAllPairsShortestPaths` no longer overflows the call stack on
+    graphs with a few hundred nodes.
+  - **Benchmarks**: reproducible via `pnpm bench:compare` (`--quick` variant,
+    JSON results, generated docs tables, fairness notes).
+
+- [#33](https://github.com/statelyai/graph/pull/33) [`66b3828`](https://github.com/statelyai/graph/commit/66b38287d0d66be0f5ccaae69ff1a21872e366e9) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add `getMappedGraph()` and `getFilteredGraph()` structural transforms. `getMappedGraph()` returns a new graph with node/edge `data` transformed by mapping functions while preserving all structure; `getFilteredGraph()` returns a new graph keeping only nodes and edges that pass the given predicates, dropping incident edges of removed nodes. `getSubgraph()`, `getReversedGraph()`, and the new transforms now also preserve graph-level `direction` and `style`.
+
 ## 2.1.0
 
 ### Minor Changes
