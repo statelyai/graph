@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGraph, deleteNode } from '../src/graph';
+import { createGraph, deleteNode, updateNode } from '../src/graph';
 import {
   genBFS,
   genDFS,
@@ -208,6 +208,58 @@ describe('BFS / DFS', () => {
       expect([...iterator].map((node) => node.id)).toEqual(['b', 'c']);
       expect([...traverse(g, 'a')].map((node) => node.id)).toEqual(['a']);
     }
+  });
+});
+
+describe('traversal iterator closing', () => {
+  it('iterators are exhausted after throw() and return(), like generators', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'bc', sourceId: 'b', targetId: 'c' },
+      ],
+    });
+    for (const traverse of [genBFS, genDFS, genPostorder]) {
+      const thrown = traverse(g, 'a');
+      thrown.next();
+      expect(() => thrown.throw(new Error('boom'))).toThrow('boom');
+      expect(thrown.next().done).toBe(true);
+
+      const returned = traverse(g, 'a');
+      returned.next();
+      expect(returned.return(undefined).done).toBe(true);
+      expect(returned.next().done).toBe(true);
+    }
+  });
+
+  it('iterators are exhausted after a setup error, like generators', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }],
+    });
+    for (const traverse of [genBFS, genDFS, genPostorder]) {
+      const it = traverse(g, { from: 'a', radius: -1 });
+      expect(() => it.next()).toThrow(RangeError);
+      expect(it.next().done).toBe(true);
+    }
+  });
+});
+
+describe('traversal after updateNode', () => {
+  it('fresh traversals see the replaced node object', () => {
+    const g = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }],
+    });
+    // Warm the cached CSR (and its node snapshot) before the update
+    expect([...genBFS(g, 'a')][0].label).toBe(null);
+
+    updateNode(g, 'a', { label: 'new' });
+
+    expect([...genBFS(g, 'a')][0].label).toBe('new');
+    expect([...genDFS(g, 'a')][0].label).toBe('new');
+    expect([...genPostorder(g, 'a')][1].label).toBe('new');
   });
 });
 

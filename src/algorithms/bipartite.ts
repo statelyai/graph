@@ -26,34 +26,17 @@ interface ColoringConflict {
  * proves the graph is not bipartite.
  */
 function getTwoColoring(graph: Graph): TwoColoring | ColoringConflict {
+  // 2-color straight over the cached CSR: the union of out-arcs and in-arcs
+  // covers every edge in both directions regardless of mode, so no separate
+  // undirected adjacency needs to be built (or allocated) per call.
   const csr = getCSR(graph);
   const n = csr.ids.length;
   const m = graph.edges.length;
 
-  // Undirected adjacency with the originating edge index per arc.
-  const degree = new Int32Array(n);
-  for (let e = 0; e < m; e++) {
-    const edge = graph.edges[e];
-    if (edge.sourceId === edge.targetId) {
-      return { conflictEdgeId: edge.id };
-    }
-    degree[csr.indexOf.get(edge.sourceId)!]++;
-    degree[csr.indexOf.get(edge.targetId)!]++;
-  }
-  const offsets = new Int32Array(n + 1);
-  for (let i = 0; i < n; i++) offsets[i + 1] = offsets[i] + degree[i];
-  const targets = new Int32Array(offsets[n]);
-  const arcEdge = new Int32Array(offsets[n]);
-  const cursor = Int32Array.from(offsets.subarray(0, n));
-  for (let e = 0; e < m; e++) {
-    const edge = graph.edges[e];
-    const s = csr.indexOf.get(edge.sourceId)!;
-    const t = csr.indexOf.get(edge.targetId)!;
-    targets[cursor[s]] = t;
-    arcEdge[cursor[s]++] = e;
-    targets[cursor[t]] = s;
-    arcEdge[cursor[t]++] = e;
-  }
+  const outOffsets = csr.outOffsets;
+  const outTargets = csr.outTargets;
+  const inOffsets = csr.inOffsets;
+  const inOrigins = csr.inOrigins;
 
   const colors = new Int8Array(n).fill(-1);
   const queue = new Int32Array(n);
@@ -65,15 +48,36 @@ function getTwoColoring(graph: Graph): TwoColoring | ColoringConflict {
     let tail = 1;
     while (head < tail) {
       const u = queue[head++];
-      for (let a = offsets[u]; a < offsets[u + 1]; a++) {
-        const v = targets[a];
+      const next = (1 - colors[u]) as 0 | 1;
+      for (let a = outOffsets[u]; a < outOffsets[u + 1]; a++) {
+        const v = outTargets[a];
         if (colors[v] === -1) {
-          colors[v] = (1 - colors[u]) as 0 | 1;
+          colors[v] = next;
           queue[tail++] = v;
-        } else if (colors[v] === colors[u]) {
-          return { conflictEdgeId: graph.edges[arcEdge[a]].id };
+        } else if (colors[v] !== next) {
+          return { conflictEdgeId: graph.edges[csr.outEdgeIndex[a]].id };
         }
       }
+      for (let a = inOffsets[u]; a < inOffsets[u + 1]; a++) {
+        const v = inOrigins[a];
+        if (colors[v] === -1) {
+          colors[v] = next;
+          queue[tail++] = v;
+        } else if (colors[v] !== next) {
+          return { conflictEdgeId: graph.edges[csr.inEdgeIndex[a]].id };
+        }
+      }
+    }
+  }
+
+  // Self-loops between existing nodes surface as arc conflicts above; a
+  // self-loop with a *dangling* endpoint contributes no arcs, so a final
+  // edge sweep keeps the previous "self-loops are never bipartite" contract.
+  // Only runs when the coloring succeeded — the hot early-exit path skips it.
+  for (let e = 0; e < m; e++) {
+    const edge = graph.edges[e];
+    if (edge.sourceId === edge.targetId) {
+      return { conflictEdgeId: edge.id };
     }
   }
 

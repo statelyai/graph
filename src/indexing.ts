@@ -24,11 +24,31 @@ export interface GraphIndex {
    * index object identity + this version to revalidate in O(1).
    */
   version: number;
+  /**
+   * Lazy per-node degree cache (see `getDegree` in queries.ts). Stored on the
+   * index itself so a degree sweep pays one property load, not an extra
+   * WeakMap lookup, per call. Revalidated against `version` + `graph.mode`.
+   */
+  degrees?: {
+    version: number;
+    mode: Graph['mode'];
+    /** node id → degree; one hashed lookup per getDegree call */
+    byId: Map<string, number>;
+  };
 }
 
 // WeakMap cache
 
 const indexes = new WeakMap<Graph, GraphIndex>();
+
+// One-entry memo in front of the WeakMap: point queries (getDegree,
+// getNode, …) are typically issued in bursts against one graph, and a
+// WeakRef deref + pointer compare is measurably cheaper than a WeakMap
+// lookup in such sweeps. Both refs are weak, so the memo never extends the
+// lifetime of a graph (the index itself is kept alive by the WeakMap value
+// exactly as long as its graph is).
+let lastGraphRef: WeakRef<Graph> | undefined;
+let lastIdxRef: WeakRef<GraphIndex> | undefined;
 
 // Public API
 
@@ -58,7 +78,10 @@ const indexes = new WeakMap<Graph, GraphIndex>();
  * ```
  */
 export function getIndex(graph: Graph): GraphIndex {
-  let idx = indexes.get(graph);
+  const memoGraph = lastGraphRef?.deref();
+  let idx =
+    (memoGraph === graph ? lastIdxRef?.deref() : undefined) ??
+    indexes.get(graph);
   // Rebuild when the arrays were replaced (immutable-style update) or
   // counts changed — the cached index describes different arrays.
   if (
@@ -70,6 +93,11 @@ export function getIndex(graph: Graph): GraphIndex {
   ) {
     idx = buildIndex(graph);
     indexes.set(graph, idx);
+    lastIdxRef = new WeakRef(idx);
+    if (memoGraph !== graph) lastGraphRef = new WeakRef(graph);
+  } else if (memoGraph !== graph) {
+    lastGraphRef = new WeakRef(graph);
+    lastIdxRef = new WeakRef(idx);
   }
   return idx;
 }
@@ -94,6 +122,10 @@ export function getIndex(graph: Graph): GraphIndex {
  */
 export function invalidateIndex(graph: Graph): void {
   indexes.delete(graph);
+  if (lastGraphRef?.deref() === graph) {
+    lastGraphRef = undefined;
+    lastIdxRef = undefined;
+  }
 }
 
 // Full rebuild
@@ -135,6 +167,35 @@ function buildIndex(graph: Graph): GraphIndex {
     edgesRef: graph.edges,
     version: 0,
   };
+}
+
+// Node-replacement notifications — updateNode swaps the node object in
+// place (same id, same position, arrays untouched), which no staleness
+// check can see. Derived caches that captured node *objects* (the CSR's
+// node snapshot) subscribe here and patch the one slot in O(1) instead of
+// rebuilding or serving the stale object.
+
+type NodeReplacedListener = (
+  idx: GraphIndex,
+  arrayIndex: number,
+  node: GraphNode,
+) => void;
+
+const nodeReplacedListeners: NodeReplacedListener[] = [];
+
+export function onIndexNodeReplaced(listener: NodeReplacedListener): void {
+  nodeReplacedListeners.push(listener);
+}
+
+/** Notify derived caches that `graph.nodes[arrayIndex]` was replaced. */
+export function indexReplaceNode(
+  idx: GraphIndex,
+  arrayIndex: number,
+  node: GraphNode,
+): void {
+  for (const listener of nodeReplacedListeners) {
+    listener(idx, arrayIndex, node);
+  }
 }
 
 // Incremental updates — used by mutation functions in graph.ts
