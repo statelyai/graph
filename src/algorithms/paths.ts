@@ -20,6 +20,23 @@ import {
 } from './shared';
 import { getArcWeights, getCSR, getEdgeOrderArcs } from './csr';
 import { throwIfAborted } from './abort';
+import { addFiniteNumbers, assertFiniteNumber } from './numeric';
+
+function assertFiniteEdgeWeight(
+  graph: Graph<any, any>,
+  edgeIndex: number,
+  weight: number,
+  algorithmName: string,
+): number {
+  return assertFiniteNumber(
+    weight,
+    `${algorithmName}: weight for edge "${graph.edges[edgeIndex].id}"`,
+  );
+}
+
+function addPathCost(left: number, right: number, algorithmName: string): number {
+  return addFiniteNumbers(left, right, `${algorithmName}: path cost`);
+}
 
 /** Cold path: load the offending edge and throw the negative-weight error. */
 function throwNegativeWeight(
@@ -170,18 +187,13 @@ function computeShortestDistances<N, E>(
   const stopAt = stopAtId !== undefined ? csr.indexOf.get(stopAtId) : undefined;
   let stopDistance = Infinity;
 
-  // An early-exit search may finish without scanning a reachable negative
-  // edge, so the throw-on-negative contract needs an up-front check; the
-  // full search keeps its scan-time checks (identical observable behavior)
-  if (stopAt !== undefined) {
-    assertNoNegativeWeights(
-      graph,
-      csr,
-      getWeight,
-      'Dijkstra',
-      "Use { algorithm: 'bellman-ford' } instead.",
-    );
-  }
+  assertNoNegativeWeights(
+    graph,
+    csr,
+    getWeight,
+    'Dijkstra',
+    "Use { algorithm: 'bellman-ford' } instead.",
+  );
 
   const useBFS = !getWeight && !graph.edges.some((edge) => edge.weight !== undefined);
 
@@ -228,9 +240,14 @@ function computeShortestDistances<N, E>(
       visited[u] = 1;
 
       for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
-        const weight = arcWeights
-          ? arcWeights[a]
-          : getWeight!(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>);
+        const weight = assertFiniteEdgeWeight(
+          graph,
+          csr.outEdgeIndex[a],
+          arcWeights
+            ? arcWeights[a]
+            : getWeight!(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>),
+          'Dijkstra',
+        );
         if (weight < 0) {
           throwNegativeWeight(
             graph,
@@ -241,7 +258,7 @@ function computeShortestDistances<N, E>(
           );
         }
         const v = csr.outTargets[a];
-        const nextDistance = distance + weight;
+        const nextDistance = addPathCost(distance, weight, 'Dijkstra');
 
         if (nextDistance < distArr[v]) {
           distArr[v] = nextDistance;
@@ -280,6 +297,8 @@ function bellmanFordTyped<N, E>(
     };
   }
 
+  assertFiniteWeights(graph, csr, getWeight, 'Bellman-Ford');
+
   // Cached compact arcs in edge order; custom weights overlay the endpoints
   const arcs = getEdgeOrderArcs(graph, csr);
   const arcCount = arcs.count;
@@ -304,7 +323,7 @@ function bellmanFordTyped<N, E>(
     for (let a = 0; a < arcCount; a++) {
       const du = distArr[arcFrom[a]];
       if (du === Infinity) continue;
-      const nextDistance = du + arcWeight[a];
+      const nextDistance = addPathCost(du, arcWeight[a], 'Bellman-Ford');
       const t = arcTo[a];
       const existing = distArr[t];
       if (nextDistance < existing) {
@@ -331,7 +350,7 @@ function bellmanFordTyped<N, E>(
   for (let a = 0; a < arcCount; a++) {
     const du = distArr[arcFrom[a]];
     if (du === Infinity) continue;
-    if (du + arcWeight[a] < distArr[arcTo[a]]) {
+    if (addPathCost(du, arcWeight[a], 'Bellman-Ford') < distArr[arcTo[a]]) {
       throw new Error(
         'Graph contains a negative-weight cycle reachable from the source node',
       );
@@ -522,6 +541,8 @@ function bellmanFordSinglePath<N, E>(
   }
   if (target === undefined) return undefined;
 
+  assertFiniteWeights(graph, csr, getWeight, 'Bellman-Ford');
+
   const n = csr.ids.length;
   const arcs = getEdgeOrderArcs(graph, csr);
   const arcCount = arcs.count;
@@ -546,7 +567,7 @@ function bellmanFordSinglePath<N, E>(
     for (let a = 0; a < arcCount; a++) {
       const du = distArr[arcFrom[a]];
       if (du === Infinity) continue;
-      const nextDistance = du + arcWeight[a];
+      const nextDistance = addPathCost(du, arcWeight[a], 'Bellman-Ford');
       const t = arcTo[a];
       if (nextDistance < distArr[t]) {
         distArr[t] = nextDistance;
@@ -561,7 +582,7 @@ function bellmanFordSinglePath<N, E>(
   for (let a = 0; a < arcCount; a++) {
     const du = distArr[arcFrom[a]];
     if (du === Infinity) continue;
-    if (du + arcWeight[a] < distArr[arcTo[a]]) {
+    if (addPathCost(du, arcWeight[a], 'Bellman-Ford') < distArr[arcTo[a]]) {
       throw new Error(
         'Graph contains a negative-weight cycle reachable from the source node',
       );
@@ -598,13 +619,24 @@ function assertNoNegativeWeights<N, E>(
   let offending: GraphEdge<E> | undefined;
   let weight = 0;
   if (getWeight === undefined) {
+    if (csr.firstNonFiniteWeightEdge !== -1) {
+      const edge = graph.edges[csr.firstNonFiniteWeightEdge] as GraphEdge<E>;
+      assertFiniteEdgeWeight(
+        graph,
+        csr.firstNonFiniteWeightEdge,
+        edge.weight ?? 1,
+        algorithmName,
+      );
+    }
     if (csr.firstNegativeEdge !== -1) {
       offending = graph.edges[csr.firstNegativeEdge] as GraphEdge<E>;
       weight = offending.weight ?? 1;
     }
   } else {
-    for (const edge of graph.edges) {
+    for (let edgeIndex = 0; edgeIndex < graph.edges.length; edgeIndex++) {
+      const edge = graph.edges[edgeIndex] as GraphEdge<E>;
       const w = getWeight(edge as GraphEdge<E>);
+      assertFiniteEdgeWeight(graph, edgeIndex, w, algorithmName);
       if (w < 0) {
         offending = edge as GraphEdge<E>;
         weight = w;
@@ -615,6 +647,33 @@ function assertNoNegativeWeights<N, E>(
   if (offending) {
     throw new Error(
       `Negative edge weight ${weight} on edge "${offending.sourceId}->${offending.targetId}" (id "${offending.id}"): ${algorithmName} requires non-negative weights. ${remedy}`,
+    );
+  }
+}
+
+function assertFiniteWeights<N, E>(
+  graph: Graph<N, E>,
+  csr: ReturnType<typeof getCSR>,
+  getWeight: ((edge: GraphEdge<E>) => number) | undefined,
+  algorithmName: string,
+): void {
+  if (getWeight === undefined) {
+    if (csr.firstNonFiniteWeightEdge === -1) return;
+    const edge = graph.edges[csr.firstNonFiniteWeightEdge] as GraphEdge<E>;
+    assertFiniteEdgeWeight(
+      graph,
+      csr.firstNonFiniteWeightEdge,
+      edge.weight ?? 1,
+      algorithmName,
+    );
+    return;
+  }
+  for (let edgeIndex = 0; edgeIndex < graph.edges.length; edgeIndex++) {
+    assertFiniteEdgeWeight(
+      graph,
+      edgeIndex,
+      getWeight(graph.edges[edgeIndex] as GraphEdge<E>),
+      algorithmName,
     );
   }
 }
@@ -697,7 +756,7 @@ function bidirectionalShortestPath<N, E>(
         ? arcWeights.out[a]
         : getWeight!(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>);
       const v = csr.outTargets[a];
-      const next = d + weight;
+      const next = addPathCost(d, weight, 'Dijkstra');
       if (next < distF[v]) {
         distF[v] = next;
         predF[v] = u;
@@ -706,9 +765,12 @@ function bidirectionalShortestPath<N, E>(
       }
       // distB[v] is the cost of a real backward path (tentative or settled),
       // so next + distB[v] is the cost of a real s→t path
-      if (distB[v] !== Infinity && next + distB[v] < mu) {
-        mu = next + distB[v];
-        meet = v;
+      if (distB[v] !== Infinity) {
+        const candidate = addPathCost(next, distB[v], 'Dijkstra');
+        if (candidate < mu) {
+          mu = candidate;
+          meet = v;
+        }
       }
     }
   };
@@ -723,16 +785,19 @@ function bidirectionalShortestPath<N, E>(
         ? arcWeights.in[a]
         : getWeight!(graph.edges[csr.inEdgeIndex[a]] as GraphEdge<E>);
       const v = csr.inOrigins[a];
-      const next = d + weight;
+      const next = addPathCost(d, weight, 'Dijkstra');
       if (next < distB[v]) {
         distB[v] = next;
         predB[v] = u;
         predBEdge[v] = csr.inEdgeIndex[a];
         pqB.push(next, v);
       }
-      if (distF[v] !== Infinity && next + distF[v] < mu) {
-        mu = next + distF[v];
-        meet = v;
+      if (distF[v] !== Infinity) {
+        const candidate = addPathCost(next, distF[v], 'Dijkstra');
+        if (candidate < mu) {
+          mu = candidate;
+          meet = v;
+        }
       }
     }
   };
@@ -743,7 +808,7 @@ function bidirectionalShortestPath<N, E>(
     // A side running dry means its dist array is final everywhere reachable,
     // so mu already equals the optimum (or stays Infinity: no path)
     if (topF === undefined || topB === undefined) break;
-    if (topF + topB >= mu) break;
+    if (addPathCost(topF, topB, 'Dijkstra') >= mu) break;
     if (topF <= topB) scanForward();
     else scanBackward();
   }
@@ -1161,6 +1226,7 @@ function floydWarshallAllPaths<N, E>(
   const nodes = graph.nodes;
   const nodeCount = nodes.length;
   const csr = getCSR(graph); // positions match graph.nodes order
+  assertFiniteWeights(graph, csr, getWeight, 'Floyd-Warshall');
   const INF = Infinity;
 
   // Flat n×n distance matrix; tie predecessors as flat (fromPos, edgeIndex)
@@ -1177,7 +1243,12 @@ function floydWarshallAllPaths<N, E>(
     const s = csr.indexOf.get(edge.sourceId);
     const t = csr.indexOf.get(edge.targetId);
     if (s === undefined || t === undefined) continue;
-    const edgeWeight = weight(edge);
+    const edgeWeight = assertFiniteEdgeWeight(
+      graph,
+      e,
+      weight(edge),
+      'Floyd-Warshall',
+    );
     const forward = s * nodeCount + t;
     if (edgeWeight < dist[forward]) {
       dist[forward] = edgeWeight;
@@ -1214,7 +1285,7 @@ function floydWarshallAllPaths<N, E>(
       for (let j = 0; j < nodeCount; j++) {
         const dkj = dist[rowK + j];
         if (dkj === INF) continue;
-        const nextDistance = dik + dkj;
+        const nextDistance = addPathCost(dik, dkj, 'Floyd-Warshall');
         const cell = rowI + j;
         const current = dist[cell];
         if (nextDistance < current) {
@@ -1356,10 +1427,6 @@ export function getAStarPath<N, E>(
   if (sourceNi === undefined) return undefined;
   if (!idx.nodeById.has(targetId)) return undefined;
 
-  if (sourceId === targetId) {
-    return { source: graph.nodes[sourceNi], steps: [] };
-  }
-
   const csr = getCSR(graph);
   const n = csr.ids.length;
   const source = csr.indexOf.get(sourceId)!;
@@ -1383,6 +1450,11 @@ export function getAStarPath<N, E>(
     'A*',
     "Use getShortestPath with { algorithm: 'bellman-ford' } instead.",
   );
+
+  if (sourceId === targetId) {
+    getHeuristic(sourceId);
+    return { source: graph.nodes[sourceNi], steps: [] };
+  }
 
   gScore[source] = 0;
   openSet.push(getHeuristic(sourceId), source);
@@ -1408,19 +1480,28 @@ export function getAStarPath<N, E>(
     closed[current] = 1;
 
     for (let a = csr.outOffsets[current]; a < csr.outOffsets[current + 1]; a++) {
-      const weight = arcWeights
-        ? arcWeights.out[a]
-        : getWeight(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>);
+      const weight = assertFiniteEdgeWeight(
+        graph,
+        csr.outEdgeIndex[a],
+        arcWeights
+          ? arcWeights.out[a]
+          : getWeight(graph.edges[csr.outEdgeIndex[a]] as GraphEdge<E>),
+        'A*',
+      );
       const neighbor = csr.outTargets[a];
       if (closed[neighbor]) continue;
 
-      const tentativeScore = gScore[current] + weight;
+      const tentativeScore = addPathCost(gScore[current], weight, 'A*');
       if (tentativeScore < gScore[neighbor]) {
         cameFromPos[neighbor] = current;
         cameFromEdge[neighbor] = csr.outEdgeIndex[a];
         gScore[neighbor] = tentativeScore;
         openSet.push(
-          tentativeScore + getHeuristic(csr.ids[neighbor]),
+          addPathCost(
+            tentativeScore,
+            getHeuristic(csr.ids[neighbor]),
+            'A*',
+          ),
           neighbor,
         );
       }

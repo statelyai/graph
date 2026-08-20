@@ -6,9 +6,12 @@ export {
   dfs,
   isAcyclic,
   getConnectedComponents,
+  getUnweightedDistances,
   getTopologicalSort,
   hasPath,
   isConnected,
+  isWeaklyConnected,
+  isStronglyConnected,
   isTree,
 } from './algorithms/traversal';
 

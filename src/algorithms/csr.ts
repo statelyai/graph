@@ -46,6 +46,8 @@ export interface GraphCSR {
    * weight; custom `getWeight` callbacks need their own scan.
    */
   firstNegativeEdge: number;
+  /** Index of the first non-finite default edge weight, or -1. */
+  firstNonFiniteWeightEdge: number;
   /**
    * Whether any edge's *effective* mode is not `'directed'` (dangling edges
    * included). Lets directed-only algorithms (topological sort) bail out in
@@ -104,10 +106,15 @@ function buildCSR(graph: Graph): GraphCSR {
   const outCounts = new Int32Array(n);
   const inCounts = new Int32Array(n);
   let firstNegativeEdge = -1;
+  let firstNonFiniteWeightEdge = -1;
   let hasNonDirected = false;
   for (let e = 0; e < m; e++) {
     const edge = graph.edges[e];
-    if (firstNegativeEdge === -1 && (edge.weight ?? 1) < 0) {
+    const weight = edge.weight ?? 1;
+    if (firstNonFiniteWeightEdge === -1 && !Number.isFinite(weight)) {
+      firstNonFiniteWeightEdge = e;
+    }
+    if (firstNegativeEdge === -1 && weight < 0) {
       firstNegativeEdge = e;
     }
     const nd = getEdgeMode(graph, edge) !== 'directed' ? 1 : 0;
@@ -171,6 +178,7 @@ function buildCSR(graph: Graph): GraphCSR {
     inOrigins,
     inEdgeIndex,
     firstNegativeEdge,
+    firstNonFiniteWeightEdge,
     hasNonDirected,
   };
 }

@@ -92,7 +92,7 @@ const neighbors = getNeighbors(graph, 'a'); // adjacent nodes
 const roots = getSources(graph); // nodes with no incoming edges
 ```
 
-Batch operations (`addEntities`, `deleteEntities`, `updateEntities`) let you apply multiple changes at once.
+Batch operations (`addEntities`, `deleteEntities`, `updateEntities`) let you apply multiple changes at once. `deleteEntities` accepts any iterable of IDs, collects it before mutation, and filters nodes/edges in one pass.
 
 Every mutable CRUD operation has an immutable counterpart:
 
@@ -209,7 +209,7 @@ const parsed = GraphSchema.parse(unknownValue);
 
 <!-- algorithm functions exported from src/algorithms.ts -->
 
-Includes traversal (BFS, DFS, preorder/postorder), pathfinding (shortest path, ordered shortest simple paths, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), Eulerian paths/circuits, centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), graph coloring (`getGraphColoring`, `isValidColoring`), planarity testing (`isPlanar`), approximate TSP tours (`getTSPTour`) and Steiner trees (`getSteinerTree`), cycle detection, connected/strongly-connected components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`, `createWattsStrogatzGraph`, `createBarabasiAlbertGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
+Includes traversal (BFS, DFS, preorder/postorder), unweighted hop distances, pathfinding (shortest path, ordered shortest simple paths, simple paths, all-pairs shortest paths, A*, bidirectional Dijkstra), Eulerian paths/circuits, centrality/link analysis (degree, closeness, betweenness, PageRank, HITS, eigenvector, Katz), community detection (Louvain, label propagation, Girvan-Newman, greedy modularity, modularity scoring), flow & cuts (`getMaxFlow`, `getMinCut`), bipartite analysis (`isBipartite`, Hopcroft–Karp `getMaximumBipartiteMatching`), k-cores (`getCoreNumbers`, `getKCore`), graph coloring (`getGraphColoring`, `isValidColoring`), planarity testing (`isPlanar`), approximate TSP tours (`getTSPTour`) and Steiner trees (`getSteinerTree`), cycle detection, weak/strong connectivity and components, bridges, articulation points, biconnected components, dominator trees, transitive reduction, isomorphism, topological sort, minimum spanning tree, and seeded graph generators (`createCompleteGraph`, `createGridGraph`, `createRandomGraph`, `createWattsStrogatzGraph`, `createBarabasiAlbertGraph`). Many algorithms have lazy generator variants (`gen*`) for early exit. See [docs/algorithms.md](./docs/algorithms.md) for the full reference.
 
 Hot algorithm loops (centrality, components) run on an internal compressed-sparse-row snapshot — cached and invalidated transparently like the rest of the index — so they stay fast on large graphs without changing the plain-JSON model. Algorithm results are differential-tested against graphology on seeded random graphs.
 
@@ -224,6 +224,8 @@ import {
   getCycles,
   getTopologicalSort,
   getConnectedComponents,
+  getUnweightedDistances,
+  isStronglyConnected,
   getMinimumSpanningTree,
   getPageRank,
   getLouvainCommunities,
@@ -267,6 +269,8 @@ getShortestPath(graph, {
 }); // shortest path from any matching source
 getTopologicalSort(graph); // topological order (or null)
 getConnectedComponents(graph); // connected components
+getUnweightedDistances(graph, 'a'); // reachable node IDs → hop counts
+isStronglyConnected(graph); // every node reaches every other node
 getMinimumSpanningTree(graph, { getWeight: (e) => e.weight ?? 1 }); // MST
 getPageRank(graph); // link analysis scores
 getLouvainCommunities(graph); // community detection (Louvain)
@@ -409,6 +413,7 @@ Beyond classic graph algorithms, the library also includes utilities for evolvin
 - `getDiff()`, `getPatches()`, `getPatchedGraph()` (immutable), and `updateGraphWithPatches()` (mutable) for graph change tracking
 - `genRandomWalk()`, `genWeightedRandomWalk()`, and coverage helpers for model-based testing and simulation
 - `getSubgraph()`, `getFilteredGraph()`, `getMappedGraph()`, `getNeighborhood()`, `getReversedGraph()`, and `getLineGraph()` for structural transforms
+- Mapping/filtering transforms capture node and edge collections before callbacks run, so callback-driven structural mutation cannot produce a torn result
 - `getGraphUnion()`, `getGraphIntersection()`, `getGraphDifference()`, `getGraphSymmetricDifference()`, `getDisjointUnion()`, and `getGraphComplement()` for graph set operations
 
 Binary set operations match nodes and edges by stable ID, require matching graph modes, and retain graph metadata from the left operand. Union and intersection use right-side entity data when IDs conflict. Disjoint union keeps left IDs and deterministically remaps right-side collisions.

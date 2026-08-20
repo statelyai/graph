@@ -3,6 +3,7 @@ import type {
   GraphNode,
   TraversalDirection,
   TraversalSearchOptions,
+  UnweightedDistanceOptions,
 } from '../types';
 import { getIndex } from '../indexing';
 import {
@@ -792,6 +793,54 @@ export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
 }
 
 /**
+ * Returns minimum hop counts from `sourceId` to every reachable node.
+ * Unknown sources return an empty map. Results follow BFS discovery order.
+ */
+export function getUnweightedDistances(
+  graph: Graph,
+  sourceId: string,
+  options?: UnweightedDistanceOptions,
+): Map<string, number> {
+  const csr = getCSR(graph);
+  const source = csr.indexOf.get(sourceId);
+  const result = new Map<string, number>();
+  if (source === undefined) return result;
+
+  const direction = options?.direction ?? 'outgoing';
+  const distances = new Int32Array(csr.ids.length).fill(-1);
+  const queue = new Int32Array(csr.ids.length);
+  distances[source] = 0;
+  queue[0] = source;
+  let head = 0;
+  let tail = 1;
+
+  while (head < tail) {
+    const node = queue[head++];
+    const distance = distances[node];
+    result.set(csr.ids[node], distance);
+
+    if (direction !== 'incoming') {
+      for (let arc = csr.outOffsets[node]; arc < csr.outOffsets[node + 1]; arc++) {
+        const neighbor = csr.outTargets[arc];
+        if (distances[neighbor] !== -1) continue;
+        distances[neighbor] = distance + 1;
+        queue[tail++] = neighbor;
+      }
+    }
+    if (direction !== 'outgoing') {
+      for (let arc = csr.inOffsets[node]; arc < csr.inOffsets[node + 1]; arc++) {
+        const neighbor = csr.inOrigins[arc];
+        if (distances[neighbor] !== -1) continue;
+        distances[neighbor] = distance + 1;
+        queue[tail++] = neighbor;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Returns a topological ordering of the graph's nodes, or `null` if no such
  * ordering exists.
  *
@@ -861,6 +910,16 @@ export function hasPath(
 export function isConnected(graph: Graph): boolean {
   if (graph.nodes.length === 0) return true;
   return getConnectedComponents(graph).length <= 1;
+}
+
+/** Returns whether the graph has at most one weakly connected component. */
+export function isWeaklyConnected(graph: Graph): boolean {
+  return isConnected(graph);
+}
+
+/** Returns whether every node is reachable from every other node. */
+export function isStronglyConnected(graph: Graph): boolean {
+  return getStronglyConnectedComponents(graph).length <= 1;
 }
 
 /**
