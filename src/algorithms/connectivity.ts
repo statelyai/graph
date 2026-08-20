@@ -1,212 +1,165 @@
 import type { Graph, GraphEdge, GraphNode } from '../types';
-import { getIndex } from '../indexing';
 
-interface TraversalState<N = any, E = any> {
-  time: number;
-  disc: Map<string, number>;
-  low: Map<string, number>;
-  edgeStack: string[];
-  bridges: Set<string>;
-  articulationPoints: Set<string>;
-  components: Array<Set<string>>;
-  nodeById: Map<string, GraphNode<N>>;
-  edgeById: Map<string, GraphEdge<E>>;
+interface Neighbor {
+  nodeId: string;
+  edgeId: string;
 }
 
-function getUndirectedNeighbors(
-  graph: Graph,
-  nodeId: string,
-): Array<{ nodeId: string; edgeId: string }> {
-  const idx = getIndex(graph);
-  const neighbors: Array<{ nodeId: string; edgeId: string }> = [];
-
-  for (const edgeId of idx.outEdges.get(nodeId) ?? []) {
-    const edgeIndex = idx.edgeById.get(edgeId);
-    if (edgeIndex !== undefined) {
-      neighbors.push({
-        nodeId: graph.edges[edgeIndex].targetId,
-        edgeId,
-      });
-    }
-  }
-
-  for (const edgeId of idx.inEdges.get(nodeId) ?? []) {
-    const edgeIndex = idx.edgeById.get(edgeId);
-    if (edgeIndex !== undefined) {
-      neighbors.push({
-        nodeId: graph.edges[edgeIndex].sourceId,
-        edgeId,
-      });
-    }
-  }
-
-  return neighbors;
+interface Frame {
+  nodeId: string;
+  parentId: string | null;
+  parentEdgeId: string | null;
+  nextNeighbor: number;
+  childCount: number;
 }
 
-function popComponentUntil<N, E>(
-  state: TraversalState<N, E>,
-  stopEdgeId: string,
-): void {
-  const nodeIds = new Set<string>();
-
-  while (state.edgeStack.length > 0) {
-    const edgeId = state.edgeStack.pop()!;
-    const edge = state.edgeById.get(edgeId);
-    if (edge) {
-      nodeIds.add(edge.sourceId);
-      nodeIds.add(edge.targetId);
-    }
-    if (edgeId === stopEdgeId) {
-      break;
-    }
-  }
-
-  if (nodeIds.size > 0) {
-    state.components.push(nodeIds);
-  }
+interface ConnectivityResult<N, E> {
+  bridges: GraphEdge<E>[];
+  articulationPoints: GraphNode<N>[];
+  biconnectedComponents: GraphNode<N>[][];
 }
 
-function finalizeRemainingComponent<N, E>(state: TraversalState<N, E>): void {
-  if (state.edgeStack.length === 0) {
-    return;
-  }
-
-  const nodeIds = new Set<string>();
-  while (state.edgeStack.length > 0) {
-    const edge = state.edgeById.get(state.edgeStack.pop()!);
-    if (edge) {
-      nodeIds.add(edge.sourceId);
-      nodeIds.add(edge.targetId);
+/** Iterative Tarjan low-link analysis with multigraph and self-loop support. */
+function analyzeConnectivity<N, E>(graph: Graph<N, E>): ConnectivityResult<N, E> {
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+  const edgeById = new Map(graph.edges.map((edge) => [edge.id, edge]));
+  const adjacency = new Map<string, Neighbor[]>();
+  for (const node of graph.nodes) adjacency.set(node.id, []);
+  for (const edge of graph.edges) {
+    if (!adjacency.has(edge.sourceId) || !adjacency.has(edge.targetId)) continue;
+    adjacency.get(edge.sourceId)!.push({ nodeId: edge.targetId, edgeId: edge.id });
+    if (edge.sourceId !== edge.targetId) {
+      adjacency.get(edge.targetId)!.push({ nodeId: edge.sourceId, edgeId: edge.id });
     }
   }
 
-  if (nodeIds.size > 0) {
-    state.components.push(nodeIds);
-  }
-}
+  const discovered = new Map<string, number>();
+  const low = new Map<string, number>();
+  const bridgeIds = new Set<string>();
+  const articulationIds = new Set<string>();
+  const edgeStack: string[] = [];
+  const componentIds: Set<string>[] = [];
+  const selfLoopNodes = new Set<string>();
+  let time = 0;
 
-function traverseConnectivity<N, E>(
-  graph: Graph<N, E>,
-  nodeId: string,
-  parentEdgeId: string | null,
-  state: TraversalState<N, E>,
-): void {
-  state.time += 1;
-  state.disc.set(nodeId, state.time);
-  state.low.set(nodeId, state.time);
-
-  let childCount = 0;
-
-  for (const neighbor of getUndirectedNeighbors(graph, nodeId)) {
-    if (neighbor.edgeId === parentEdgeId) continue;
-
-    if (!state.disc.has(neighbor.nodeId)) {
-      childCount += 1;
-      state.edgeStack.push(neighbor.edgeId);
-      traverseConnectivity(graph, neighbor.nodeId, neighbor.edgeId, state);
-      state.low.set(
-        nodeId,
-        Math.min(state.low.get(nodeId)!, state.low.get(neighbor.nodeId)!),
-      );
-
-      if (state.low.get(neighbor.nodeId)! > state.disc.get(nodeId)!) {
-        state.bridges.add(neighbor.edgeId);
+  const popComponent = (stopEdgeId?: string): void => {
+    const nodes = new Set<string>();
+    while (edgeStack.length > 0) {
+      const edgeId = edgeStack.pop()!;
+      const edge = edgeById.get(edgeId);
+      if (edge) {
+        nodes.add(edge.sourceId);
+        nodes.add(edge.targetId);
       }
-
-      if (state.low.get(neighbor.nodeId)! >= state.disc.get(nodeId)!) {
-        if (parentEdgeId !== null) {
-          state.articulationPoints.add(nodeId);
-        }
-        // Pop for the root's children too, so each child subtree forms its
-        // own biconnected component instead of being lumped together.
-        popComponentUntil(state, neighbor.edgeId);
-      }
-    } else if (state.disc.get(neighbor.nodeId)! < state.disc.get(nodeId)!) {
-      state.edgeStack.push(neighbor.edgeId);
-      state.low.set(
-        nodeId,
-        Math.min(state.low.get(nodeId)!, state.disc.get(neighbor.nodeId)!),
-      );
+      if (edgeId === stopEdgeId) break;
     }
-  }
-
-  if (parentEdgeId === null && childCount > 1) {
-    state.articulationPoints.add(nodeId);
-  }
-}
-
-function analyzeConnectivity<N, E>(graph: Graph<N, E>): TraversalState<N, E> {
-  const state: TraversalState<N, E> = {
-    time: 0,
-    disc: new Map(),
-    low: new Map(),
-    edgeStack: [],
-    bridges: new Set(),
-    articulationPoints: new Set(),
-    components: [],
-    nodeById: new Map(graph.nodes.map((node) => [node.id, node])),
-    edgeById: new Map(graph.edges.map((edge) => [edge.id, edge])),
+    if (nodes.size > 0) componentIds.push(nodes);
   };
 
-  for (const node of graph.nodes) {
-    if (state.disc.has(node.id)) continue;
-    traverseConnectivity(graph, node.id, null, state);
-    finalizeRemainingComponent(state);
+  for (const root of graph.nodes) {
+    if (discovered.has(root.id)) continue;
+    discovered.set(root.id, ++time);
+    low.set(root.id, time);
+    const stack: Frame[] = [{
+      nodeId: root.id,
+      parentId: null,
+      parentEdgeId: null,
+      nextNeighbor: 0,
+      childCount: 0,
+    }];
+
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1];
+      const neighbors = adjacency.get(frame.nodeId)!;
+      if (frame.nextNeighbor < neighbors.length) {
+        const neighbor = neighbors[frame.nextNeighbor++];
+        if (neighbor.edgeId === frame.parentEdgeId) continue;
+
+        if (neighbor.nodeId === frame.nodeId) {
+          if (!selfLoopNodes.has(frame.nodeId)) {
+            selfLoopNodes.add(frame.nodeId);
+            componentIds.push(new Set([frame.nodeId]));
+          }
+          continue;
+        }
+
+        if (!discovered.has(neighbor.nodeId)) {
+          frame.childCount++;
+          edgeStack.push(neighbor.edgeId);
+          discovered.set(neighbor.nodeId, ++time);
+          low.set(neighbor.nodeId, time);
+          stack.push({
+            nodeId: neighbor.nodeId,
+            parentId: frame.nodeId,
+            parentEdgeId: neighbor.edgeId,
+            nextNeighbor: 0,
+            childCount: 0,
+          });
+          continue;
+        }
+
+        if (discovered.get(neighbor.nodeId)! < discovered.get(frame.nodeId)!) {
+          edgeStack.push(neighbor.edgeId);
+          low.set(
+            frame.nodeId,
+            Math.min(low.get(frame.nodeId)!, discovered.get(neighbor.nodeId)!),
+          );
+        }
+        continue;
+      }
+
+      stack.pop();
+      if (frame.parentId === null) {
+        if (frame.childCount > 1) articulationIds.add(frame.nodeId);
+        popComponent();
+        continue;
+      }
+
+      low.set(
+        frame.parentId,
+        Math.min(low.get(frame.parentId)!, low.get(frame.nodeId)!),
+      );
+      if (low.get(frame.nodeId)! > discovered.get(frame.parentId)!) {
+        bridgeIds.add(frame.parentEdgeId!);
+      }
+      if (low.get(frame.nodeId)! >= discovered.get(frame.parentId)!) {
+        const parentFrame = stack[stack.length - 1];
+        if (parentFrame.parentId !== null) articulationIds.add(frame.parentId);
+        popComponent(frame.parentEdgeId!);
+      }
+    }
   }
 
-  return state;
+  const components = componentIds
+    .map((ids) =>
+      [...ids].sort((a, b) => a.localeCompare(b)).map((id) => nodeById.get(id)!),
+    )
+    .sort((a, b) => a[0].id.localeCompare(b[0].id));
+
+  return {
+    bridges: graph.edges
+      .filter((edge) => bridgeIds.has(edge.id))
+      .sort((a, b) => a.id.localeCompare(b.id)) as GraphEdge<E>[],
+    articulationPoints: graph.nodes
+      .filter((node) => articulationIds.has(node.id))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    biconnectedComponents: components,
+  };
 }
 
-/**
- * Returns bridge edges whose removal disconnects the graph.
- *
- * Connectivity algorithms in this module treat the graph as undirected.
- */
+/** Returns bridge edges whose removal disconnects the undirected projection. */
 export function getBridges<N, E>(graph: Graph<N, E>): GraphEdge<E>[] {
-  if (graph.edges.length === 0) {
-    return [];
-  }
-
-  const state = analyzeConnectivity(graph);
-  return [...state.bridges]
-    .map((edgeId) => state.edgeById.get(edgeId)!)
-    .sort((a, b) => a.id.localeCompare(b.id));
+  return analyzeConnectivity(graph).bridges;
 }
 
-/**
- * Returns articulation points (cut vertices) for the graph.
- *
- * Connectivity algorithms in this module treat the graph as undirected.
- */
+/** Returns cut vertices in graph node order. */
 export function getArticulationPoints<N, E>(graph: Graph<N, E>): GraphNode<N>[] {
-  if (graph.nodes.length === 0) {
-    return [];
-  }
-
-  const state = analyzeConnectivity(graph);
-  return [...state.articulationPoints]
-    .map((nodeId) => state.nodeById.get(nodeId)!)
-    .sort((a, b) => a.id.localeCompare(b.id));
+  return analyzeConnectivity(graph).articulationPoints;
 }
 
-/**
- * Returns biconnected components as arrays of nodes.
- *
- * Articulation points may appear in multiple returned components.
- */
+/** Returns biconnected node components; articulation points may repeat. */
 export function getBiconnectedComponents<N, E>(
   graph: Graph<N, E>,
 ): GraphNode<N>[][] {
-  if (graph.edges.length === 0) {
-    return [];
-  }
-
-  const state = analyzeConnectivity(graph);
-  return state.components
-    .map((component) =>
-      [...component]
-        .map((nodeId) => state.nodeById.get(nodeId)!)
-        .sort((a, b) => a.id.localeCompare(b.id)),
-    )
-    .sort((a, b) => a[0].id.localeCompare(b[0].id));
+  return analyzeConnectivity(graph).biconnectedComponents;
 }

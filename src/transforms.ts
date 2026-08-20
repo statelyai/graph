@@ -381,6 +381,7 @@ export interface FilteredGraphOptions<N, E, P> {
  * preserved; only `data` changes. Returning `undefined` clears `data`.
  *
  * Keep mapped data JSON-serializable — no functions, classes, or symbols.
+ * Node and edge collections are snapshotted before callbacks run.
  *
  * @example
  * ```ts
@@ -402,11 +403,15 @@ export function getMappedGraph<N, E, G, P, N2 = N, E2 = E>(
   graph: Graph<N, E, G, P>,
   options: MappedGraphOptions<N, E, P, N2, E2>,
 ): Graph<N2, E2, G, P> {
+  // Callbacks may structurally mutate the source graph. Capture both
+  // collections before invoking either callback so the result is coherent.
+  const sourceNodes = graph.nodes.slice();
+  const sourceEdges = graph.edges.slice();
   return createGraph({
     id: graph.id,
     mode: graph.mode,
     initialNodeId: graph.initialNodeId ?? undefined,
-    nodes: graph.nodes.map((n) => {
+    nodes: sourceNodes.map((n) => {
       const config = toNodeConfig(n) as NodeConfig<unknown, P>;
       if (options.node) {
         const data = options.node(n);
@@ -415,7 +420,7 @@ export function getMappedGraph<N, E, G, P, N2 = N, E2 = E>(
       }
       return config as NodeConfig<N2, P>;
     }),
-    edges: graph.edges.map((e) => {
+    edges: sourceEdges.map((e) => {
       const config = toEdgeConfig(e) as EdgeConfig<unknown>;
       if (options.edge) {
         const data = options.edge(e);
@@ -435,6 +440,7 @@ export function getMappedGraph<N, E, G, P, N2 = N, E2 = E>(
  * predicates. Dropping a node also drops its incident edges; parent and
  * initial-node references to dropped nodes are removed (as in
  * {@link getSubgraph}).
+ * Node and edge collections are snapshotted before predicates run.
  *
  * @example
  * ```ts
@@ -456,9 +462,13 @@ export function getFilteredGraph<N, E, G, P>(
   graph: Graph<N, E, G, P>,
   options: FilteredGraphOptions<N, E, P>,
 ): Graph<N, E, G, P> {
+  // Keep node and edge selection on one structural snapshot even when a
+  // predicate mutates the source graph through the public mutation API.
+  const sourceNodes = graph.nodes.slice();
+  const sourceEdges = graph.edges.slice();
   const nodes = options.node
-    ? graph.nodes.filter((n) => options.node!(n))
-    : graph.nodes;
+    ? sourceNodes.filter((n) => options.node!(n))
+    : sourceNodes;
   const nodeIdSet = new Set(nodes.map((n) => n.id));
 
   return createGraph({
@@ -469,7 +479,7 @@ export function getFilteredGraph<N, E, G, P>(
         ? graph.initialNodeId
         : undefined,
     nodes: nodes.map((n) => toScopedNodeConfig(n, nodeIdSet)),
-    edges: graph.edges
+    edges: sourceEdges
       .filter(
         (e) =>
           nodeIdSet.has(e.sourceId) &&

@@ -2,13 +2,14 @@ import type { Graph, GraphEdge } from '../types';
 import { getIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
 import { throwIfAborted } from './abort';
+import { addFiniteNumbers, assertFiniteNumber } from './numeric';
 
 export interface MaxFlowOptions<E = any> {
   /** Source node id. */
   from: string;
   /** Sink node id. */
   to: string;
-  /** Edge capacity accessor. Defaults to `edge.weight ?? 1`. */
+  /** Finite non-negative edge capacity. Defaults to `edge.weight ?? 1`. */
   getCapacity?: (edge: GraphEdge<E>) => number;
   /** Abort signal, checked once per augmenting path. Throws `signal.reason`. */
   signal?: AbortSignal;
@@ -28,7 +29,7 @@ export interface MinCutOptions<E = any> {
   source: string;
   /** Sink node id. */
   sink: string;
-  /** Edge capacity accessor. Defaults to `edge.weight ?? 1`. */
+  /** Finite non-negative edge capacity. Defaults to `edge.weight ?? 1`. */
   getCapacity?: (edge: GraphEdge<E>) => number;
   /** Abort signal, checked once per augmenting path. Throws `signal.reason`. */
   signal?: AbortSignal;
@@ -108,7 +109,10 @@ function solveMaxFlow<N, E>(
   }
 
   for (const edge of graph.edges) {
-    const capacity = getCapacity(edge as GraphEdge<E>);
+    const capacity = assertFiniteNumber(
+      getCapacity(edge as GraphEdge<E>),
+      `${caller}: capacity for edge "${edge.id}"`,
+    );
     if (capacity < 0) {
       throw new Error(
         `${caller}: edge "${edge.id}" has negative capacity ${capacity} — capacities must be >= 0; fix edge.weight or provide a non-negative getCapacity`,
@@ -163,7 +167,7 @@ function solveMaxFlow<N, E>(
       arcs[ai ^ 1].flow -= bottleneck;
       v = arcs[ai ^ 1].to;
     }
-    value += bottleneck;
+    value = addFiniteNumbers(value, bottleneck, `${caller}: total flow`);
   }
 
   // --- Net flow per edge id ---
@@ -172,7 +176,11 @@ function solveMaxFlow<N, E>(
   ) as Record<string, number>;
   for (const arc of arcs) {
     if (arc.edgeId !== undefined && arc.flow > 0) {
-      flows[arc.edgeId] += arc.sign! * arc.flow;
+      flows[arc.edgeId] = addFiniteNumbers(
+        flows[arc.edgeId],
+        arc.sign! * arc.flow,
+        `${caller}: flow for edge "${arc.edgeId}"`,
+      );
     }
   }
 
@@ -221,6 +229,7 @@ function solveMaxFlow<N, E>(
  *
  * Pass `options.signal` to cancel: the abort is checked once per augmenting
  * path and throws `signal.reason`.
+ * Capacities and every accumulated flow value must remain finite.
  *
  * @example
  * ```ts

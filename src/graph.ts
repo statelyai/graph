@@ -874,6 +874,8 @@ export function addEntities<N, E>(
 /**
  * **Mutable.** Delete entities by id(s). Automatically detects whether each id
  * is a node or edge. Node deletions cascade to children and connected edges.
+ * The iterable is collected before mutation, then nodes and edges are filtered
+ * once, so an iterator over the same graph is safe.
  *
  * @example
  * ```ts
@@ -887,17 +889,55 @@ export function addEntities<N, E>(
  */
 export function deleteEntities(
   graph: Graph,
-  ids: string | string[],
+  ids: string | Iterable<string>,
   opts?: DeleteNodeOptions,
 ): void {
-  const idArray = Array.isArray(ids) ? ids : [ids];
+  // Collect before mutation so callers may pass an iterator over this graph.
+  const idArray = typeof ids === 'string' ? [ids] : Array.from(ids);
+  const idx = getIndex(graph);
+  const nodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
   for (const id of idArray) {
-    if (hasNode(graph, id)) {
-      deleteNode(graph, id, opts);
-    } else if (hasEdge(graph, id)) {
-      deleteEdge(graph, id);
+    if (idx.nodeById.has(id)) nodeIds.add(id);
+    else if (idx.edgeById.has(id)) edgeIds.add(id);
+  }
+
+  if (!opts?.reparent) {
+    const pending = [...nodeIds];
+    for (let index = 0; index < pending.length; index++) {
+      for (const childId of idx.childNodes.get(pending[index]) ?? []) {
+        if (nodeIds.has(childId)) continue;
+        nodeIds.add(childId);
+        pending.push(childId);
+      }
+    }
+  } else if (nodeIds.size > 0) {
+    const parentById = new Map(
+      graph.nodes.map((node) => [node.id, node.parentId ?? null]),
+    );
+    for (const node of graph.nodes) {
+      if (nodeIds.has(node.id) || !node.parentId || !nodeIds.has(node.parentId)) {
+        continue;
+      }
+      let parentId: string | null = node.parentId;
+      const seen = new Set<string>();
+      while (parentId !== null && nodeIds.has(parentId) && !seen.has(parentId)) {
+        seen.add(parentId);
+        parentId = parentById.get(parentId) ?? null;
+      }
+      node.parentId = parentId;
     }
   }
+
+  if (nodeIds.size === 0 && edgeIds.size === 0) return;
+  graph.nodes = graph.nodes.filter((node) => !nodeIds.has(node.id));
+  graph.edges = graph.edges.filter(
+    (edge) =>
+      !edgeIds.has(edge.id) &&
+      !nodeIds.has(edge.sourceId) &&
+      !nodeIds.has(edge.targetId),
+  );
+  invalidateIndex(graph);
 }
 
 // Batch update operations
@@ -1023,7 +1063,7 @@ export function getGraphWithEntities<N = any, E = any, G = any, P = any>(
 /** Return a graph copy without the identified nodes and edges. */
 export function getGraphWithoutEntities<N = any, E = any, G = any, P = any>(
   graph: Graph<N, E, G, P>,
-  ids: string | string[],
+  ids: string | Iterable<string>,
   opts?: DeleteNodeOptions,
 ): Graph<N, E, G, P> {
   const next = getGraphMutationCopy(graph);
@@ -1145,7 +1185,7 @@ export class GraphInstance<N = any, E = any, G = any, P = any> {
   addEntities(entities: EntitiesConfig<N, E, P>) {
     return addEntities(this.graph, entities);
   }
-  deleteEntities(ids: string | string[], opts?: DeleteNodeOptions) {
+  deleteEntities(ids: string | Iterable<string>, opts?: DeleteNodeOptions) {
     return deleteEntities(this.graph, ids, opts);
   }
   updateEntities(updates: EntitiesUpdate<N, E, P>) {

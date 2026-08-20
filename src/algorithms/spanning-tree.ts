@@ -4,13 +4,26 @@ import { createGraph } from '../graph';
 import { toNodeConfig, toEdgeConfig } from '../config';
 import { getEdgeMode } from '../mode';
 import { MinPriorityQueue } from './shared';
+import { assertFiniteNumber } from './numeric';
 
 export function getMinimumSpanningTree<N, E>(
   graph: Graph<N, E>,
   opts?: MSTOptions<E>,
 ): Graph<N, E> {
   const algorithm = opts?.algorithm ?? 'prim';
-  const getWeight = opts?.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const weightAccessor =
+    opts?.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
+  const weights = new Map<string, number>();
+  for (const edge of graph.edges) {
+    weights.set(
+      edge.id,
+      assertFiniteNumber(
+        weightAccessor(edge as GraphEdge<E>),
+        `getMinimumSpanningTree: weight for edge "${edge.id}"`,
+      ),
+    );
+  }
+  const getWeight = (edge: GraphEdge<E>) => weights.get(edge.id)!;
 
   const mstEdges =
     algorithm === 'kruskal'

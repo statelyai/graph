@@ -432,7 +432,7 @@ export interface EdgeCoveragePathsResult<
 export interface ShortestSimplePathsOptions<TEdgeData = any> {
   from: string;
   to: string;
-  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  /** Finite edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
   /** Maximum paths to yield/return. Omit to enumerate every simple path by cost. */
   limit?: number;
@@ -452,7 +452,7 @@ export interface PathOptions<TEdgeData = any, TNodeData = any> {
   from?: NodeSelector<TNodeData>;
   /** Target node ID. If omitted → paths to all reachable nodes */
   to?: string;
-  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  /** Finite edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
   /** Algorithm to use. Default: 'dijkstra'. Use 'bellman-ford' for negative weights. */
   algorithm?: 'dijkstra' | 'bellman-ford';
@@ -463,7 +463,7 @@ export interface SinglePathOptions<TEdgeData = any, TNodeData = any> {
   from?: NodeSelector<TNodeData>;
   /** Target node ID. Required for single-path queries. */
   to: string;
-  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  /** Finite edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
   /** Algorithm to use. Default: 'dijkstra'. Use 'bellman-ford' for negative weights. */
   algorithm?: 'dijkstra' | 'bellman-ford';
@@ -474,7 +474,7 @@ export interface AStarOptions<TEdgeData = any, TNodeData = any> {
   from: NodeSelector<TNodeData>;
   /** Target node ID. */
   to: string;
-  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  /** Finite edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
   /**
    * Heuristic function estimating cost from a node to the target.
@@ -492,6 +492,12 @@ export interface TraversalOptions {
 }
 
 export type TraversalDirection = 'outgoing' | 'incoming' | 'undirected';
+
+/** Options for unweighted shortest-hop distances. */
+export interface UnweightedDistanceOptions {
+  /** Edge direction to follow. Default: `'outgoing'`. */
+  direction?: TraversalDirection;
+}
 
 /** Options for lazy breadth-first and depth-first graph traversal. */
 export interface TraversalSearchOptions {
@@ -513,7 +519,7 @@ export interface PostorderOptions
 export interface MSTOptions<TEdgeData = any> {
   /** Algorithm to use. Default: 'prim'. */
   algorithm?: 'prim' | 'kruskal';
-  /** Edge weight function. Default: `(e) => e.weight ?? 1`. */
+  /** Finite edge weight function. Default: `(e) => e.weight ?? 1`. */
   getWeight?: (edge: GraphEdge<TEdgeData>) => number;
 }
 

@@ -26,12 +26,15 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 |---|---|---|---|
 | `hasPath(graph, sourceId, targetId)` | Reachability | O(n + m) | BFS, mode-aware. `hasPath(g, a, a)` is `true`. |
 | `isConnected(graph)` | Single weak component? | O(n + m) | Empty graph is connected. |
+| `isWeaklyConnected(graph)` | Single weak component? | O(n + m) | Explicit alias for weak connectivity; ignores edge direction. |
+| `isStronglyConnected(graph)` | Every node reaches every other node? | O(n + m) | Empty graph is strongly connected; non-directed edges are mutual. |
+| `getUnweightedDistances(graph, sourceId, opts?)` | Reachable node IDs → minimum hop count | O(n + m) | `direction` is outgoing (default), incoming, or undirected. Unknown source returns an empty map. |
 | `isTree(graph)` | Connected + acyclic + exactly `n − 1` edges | O(n + m) | Directed diamonds and parallel edges are not trees. Empty/single-node graphs are trees. |
 | `getConnectedComponents(graph)` | Weakly-connected components | O(n + m) | Every edge connects regardless of mode/direction. CSR-backed. |
 | `getStronglyConnectedComponents(graph)` | SCCs (Tarjan) | O(n + m) | Non-directed edges count as mutual reachability. Recursive — deep graphs may hit stack limits. |
-| `getBridges(graph)` | Edges whose removal disconnects | O(n + m) | Treats the graph as undirected. Result sorted by id. |
-| `getArticulationPoints(graph)` | Cut vertices | O(n + m) | Undirected semantics; sorted by id. |
-| `getBiconnectedComponents(graph)` | Biconnected components (node arrays) | O(n + m) | Articulation points appear in multiple components. |
+| `getBridges(graph)` | Edges whose removal disconnects | O(n + m) | Iterative, stack-safe low-link traversal over the undirected projection. Result sorted by id. |
+| `getArticulationPoints(graph)` | Cut vertices | O(n + m) | Iterative undirected semantics; sorted by id. |
+| `getBiconnectedComponents(graph)` | Biconnected components (node arrays) | O(n + m) | Handles parallel edges and self-loop singleton components; articulation points may repeat. |
 
 ## Cycles & DAG
 
@@ -57,7 +60,7 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 | `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. DFS with backtracking; without `to`, every non-empty simple path is yielded. |
 | `getJoinedPath(headPath, tailPath)` | Concatenated `GraphPath` | O(steps) | Throws unless head ends where tail starts. |
 
-**Negative-weight contract.** Dijkstra, A*, and the bidirectional/early-exit searches may legitimately finish without ever scanning a negative edge — so they assert "no negative weights" **up front**: O(1) via the CSR's cached `firstNegativeEdge` flag for the default weight, or one O(m) sweep when a custom `getWeight` is supplied. They throw with a pointer to `{ algorithm: 'bellman-ford' }` (O(n·m), handles negative edges; negative *cycles* still throw).
+**Numeric contract.** Every shortest-path weight and intermediate cost must remain finite; `NaN`, infinities, and arithmetic overflow throw. Dijkstra, A*, and bidirectional/early-exit searches also assert "no negative weights" **up front**: O(1) via cached CSR flags for default weights, or one O(m) sweep for custom `getWeight`. Bellman–Ford handles finite negative edges; negative cycles still throw.
 
 ## Path sets & coverage
 
@@ -93,7 +96,7 @@ whose output can itself be O(m²).
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `getMinimumSpanningTree(graph, opts?)` | New `Graph` containing the MST/forest edges | Prim (default) O(m log m); `algorithm: 'kruskal'` O(m log m) | Mode-aware: non-directed edges are candidates in both directions; directed edges only source→target (Prim). All nodes are kept; weight from `opts.getWeight ?? edge.weight ?? 1`. |
+| `getMinimumSpanningTree(graph, opts?)` | New `Graph` containing the MST/forest edges | Prim (default) O(m log m); `algorithm: 'kruskal'` O(m log m) | Mode-aware: non-directed edges are candidates in both directions; directed edges only source→target (Prim). All nodes are kept; weights must be finite. |
 
 ## Centrality
 
@@ -126,7 +129,7 @@ All community algorithms treat the graph as **undirected** regardless of mode. O
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `getMaxFlow(graph, { from, to, getCapacity? })` | `{ value, flows, cutEdges }` | Edmonds–Karp O(n·m²) | Capacity defaults to `edge.weight ?? 1`; negative capacity throws. Directed edges carry flow source→target only; non-directed edges become two independent opposite arcs each with full capacity. `flows` is net flow per edge id (positive = source→target). Self-loops carry nothing. |
+| `getMaxFlow(graph, { from, to, getCapacity? })` | `{ value, flows, cutEdges }` | Edmonds–Karp O(n·m²) | Capacity defaults to `edge.weight ?? 1`; non-finite/negative capacity and total-flow overflow throw. Directed edges carry flow source→target only; non-directed edges become two independent opposite arcs each with full capacity. `flows` is net flow per edge id (positive = source→target). Self-loops carry nothing. |
 | `getMinCut(graph, { source, sink, getCapacity? })` | `{ value, cutEdges, partition }` | same solver | Max-flow-min-cut: `partition.source` = residual-reachable side (in `graph.nodes` order); `Σ cap(cutEdges) === value`. |
 
 ## Bipartite
@@ -179,7 +182,7 @@ Walk generators yield `GraphStep`s lazily and honor effective edge modes (non-di
 
 ## Performance notes
 
-- **CSR snapshot.** Hot loops (BFS/DFS, components, shortest paths, centrality, cores, bipartite) run on a compressed-sparse-row snapshot of the graph's *traversable arcs* (`src/algorithms/csr.ts`): flat `Int32Array`s addressed by node position, so traversal pays no string hashing or Map lookups. Directed edges contribute one arc; non-directed edges contribute both. It also caches a `firstNegativeEdge` flag for O(1) negative-weight assertions.
+- **CSR snapshot.** Hot loops (BFS/DFS, components, shortest paths, centrality, cores, bipartite) run on a compressed-sparse-row snapshot of the graph's *traversable arcs* (`src/algorithms/csr.ts`): flat `Int32Array`s addressed by node position, so traversal pays no string hashing or Map lookups. Directed edges contribute one arc; non-directed edges contribute both. It caches invalid/negative default-weight flags for O(1) assertions.
 - **Auto-invalidation.** The CSR is cached per `GraphIndex` and revalidated against the index `version` and `graph.mode` — O(1) per access. Replacing `nodes`/`edges` arrays, length changes, and all `add*`/`delete*`/`update*` API mutations are detected automatically.
 - **`invalidateIndex(graph)`** is only needed after *direct in-place field mutation* (e.g. `edge.sourceId = 'x'`, `node.parentId = 'y'`), which is not O(1)-detectable. The same staleness contract covers both the index and the CSR.
 - Algorithm results are differential-tested against graphology on seeded random graphs; see [./benchmarks.md](./benchmarks.md) for throughput comparisons.
