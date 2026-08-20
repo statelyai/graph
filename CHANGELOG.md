@@ -1,5 +1,11 @@
 # @statelyai/graph
 
+## 2.4.0
+
+### Minor Changes
+
+- [#36](https://github.com/statelyai/graph/pull/36) [`e1ef7bc`](https://github.com/statelyai/graph/commit/e1ef7bca27b19bdbf562824b60b800a280a772e7) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add unweighted-distance and explicit connectivity APIs. Harden weighted arithmetic, low-link traversal, transform callbacks, and bulk deletion.
+
 ## 2.3.0
 
 ### Minor Changes
