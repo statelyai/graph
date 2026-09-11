@@ -412,4 +412,75 @@ describe('createGraphFromMachine', () => {
       expect(ours).toEqual(core);
     });
   });
+
+  describe('review regressions', () => {
+    it('keeps one actor identity across the traversal', () => {
+      const machine = createMachine({
+        id: 'ident',
+        context: { actorId: '' },
+        initial: 'a',
+        states: {
+          a: {
+            on: {
+              PING: {
+                actions: assign({ actorId: ({ self }) => self.sessionId }),
+              },
+            },
+          },
+        },
+      });
+      const graph = createGraphFromMachine(machine);
+      // initial (actorId '') → one PING sets a stable id → further PINGs self-loop
+      expect(graph.nodes).toHaveLength(2);
+      expect(graph.edges).toHaveLength(2);
+    });
+
+    it('does not expand completed snapshots even if ancestors handle events', () => {
+      const machine = createMachine({
+        id: 'done',
+        initial: 'a',
+        on: { RESET: '.a' },
+        states: {
+          a: { on: { FINISH: 'end' } },
+          end: { type: 'final' },
+        },
+      });
+      const graph = createGraphFromMachine(machine);
+      const done = graph.nodes.find((n) => n.data.status === 'done')!;
+      expect(done).toBeDefined();
+      expect(getOutEdges(graph, done.id)).toEqual([]);
+    });
+
+    it('matches supplied events against wildcard descriptors', () => {
+      const machine = createMachine({
+        id: 'wild',
+        types: {} as { events: { type: 'user.login'; user: string } | { type: 'user.logout' } },
+        initial: 'out',
+        states: {
+          out: {
+            on: {
+              'user.*': [
+                { guard: ({ event }) => event.type === 'user.login' && event.user === 'alice', target: 'in' },
+              ],
+            },
+          },
+          in: { on: { 'user.logout': 'out' } },
+        },
+      });
+      const graph = createGraphFromMachine(machine, {
+        events: [{ type: 'user.login', user: 'alice' }],
+      });
+      expect(graph.nodes.map((n) => n.data.value).sort()).toEqual(['in', 'out']);
+      const login = graph.edges.find((e) => e.data.eventType === 'user.login')!;
+      expect(login.data.event).toEqual({ type: 'user.login', user: 'alice' });
+    });
+
+    it('does not count stopped snapshots against limit', () => {
+      const graph = createGraphFromMachine(trafficLight, {
+        limit: 1,
+        stopWhen: (s) => s.value !== 'green',
+      });
+      expect(graph.nodes).toHaveLength(2);
+    });
+  });
 });

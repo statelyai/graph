@@ -6,8 +6,7 @@
  * @module @statelyai/graph/xstate
  */
 import {
-  getInitialSnapshot,
-  transition as transitionLogic,
+  createEmptyActor,
   __unsafe_getAllOwnEventDescriptors,
   type AnyMachineSnapshot,
   type AnyStateMachine,
@@ -65,19 +64,28 @@ export interface MachineEdgeData<TEvent extends EventObject = EventObject> {
   eventType: string;
   /** Graph node id of the source state (same as `edge.sourceId`; duplicated for path consumers). */
   sourceNodeId: string;
-  /** Guard of the first selected transition, when present and `includeGuards` is on. */
+  /** Guard of the first guarded selected transition, when `includeGuards` is on. */
   guard?: MachineGuardData;
-  /** Action labels from every selected transition, in order. */
+  /**
+   * Action labels from every selected transition, in order. Entry/exit actions
+   * and actions of `always` transitions taken after the event are not listed.
+   */
   actions: string[];
-  /** Transition definitions XState selected for this `(state, event)` pair. Empty for unhandled events. */
+  /**
+   * Transition definitions XState selected for the event itself. Eventless
+   * (`always`) transitions taken afterwards are folded into `targetId` but not
+   * listed here. Empty for unhandled events.
+   */
   transitions: MachineTransitionData[];
 }
 
 export interface MachineGraphOptions<TMachine extends AnyStateMachine> {
   /**
-   * Extra event objects (with payloads) to try. Events are enumerated from the
-   * machine's own descriptors at each state; entries here replace the bare
-   * `{ type }` for matching types.
+   * Event objects (with payloads) to try. Event types are enumerated from the
+   * machine's own descriptors at each state and sent as bare `{ type }`; an
+   * entry here whose type matches a descriptor (exact, `*`, or `prefix.*`)
+   * replaces that bare event. Wildcard descriptors need a supplied event to be
+   * explored with a concrete type.
    */
   events?:
     | readonly EventFromLogic<TMachine>[]
@@ -140,6 +148,32 @@ function getTransitionData(
     reenter: transition.reenter,
     ...(guard ? { guard } : {}),
     actions: getActionTexts(transition.actions),
+  };
+}
+
+function isMatchingDescriptor(descriptor: string, eventType: string): boolean {
+  if (descriptor === eventType || descriptor === '*') return true;
+  if (!descriptor.endsWith('.*')) return false;
+  const prefix = descriptor.slice(0, -1);
+  return eventType.startsWith(prefix) && eventType !== descriptor;
+}
+
+/**
+ * One inert actor scope for the whole traversal, so `self`, `sessionId`, and
+ * the system stay stable across steps (as they would in a running actor).
+ */
+function createInertActorScope() {
+  const self = createEmptyActor();
+  return {
+    self,
+    logger: () => {},
+    id: '',
+    sessionId: self.sessionId,
+    defer: () => {},
+    system: self.system,
+    stopChild: () => {},
+    emit: () => {},
+    actionExecutor: () => {},
   };
 }
 
@@ -216,13 +250,27 @@ export function createGraphFromMachine<TMachine extends AnyStateMachine>(
       typeof extraEvents === 'function'
         ? extraEvents(snapshot)
         : (extraEvents ?? []);
-    return __unsafe_getAllOwnEventDescriptors(snapshot).flatMap((type) => {
-      const matching = supplied.filter((event) => event.type === type);
-      return matching.length ? matching : [{ type } as TEvent];
-    });
+    const seen = new Set<string>();
+    return __unsafe_getAllOwnEventDescriptors(snapshot)
+      .flatMap((descriptor) => {
+        const matching = supplied.filter((event) =>
+          isMatchingDescriptor(descriptor, event.type),
+        );
+        return matching.length ? matching : [{ type: descriptor } as TEvent];
+      })
+      .filter((event) => {
+        const key = serializeEvent(event);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
   };
 
-  const initial = getInitialSnapshot(machine, options.input as any) as TSnapshot;
+  const actorScope = createInertActorScope();
+  const initial = machine.getInitialSnapshot(
+    actorScope as any,
+    options.input as any,
+  ) as TSnapshot;
   const initialId = serializeState(initial);
 
   const nodes: NodeConfig<MachineNodeData>[] = [];
@@ -242,17 +290,23 @@ export function createGraphFromMachine<TMachine extends AnyStateMachine>(
   while (queue.length > 0) {
     const snapshot = queue.shift()!;
     const sourceId = serializeState(snapshot);
-    if (++iterations > limit) throw new Error('Traversal limit exceeded');
+    // A stopped/done actor accepts no events; keep the node, do not expand.
+    if ((snapshot as AnyMachineSnapshot).status !== 'active') continue;
     if (options.stopWhen?.(snapshot)) continue;
+    if (++iterations > limit) throw new Error('Traversal limit exceeded');
 
     for (const event of getEvents(snapshot)) {
       if (options.filterEvents && !options.filterEvents(snapshot, event)) continue;
 
-      const selected: AnyTransitionDefinition[] =
-        (snapshot as AnyMachineSnapshot).status === 'active'
-          ? machine.getTransitionData(snapshot as any, event)
-          : [];
-      const [next] = transitionLogic(machine, snapshot, event) as [TSnapshot, unknown];
+      const selected: AnyTransitionDefinition[] = machine.getTransitionData(
+        snapshot as any,
+        event,
+      );
+      const next = machine.transition(
+        snapshot as any,
+        event,
+        actorScope as any,
+      ) as TSnapshot;
       const targetId = serializeState(next);
       if (!visited.has(targetId)) {
         addNode(targetId, next);

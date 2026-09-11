@@ -31,7 +31,7 @@ graph.nodes.length; // 2
 graph.edges.map((edge) => edge.data.eventType); // ['TOGGLE', 'TOGGLE']
 ```
 
-Events are enumerated from the machine's own event descriptors at each state, so you never list them yourself. Transitions are taken by `xstate` itself — the graph contains only real behavior. The resulting graph is `directed`, with `initialNodeId` set to the initial snapshot's id.
+Event types are enumerated from the machine's own event descriptors at each state and sent as bare `{ type }` objects. Provide the `events` option when a transition needs payload fields (see [Options](#options)). Transitions are taken by `xstate` itself — the graph contains only real behavior. Completed (`done`) snapshots are kept as nodes but not expanded, since a finished actor accepts no events. The resulting graph is `directed`, with `initialNodeId` set to the initial snapshot's id.
 
 ## What nodes and edges carry
 
@@ -128,6 +128,12 @@ const graph = createGraphFromMachine(machine, {
   limit: 10_000,
 });
 ```
+
+## Data boundary
+
+Node `context` and edge `event` values are stored as-is and the default ids `JSON.stringify` them, so machine context and events must be JSON-serializable (no `bigint`, cycles, functions, or class instances). Provide `serializeState` / `serializeEvent` and project the data yourself if your machine holds non-JSON values.
+
+`transitions` and `actions` on an edge describe the transitions XState selected for the event itself. `always` transitions taken afterwards, and entry/exit actions, are reflected in the target node but not listed on the edge.
 
 ## Guards
 
