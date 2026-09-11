@@ -445,6 +445,19 @@ async function main(): Promise<void> {
         `flow.nodes[0]?.id;`,
       ],
     },
+    './xstate': {
+      phase: 'optional',
+      runtime: [
+        `const { createMachine } = await import('xstate');`,
+        `const graph = $MOD.createGraphFromMachine(createMachine({ initial: 'a', states: { a: { on: { NEXT: 'b' } }, b: {} } }));`,
+        `assert.equal(graph.nodes.length, 2);`,
+        `assert.equal(graph.edges[0].data.eventType, 'NEXT');`,
+      ],
+      types: [
+        `const graph: $MOD.MachineGraph = $MOD.createGraphFromMachine({} as any);`,
+        `graph.nodes[0]?.data.stateIds;`,
+      ],
+    },
     './queries': {
       phase: 'core',
       runtime: [
@@ -615,6 +628,8 @@ async function main(): Promise<void> {
         'd3-hierarchy',
         'webcola',
         'cytoscape',
+        // XState adapter optional peer
+        'xstate',
       ],
       {
         cwd: consumerDir,

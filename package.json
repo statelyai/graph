@@ -54,6 +54,7 @@
     "./layout/webcola": "./dist/layout/webcola.mjs",
     "./queries": "./dist/queries.mjs",
     "./schemas": "./dist/schemas.mjs",
+    "./xstate": "./dist/xstate/index.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
@@ -133,6 +134,7 @@
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.0",
     "webcola": "^3.4.0",
+    "xstate": "^5.19.0",
     "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
@@ -167,6 +169,9 @@
       "optional": true
     },
     "webcola": {
+      "optional": true
+    },
+    "xstate": {
       "optional": true
     },
     "zod": {

@@ -27,6 +27,7 @@ Optional peers are only needed for specific adapters:
 | `d3-hierarchy`                              | `@statelyai/graph/layout/d3-hierarchy`              |
 | `webcola`                                   | `@statelyai/graph/layout/webcola`                   |
 | `cytoscape`                                 | `@statelyai/graph/layout/cytoscape`, Cytoscape format typing |
+| `xstate`                                    | `@statelyai/graph/xstate`                           |
 
 ## Highlights
 
@@ -36,6 +37,7 @@ Optional peers are only needed for specific adapters:
 - Ports for node-editor and dataflow-style graphs
 - Algorithms for traversal, paths, centrality, communities, connectivity, flow/cuts, matching, cores, isomorphism, ordering, MST, and walks
 - Pluggable layout over eight external engines (ELK, Graphviz, dagre, d3-force, ForceAtlas2, tidy tree, WebCola, cytoscape) — pure functions, optional peers
+- XState adapter: `createGraphFromMachine` turns a machine into a graph with stable ids for paths and coverage
 - Diff/patch utilities for graph state changes
 - Multi-format conversion via package subpaths, with fidelity claims tested against fixtures
 - Small, fast test suite with broad format coverage
