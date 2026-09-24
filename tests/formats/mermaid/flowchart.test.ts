@@ -6,6 +6,25 @@ import {
 
 describe('Mermaid Flowchart Converter', () => {
   describe('fromMermaidFlowchart()', () => {
+    it('expands compact source and target links', () => {
+      const graph = fromMermaidFlowchart(`flowchart LR
+A & B --> C & D --> E`);
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId])).toEqual([
+        ['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D'], ['C', 'E'], ['D', 'E'],
+      ]);
+      expect(graph.nodes.some((node) => node.id.includes('&'))).toBe(false);
+    });
+
+    it('splits statement semicolons but preserves them inside quoted labels', () => {
+      const graph = fromMermaidFlowchart(`flowchart LR
+A["a;b"] --> B; B --> C`);
+      expect(graph.nodes.find((node) => node.id === 'A')?.label).toBe('a;b');
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId])).toEqual([
+        ['A', 'B'], ['B', 'C'],
+      ]);
+      expect(fromMermaidFlowchart(toMermaidFlowchart(graph)).nodes.find((node) => node.id === 'A')?.label).toBe('a;b');
+    });
+
     it('parses basic flowchart with nodes and edges', () => {
       const graph = fromMermaidFlowchart(`
 graph TD

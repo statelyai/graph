@@ -184,6 +184,20 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       continue;
     }
 
+    // The editor emits quoted aliases with the stereotype on the same line.
+    const aliasedStereotypeMatch = line.match(
+      /^state\s+"([^"]+)"\s+as\s+(\S+)\s+<<(choice|fork|join)>>\s*$/,
+    );
+    if (aliasedStereotypeMatch) {
+      const [, description, stateId, stateType] = aliasedStereotypeMatch;
+      const node = ensureNode(stateId);
+      node.data.description = unescapeMermaidLabel(description);
+      node.label = node.data.description;
+      node.data.stateType = stateType as 'choice' | 'fork' | 'join';
+      (node as any).shape = stateType;
+      continue;
+    }
+
     // State with stereotype: state stateId <<choice>>
     const stereotypeMatch = line.match(
       /^state\s+(\S+)\s+<<(choice|fork|join)>>\s*$/,

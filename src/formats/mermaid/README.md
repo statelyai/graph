@@ -77,6 +77,8 @@ const mermaid = toMermaidSequence(graph);
 ### Flowchart
 
 Nodes with shapes, edges with arrows. Subgraphs map to compound nodes via `parentId`.
+Compact links such as `A & B --> C & D`, semicolon-separated statements, and
+quoted node labels are expanded or decoded on import.
 
 ```ts
 const graph = fromMermaidFlowchart(`flowchart TD
@@ -102,6 +104,8 @@ const mermaid = toMermaidFlowchart(graph);
 ### State Diagram
 
 State ID is the label. Descriptions go in `data.description`. `[*]` maps to start/end pseudo-nodes.
+Quoted aliases with `<<choice>>`, `<<fork>>`, or `<<join>>` retain both their
+description and state type.
 
 ```ts
 const graph = fromMermaidState(`stateDiagram-v2

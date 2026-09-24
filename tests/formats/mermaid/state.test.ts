@@ -7,6 +7,18 @@ import { getFormatSupportEntry } from '../../../src/formats/support';
 
 describe('Mermaid State Diagram Converter', () => {
   describe('fromMermaidState()', () => {
+    it('keeps choice types on quoted state aliases', () => {
+      const graph = fromMermaidState(`stateDiagram-v2
+state "if_state" as if_state <<choice>>
+IsPositive --> if_state
+if_state --> False : if n < 0`);
+      expect(graph.nodes.find((node) => node.id === 'if_state')).toMatchObject({
+        label: 'if_state',
+        data: { description: 'if_state', stateType: 'choice' },
+      });
+      expect(graph.edges).toHaveLength(2);
+    });
+
     it('parses basic state diagram with transitions', () => {
       const graph = fromMermaidState(`
 stateDiagram-v2
