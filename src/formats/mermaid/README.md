@@ -9,7 +9,7 @@ Converters for [Mermaid](https://mermaid.js.org/) diagram syntax. Each diagram t
 
 ## API
 
-<!-- exported symbols from src/formats/mermaid/index.ts -->
+<!-- converter value exports from src/formats/mermaid/index.ts -->
 
 ```ts
 import {
@@ -98,7 +98,13 @@ const graph = fromMermaidFlowchart(`flowchart TD
 const mermaid = toMermaidFlowchart(graph);
 ```
 
-**Types:** `FlowchartNodeData` (classes, link, tooltip), `FlowchartEdgeData` (stroke, arrowType, bidirectional), `FlowchartGraphData` (classDefs)
+<!-- public type fields from src/formats/mermaid/flowchart.ts -->
+
+**Types:** `FlowchartNodeData` (classes, deprecated link, tooltip, direction,
+structured click), `FlowchartClick` (kind, target, tooltip, link target,
+explicit call), `FlowchartEdgeData` (stroke, arrow and endpoint markers,
+bidirectional, link style), `FlowchartGraphData` (class definitions, default link
+style, init directive)
 
 ---
 
@@ -127,7 +133,10 @@ const graph = fromMermaidState(`stateDiagram-v2
 const mermaid = toMermaidState(graph);
 ```
 
-**Types:** `StateNodeData` (description, stateType, isStart, isEnd), `StateEdgeData`, `StateGraphData`
+<!-- public type fields from src/formats/mermaid/state.ts -->
+
+**Types:** `StateNodeData` (description, state type, notes, start/end markers,
+classes, direction), `StateEdgeData`, `StateGraphData` (class definitions)
 
 ---
 
