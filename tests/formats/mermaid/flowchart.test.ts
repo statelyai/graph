@@ -6,6 +6,57 @@ import {
 
 describe('Mermaid Flowchart Converter', () => {
   describe('fromMermaidFlowchart()', () => {
+    it('expands compact source and target links', () => {
+      const graph = fromMermaidFlowchart(`flowchart LR
+A & B --> C & D --> E`);
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId])).toEqual([
+        ['A', 'C'], ['A', 'D'], ['B', 'C'], ['B', 'D'], ['C', 'E'], ['D', 'E'],
+      ]);
+      expect(graph.nodes.some((node) => node.id.includes('&'))).toBe(false);
+    });
+
+    it('expands labeled links and keeps pipes inside node labels', () => {
+      const graph = fromMermaidFlowchart(`flowchart LR
+A["x|y"] & B -->|yes| C["a|b"] & D`);
+      expect(graph.nodes.map((node) => node.id)).toEqual(['A', 'C', 'D', 'B']);
+      expect(graph.nodes.find((node) => node.id === 'A')?.label).toBe('x|y');
+      expect(graph.nodes.find((node) => node.id === 'C')?.label).toBe('a|b');
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId, edge.label])).toEqual([
+        ['A', 'C', 'yes'], ['A', 'D', 'yes'],
+        ['B', 'C', 'yes'], ['B', 'D', 'yes'],
+      ]);
+    });
+
+    it('expands links to quoted labels containing a pipe without an edge label', () => {
+      const graph = fromMermaidFlowchart('flowchart LR\nA & B --> C["x|y"]');
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId])).toEqual([
+        ['A', 'C'], ['B', 'C'],
+      ]);
+      expect(graph.nodes.find((node) => node.id === 'C')?.label).toBe('x|y');
+    });
+
+    it('preserves thick and dotted arrows in mixed compact chains', () => {
+      const graph = fromMermaidFlowchart(`flowchart LR
+A & B ==> C & D -.-> E & F`);
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId, edge.data.stroke])).toEqual([
+        ['A', 'C', 'thick'], ['A', 'D', 'thick'],
+        ['B', 'C', 'thick'], ['B', 'D', 'thick'],
+        ['C', 'E', 'dotted'], ['C', 'F', 'dotted'],
+        ['D', 'E', 'dotted'], ['D', 'F', 'dotted'],
+      ]);
+      expect(graph.nodes.some((node) => node.id.includes('&'))).toBe(false);
+    });
+
+    it('splits statement semicolons but preserves them inside quoted labels', () => {
+      const graph = fromMermaidFlowchart(`flowchart LR
+A["a;b"] --> B; B --> C`);
+      expect(graph.nodes.find((node) => node.id === 'A')?.label).toBe('a;b');
+      expect(graph.edges.map((edge) => [edge.sourceId, edge.targetId])).toEqual([
+        ['A', 'B'], ['B', 'C'],
+      ]);
+      expect(fromMermaidFlowchart(toMermaidFlowchart(graph)).nodes.find((node) => node.id === 'A')?.label).toBe('a;b');
+    });
+
     it('parses basic flowchart with nodes and edges', () => {
       const graph = fromMermaidFlowchart(`
 graph TD

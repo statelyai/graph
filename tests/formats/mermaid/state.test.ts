@@ -7,6 +7,35 @@ import { getFormatSupportEntry } from '../../../src/formats/support';
 
 describe('Mermaid State Diagram Converter', () => {
   describe('fromMermaidState()', () => {
+    it('keeps choice types on quoted state aliases', () => {
+      const graph = fromMermaidState(`stateDiagram-v2
+state "if_state" as if_state <<choice>>
+IsPositive --> if_state
+if_state --> False : if n < 0`);
+      expect(graph.nodes.find((node) => node.id === 'if_state')).toMatchObject({
+        label: 'if_state',
+        data: { description: 'if_state', stateType: 'choice' },
+      });
+      expect(graph.edges).toHaveLength(2);
+    });
+
+    it('round-trips entity-escaped descriptions on stereotype aliases', () => {
+      const graph = fromMermaidState('stateDiagram-v2\nstate "Say #quot;yes#quot;" as q <<choice>>');
+      const roundTrip = fromMermaidState(toMermaidState(graph));
+      expect(roundTrip.nodes.find((node) => node.id === 'q')).toMatchObject({
+        label: 'Say "yes"',
+        data: { description: 'Say "yes"', stateType: 'choice' },
+      });
+    });
+
+    it('decodes entity-escaped composite aliases', () => {
+      const graph = fromMermaidState('stateDiagram-v2\nstate "Say #quot;yes#quot;" as parent {\nchild\n}');
+      expect(graph.nodes.find((node) => node.id === 'parent')).toMatchObject({
+        label: 'Say "yes"',
+        data: { description: 'Say "yes"' },
+      });
+    });
+
     it('parses basic state diagram with transitions', () => {
       const graph = fromMermaidState(`
 stateDiagram-v2
