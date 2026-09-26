@@ -19,6 +19,23 @@ if_state --> False : if n < 0`);
       expect(graph.edges).toHaveLength(2);
     });
 
+    it('round-trips entity-escaped descriptions on stereotype aliases', () => {
+      const graph = fromMermaidState('stateDiagram-v2\nstate "Say #quot;yes#quot;" as q <<choice>>');
+      const roundTrip = fromMermaidState(toMermaidState(graph));
+      expect(roundTrip.nodes.find((node) => node.id === 'q')).toMatchObject({
+        label: 'Say "yes"',
+        data: { description: 'Say "yes"', stateType: 'choice' },
+      });
+    });
+
+    it('decodes entity-escaped composite aliases', () => {
+      const graph = fromMermaidState('stateDiagram-v2\nstate "Say #quot;yes#quot;" as parent {\nchild\n}');
+      expect(graph.nodes.find((node) => node.id === 'parent')).toMatchObject({
+        label: 'Say "yes"',
+        data: { description: 'Say "yes"' },
+      });
+    });
+
     it('parses basic state diagram with transitions', () => {
       const graph = fromMermaidState(`
 stateDiagram-v2

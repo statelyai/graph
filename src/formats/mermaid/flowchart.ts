@@ -181,15 +181,55 @@ function getTopLevelParts(input: string, separator: string): string[] {
   return parts;
 }
 
+function getTopLevelArrows(line: string): { start: number; end: number; arrow: string; label?: string }[] {
+  const arrows: { start: number; end: number; arrow: string; label?: string }[] = [];
+  let depth = 0;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && line[i - 1] !== '\\') quoted = !quoted;
+    if (quoted) continue;
+    if ('[({'.includes(char)) depth++;
+    if ('])}'.includes(char)) depth = Math.max(0, depth - 1);
+    if (depth !== 0) continue;
+
+    let arrow = '';
+    for (let length = Math.min(5, line.length - i); length >= 2; length--) {
+      const candidate = line.slice(i, i + length);
+      if (EDGE_ARROWS.some(([pattern]) => pattern.test(candidate))) {
+        arrow = candidate;
+        break;
+      }
+    }
+    if (!arrow) continue;
+    let end = i + arrow.length;
+    let label: string | undefined;
+    if (line[end] === '|') {
+      const labelEnd = line.indexOf('|', end + 1);
+      if (labelEnd < 0) return [];
+      label = line.slice(end + 1, labelEnd);
+      end = labelEnd + 1;
+    }
+    arrows.push({ start: i, end, arrow, label });
+    i = end - 1;
+  }
+  return arrows;
+}
+
 function getExpandedCompactLinks(line: string): string[] {
-  const chain = getTopLevelParts(line, '-->');
-  if (chain.length < 2 || chain.some((part) => part.includes('|'))) return [line];
+  const arrows = getTopLevelArrows(line);
+  if (!arrows.length) return [line];
+  const chain = arrows.map((arrow, i) => line.slice(i === 0 ? 0 : arrows[i - 1].end, arrow.start).trim());
+  chain.push(line.slice(arrows[arrows.length - 1].end).trim());
+  if (chain.some((part) => !part)) return [line];
   const groups = chain.map((part) => getTopLevelParts(part, '&'));
   if (groups.every((group) => group.length === 1)) return [line];
   const links: string[] = [];
   for (let i = 0; i < groups.length - 1; i++) {
     for (const source of groups[i]) {
-      for (const target of groups[i + 1]) links.push(`${source} --> ${target}`);
+      for (const target of groups[i + 1]) {
+        links.push(`${source} ${line.slice(arrows[i].start, arrows[i].end)} ${target}`);
+      }
     }
   }
   return links;
@@ -246,17 +286,15 @@ function findEdge(line: string): {
 } | null {
   // Strategy: scan for arrow patterns in the line
   // First try the pipe-label form: A -->|label| B
-  const pipeMatch = line.match(
-    /^(.+?)\s*([-=.<>ox]+)\|([^|]*)\|\s*(.+)$/,
-  );
-  if (pipeMatch) {
-    const arrowStr = pipeMatch[2];
+  const pipeArrow = getTopLevelArrows(line).find((arrow) => arrow.label !== undefined);
+  if (pipeArrow) {
+    const arrowStr = pipeArrow.arrow;
     for (const [re, info] of EDGE_ARROWS) {
       if (re.test(arrowStr)) {
         return {
-          sourceText: pipeMatch[1].trim(),
-          targetText: pipeMatch[4].trim(),
-          info: { ...info, label: pipeMatch[3].trim() },
+          sourceText: line.slice(0, pipeArrow.start).trim(),
+          targetText: line.slice(pipeArrow.end).trim(),
+          info: { ...info, label: pipeArrow.label?.trim() ?? '' },
           rest: '',
         };
       }
