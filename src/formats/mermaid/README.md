@@ -100,11 +100,11 @@ const mermaid = toMermaidFlowchart(graph);
 
 <!-- public type fields from src/formats/mermaid/flowchart.ts -->
 
-**Types:** `FlowchartNodeData` (classes, deprecated link, tooltip, direction,
-structured click), `FlowchartClick` (kind, target, tooltip, link target,
-explicit call), `FlowchartEdgeData` (stroke, arrow and endpoint markers,
-bidirectional, link style), `FlowchartGraphData` (class definitions, default link
-style, init directive)
+**Types:** `FlowchartNodeData` (`classes`, deprecated `link`, `tooltip`,
+`direction`, `click`), `FlowchartClick` (`kind`, `target`, `tooltip`,
+`linkTarget`, `explicitCall`), `FlowchartEdgeData` (`stroke`, `arrowType`,
+`endMarker`, `startMarker`, `bidirectional`, `linkStyle`),
+`FlowchartGraphData` (`diagramType`, `classDefs`, `defaultLinkStyle`, `init`)
 
 ---
 
@@ -135,8 +135,9 @@ const mermaid = toMermaidState(graph);
 
 <!-- public type fields from src/formats/mermaid/state.ts -->
 
-**Types:** `StateNodeData` (description, state type, notes, start/end markers,
-classes, direction), `StateEdgeData`, `StateGraphData` (class definitions)
+**Types:** `StateNodeData` (`description`, `stateType`, `notes`, `isStart`,
+`isEnd`, `classes`, `direction`), `StateEdgeData`,
+`StateGraphData` (`diagramType`, `classDefs`)
 
 ---
 
