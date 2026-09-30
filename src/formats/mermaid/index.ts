@@ -20,6 +20,7 @@ export {
 } from './flowchart';
 export type {
   MermaidFlowchartGraph,
+  FlowchartClick,
   FlowchartNodeData,
   FlowchartEdgeData,
   FlowchartGraphData,
