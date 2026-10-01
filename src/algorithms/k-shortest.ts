@@ -1,4 +1,5 @@
 import { getShortestPath } from './paths';
+import { getGraphSnapshot } from '../indexing';
 import { getPathWeight } from '../path-utils';
 import type {
   Graph,
@@ -32,6 +33,7 @@ export function* genShortestSimplePaths<N, E>(
   graph: Graph<N, E>,
   options: ShortestSimplePathsOptions<E>,
 ): Generator<GraphPath<N, E>> {
+  graph = getGraphSnapshot(graph);
   const getWeight = options.getWeight ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
   const first = getShortestPath(graph, {
     from: options.from,

@@ -192,7 +192,7 @@ describe('getMaximumBipartiteMatching', () => {
       ],
     });
 
-    const { value } = getMaxFlow(flowGraph, { from: 's', to: 't' });
+    const { value } = getMaxFlow(flowGraph, { from: 's', to: 't' })!;
     expect(matches).toHaveLength(value);
   });
 

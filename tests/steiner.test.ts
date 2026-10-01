@@ -18,27 +18,27 @@ describe('getSteinerTree', () => {
         { id: 'e2', sourceId: 'b', targetId: 'c', weight: 1 },
       ],
     });
-    const tree = getSteinerTree(g, { terminals: ['a'] });
+    const tree = getSteinerTree(g, { terminals: ['a'] })!;
     expect(tree.edges).toHaveLength(0);
     expect(tree.nodes.map((n) => n.id)).toEqual(['a']);
   });
 
-  it('throws for an unknown terminal', () => {
+  it('returns undefined for an unknown terminal', () => {
     const g = createGraph({
       mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
     });
-    expect(() => getSteinerTree(g, { terminals: ['a', 'zzz'] })).toThrow();
+    expect(getSteinerTree(g, { terminals: ['a', 'zzz'] })).toBeUndefined();
   });
 
-  it('throws when terminals are not connected', () => {
+  it('returns undefined when terminals are not connected', () => {
     const g = createGraph({
       mode: 'undirected',
       nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
       edges: [{ id: 'e1', sourceId: 'a', targetId: 'b' }],
     });
-    expect(() => getSteinerTree(g, { terminals: ['a', 'c' ] })).toThrow();
+    expect(getSteinerTree(g, { terminals: ['a', 'c'] })).toBeUndefined();
   });
 
   it('all-nodes-are-terminals → equals the graph MST', () => {
@@ -56,7 +56,7 @@ describe('getSteinerTree', () => {
     });
     const tree = getSteinerTree(g, {
       terminals: ['a', 'b', 'c', 'd'],
-    });
+    })!;
     // n-1 edges spanning all 4 nodes, minimum total weight = 1+2+3 = 6.
     expect(tree.nodes).toHaveLength(4);
     expect(tree.edges).toHaveLength(3);
@@ -78,7 +78,7 @@ describe('getSteinerTree', () => {
         { id: 'bc', sourceId: 'b', targetId: 'c', weight: 10 },
       ],
     });
-    const tree = getSteinerTree(g, { terminals: ['a', 'b', 'c'] });
+    const tree = getSteinerTree(g, { terminals: ['a', 'b', 'c'] })!;
     expect(totalWeight(tree.edges)).toBe(3);
     // Steiner node s must be included.
     expect(tree.nodes.map((n) => n.id)).toContain('s');
@@ -103,7 +103,7 @@ describe('getSteinerTree', () => {
         { id: 'e3', sourceId: 'b', targetId: 'x', weight: 1 },
       ],
     });
-    const tree = getSteinerTree(g, { terminals: ['a', 'c'] });
+    const tree = getSteinerTree(g, { terminals: ['a', 'c'] })!;
     const ids = tree.nodes.map((n) => n.id);
     // The dead-end x is a non-terminal leaf and must be pruned.
     expect(ids).not.toContain('x');
@@ -136,7 +136,7 @@ describe('getSteinerTree', () => {
       ],
     });
     const optimal = 4; // star through center: n,e,s,w each 1 = 4
-    const tree = getSteinerTree(g, { terminals: ['n', 'e', 's', 'w'] });
+    const tree = getSteinerTree(g, { terminals: ['n', 'e', 's', 'w'] })!;
     expect(totalWeight(tree.edges)).toBeLessThanOrEqual(2 * optimal);
     // On this instance the 2-approx finds the true optimum.
     expect(totalWeight(tree.edges)).toBe(optimal);

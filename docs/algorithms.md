@@ -24,12 +24,13 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `hasPath(graph, sourceId, targetId)` | Reachability | O(n + m) | BFS, mode-aware. `hasPath(g, a, a)` is `true`. |
+| `hasPath(graph, sourceId, targetId, opts?)` | Reachability | O(n + m) | BFS, mode-aware; `direction` is `'outgoing'` (default), `'incoming'`, or `'undirected'`. A node reaches itself; unknown ids return `false`. |
 | `isConnected(graph)` | Single weak component? | O(n + m) | Empty graph is connected. |
 | `isWeaklyConnected(graph)` | Single weak component? | O(n + m) | Explicit alias for weak connectivity; ignores edge direction. |
 | `isStronglyConnected(graph)` | Every node reaches every other node? | O(n + m) | Empty graph is strongly connected; non-directed edges are mutual. |
 | `getUnweightedDistances(graph, sourceId, opts?)` | Reachable node IDs → minimum hop count | O(n + m) | `direction` is outgoing (default), incoming, or undirected. Unknown source returns an empty map. |
-| `isTree(graph)` | Connected + acyclic + exactly `n − 1` edges | O(n + m) | Directed diamonds and parallel edges are not trees. Empty/single-node graphs are trees. |
+| `isTree(graph)` | Tree, ignoring edge direction | O(n + m) | Connected with exactly `n − 1` edges. Parallel edges and self-loops are cycles; `a → c ← b` is a tree (a polytree). The empty graph is not a tree. |
+| `isArborescence(graph, opts?)` | Rooted out-tree | O(n + m) | All edges directed, one root with in-degree 0, every other node in-degree 1, all reachable from the root. `from` requires a specific root. |
 | `getConnectedComponents(graph)` | Weakly-connected components | O(n + m) | Every edge connects regardless of mode/direction. CSR-backed. |
 | `getStronglyConnectedComponents(graph)` | SCCs (Tarjan) | O(n + m) | Non-directed edges count as mutual reachability. Recursive — deep graphs may hit stack limits. |
 | `getBridges(graph)` | Edges whose removal disconnects | O(n + m) | Iterative, stack-safe low-link traversal over the undirected projection. Result sorted by id. |
@@ -40,11 +41,12 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `isAcyclic(graph)` | No cycles? | O(n + m) typical | Mixed graphs use polynomial fast paths (directed-only cycle, union-find on non-directed edges, singleton SCCs); only ambiguous multi-node SCCs fall back to exact simple-cycle enumeration (exponential worst case, scoped to that SCC). |
-| `genCycles(graph)` / `getCycles(graph)` | All simple cycles as `GraphPath`s | exponential (output-sensitive) | Dispatches on the *effective* mode kind: directed (Johnson-style DFS), undirected (edge-id dedup — two parallel edges form a genuine 2-cycle; can't re-traverse the arrival edge), or mixed (exact search, each edge used at most once; correct but potentially expensive on dense mixed graphs). |
-| `getTopologicalSort(graph)` | Topological order or `null` | O(n + m) | Returns `null` on any cycle *and* whenever any edge's effective mode isn't `'directed'` (undirected = mutual precedence = 2-cycle). |
+| `isAcyclic(graph)` | No cycles? | O(n + m) | Iterative (stack-safe on deep graphs) and cached until the graph changes. Same cycle rules as `genCycles`. |
+| `genCycles(graph)` / `getCycles(graph)` | All simple cycles as `GraphPath`s | O((n + m) · (cycles + 1)) | Johnson's algorithm per biconnected block, iterative and lazy. Directed edges followed source→target; non-directed edges either way, never reusing an edge (two parallel non-directed edges form a 2-cycle). Each cycle is yielded once, starting at its smallest node id; all-non-directed cycles in one canonical direction. |
+| `getCycle(graph)` | One simple cycle, or `undefined` | O(n + m) | Same rules as `genCycles`. Deterministic, but not necessarily the shortest cycle. For reporting why a graph is cyclic. |
+| `genTopologicalSort(graph, opts?)` / `getTopologicalSort(graph, opts?)` | Topological order (`get*`: or `null`) | O(n + m) | Kahn's algorithm. `from` nodes go first among nodes without predecessors; ties otherwise follow `graph.nodes` order. A non-directed edge is mutual precedence (a 2-cycle). On a cycle, `gen*` stops after the schedulable prefix and `get*` returns `null`. |
 | `getTransitiveReduction(graph)` | New graph with transitively-redundant edges removed | O(n·m) time, O(n²) reach memory | DAG-only: throws on a cycle or any non-directed edge. Exact-duplicate parallel edges collapse to the first in `graph.edges` order. Input not mutated. |
-| `getDominatorTree(graph, opts?)` | `{ nodeId: idomId \| null }` rooted at `from` | near-linear (Cooper–Harvey–Kennedy iteration) | Root maps to `null`; unreachable nodes omitted. Mode-aware traversal. For statecharts: "which states must every path from the initial state pass through?" |
+| `getDominatorTree(graph, opts?)` | `{ nodeId: idomId \| null }` rooted at `from` | near-linear (Cooper–Harvey–Kennedy iteration) | Root maps to `null`; unreachable nodes omitted; an unknown root yields `{}`. Mode-aware traversal. For statecharts: "which states must every path from the initial state pass through?" |
 
 ## Shortest paths
 
@@ -57,7 +59,7 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 | `getAStarPath(graph, { from, to, heuristic, ... })` | One heuristic-guided shortest path | O((n + m) log n), heuristic-dependent | `from` accepts a node ID or predicate. Multiple matches return the globally shortest path; graph order breaks ties. Heuristics must be finite; admissible heuristic ⇒ optimal path. |
 | `genAllPairsShortestPaths(graph, opts?)` / `getAllPairsShortestPaths(...)` | Shortest paths between all ordered pairs | Dijkstra-per-source (default) O(n(n + m) log n); `'floyd-warshall'` O(n³); `'bellman-ford'` O(n²m) | Includes tied shortest paths. The generator supports early exit; the eager form can produce huge output. Floyd-Warshall throws on a negative cycle. |
 | `genShortestSimplePaths(graph, opts)` / `getShortestSimplePaths(...)` | Loopless alternatives in nondecreasing weight order | Yen: O(K·n·(m + n log n)) for K results | `from` and `to` are required. `limit` bounds results; omitting it enumerates every simple path by cost. Non-negative weights only. |
-| `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. DFS with backtracking; without `to`, every non-empty simple path is yielded. |
+| `genSimplePaths(graph, opts?)` / `getSimplePaths(...)` / `getSimplePath(...)` | All (or first) simple paths from `from` (optionally to `to`) | exponential (output-sensitive) | Iterative (stack-safe on long paths); dangling edges are skipped. `from` accepts a node ID or predicate; predicates independently fan out from every matching node in graph order. DFS with backtracking; without `to`, every non-empty simple path is yielded. |
 | `getJoinedPath(headPath, tailPath)` | Concatenated `GraphPath` | O(steps) | Throws unless head ends where tail starts. |
 
 **Numeric contract.** Every shortest-path weight and intermediate cost must remain finite; `NaN`, infinities, and arithmetic overflow throw. Dijkstra, A*, and bidirectional/early-exit searches also assert "no negative weights" **up front**: O(1) via cached CSR flags for default weights, or one O(m) sweep for custom `getWeight`. Bellman–Ford handles finite negative edges; negative cycles still throw.
@@ -123,14 +125,14 @@ All community algorithms treat the graph as **undirected** regardless of mode. O
 | `genGirvanNewmanCommunities(graph, opts?)` | Lazy successive splits via edge-betweenness removal | O(n·m) per removal round | Yields a partition each time the component count grows; abandon early to skip deeper levels. |
 | `getGirvanNewmanCommunities(graph, opts?)` | The split at `level` (default 1) | as above | `level <= 0` returns the connected components. |
 | `getGreedyModularityCommunities(graph)` | Greedy modularity merging | very expensive (re-scores every pair per merge) | Small graphs only. |
-| `getModularity(graph, communities)` | Modularity Q of a partition | O(m + Σ\|c\|²) | Undirected convention (degree counts both endpoints). |
+| `getModularity(graph, communities)` | Modularity Q of a partition | O(n + m) | Undirected convention (degree counts both endpoints; a self-loop adds 2). Dangling edges and unknown ids are ignored. |
 
 ## Flow & cuts
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `getMaxFlow(graph, { from, to, getCapacity? })` | `{ value, flows, cutEdges }` | Edmonds–Karp O(n·m²) | Capacity defaults to `edge.weight ?? 1`; non-finite/negative capacity and total-flow overflow throw. Directed edges carry flow source→target only; non-directed edges become two independent opposite arcs each with full capacity. `flows` is net flow per edge id (positive = source→target). Self-loops carry nothing. |
-| `getMinCut(graph, { source, sink, getCapacity? })` | `{ value, cutEdges, partition }` | same solver | Max-flow-min-cut: `partition.source` = residual-reachable side (in `graph.nodes` order); `Σ cap(cutEdges) === value`. |
+| `getMaxFlow(graph, { from, to, getCapacity? })` | `{ value, flows, cutEdges }` or `undefined` | Edmonds–Karp O(n·m²) | `undefined` when `from` or `to` is unknown; `from === to` throws. Capacity defaults to `edge.weight ?? 1`; non-finite/negative capacity and total-flow overflow throw. Directed edges carry flow source→target only; non-directed edges become two independent opposite arcs each with full capacity. `flows` is net flow per edge id (positive = source→target). Self-loops carry nothing. |
+| `getMinCut(graph, { from, to, getCapacity? })` | `{ value, cutEdges, partition }` or `undefined` | same solver | Same options and `cutEdges` (edge objects) as `getMaxFlow`. Max-flow-min-cut: `partition.source` = ids on the residual-reachable side (in `graph.nodes` order); `Σ cap(cutEdges) === value`. |
 
 ## Bipartite
 
@@ -150,7 +152,7 @@ All community algorithms treat the graph as **undirected** regardless of mode. O
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
-| `isIsomorphic(graphA, graphB, opts?)` | Structural isomorphism | exponential worst case (degree-signature-pruned backtracking) | Degree signatures count per *effective* edge mode (in/out for directed, one undirected incidence otherwise), so per-edge overrides participate. Optional `nodeMatch`/`edgeMatch` refine with payloads. |
+| `isIsomorphic(graphA, graphB, opts?)` | Structural isomorphism | exponential worst case; near-linear on sparse, irregular graphs | VF2-style iterative backtracking: nodes matched in breadth-first order, candidates drawn from neighbors of matched nodes, O(deg) checks. Preserves each edge's *effective* mode and direction; parallel edges and self-loops must match in number (and mode). `nodeMatch`/`edgeMatch` refine by payload; parallel edges are paired exactly, not greedily. Dangling edges are ignored. |
 | `areEntitiesEqual(a, b, keys?)` | Key-wise node/edge equality | O(keys) | Objects compared by JSON stringification. |
 | `isLayoutEqual(a, b)` / `isNonLayoutEqual(a, b)` | Equality on `LAYOUT_KEYS` / everything else | O(keys) | Layout keys: `x`, `y`, `width`, `height`, `points`, … — useful for "did layout actually change?" checks. |
 
@@ -178,7 +180,7 @@ Walk generators yield `GraphStep`s lazily and honor effective edge modes (non-di
 
 ## Queries (headline)
 
-`src/queries.ts` holds O(1)/O(deg) indexed lookups rather than algorithms — neighborhood (`getNeighbors`, `getSuccessors`, `getPredecessors`, `getEdgesOf`, `getInEdges`, `getOutEdges`, `getEdgesBetween`), degree (`getDegree`, `getInDegree`, `getOutDegree`), hierarchy (`getChildren`, `getParent`, `getAncestors`, `getDescendants`, `getRoots`, `getSiblings`, `getDepth`, `getLCA`, `isCompound`, `isLeaf`), endpoints (`getSources`, `getSinks`), BFS hop-distance maps (`getRelativeDistanceMap`, `getRelativeDistance`), and ports (`getPort`, `getPorts`, `getEdgesByPort`). All collection queries return `[]` (never `undefined`) when empty. `getGraphIssues(graph)` validates referential integrity (dangling endpoints, missing parents, …) without throwing.
+`src/queries.ts` holds O(1)/O(deg) indexed lookups rather than algorithms — neighborhood (`getNeighbors`, `getSuccessors`, `getPredecessors`, `getEdgesOf`, `getInEdges`, `getOutEdges`, `getEdgesBetween`), degree (`getDegree` — every self-loop counts twice, so degrees sum to `2 × edges.length` — `getInDegree`, `getOutDegree`), hierarchy (`getChildren`, `getParent`, `getAncestors`, `getDescendants`, `getRoots`, `getSiblings`, `getDepth`, `getLCA`, `isCompound`, `isLeaf`), endpoints (`getSources`, `getSinks`), BFS hop-distance maps (`getRelativeDistanceMap`, `getRelativeDistance`), and ports (`getPort`, `getPorts`, `getEdgesByPort`). All collection queries return `[]` (never `undefined`) when empty. Unknown node ids are "not found", never an error: `undefined` (e.g. `getDepth`), `false` (`isLeaf`, `isCompound`), `0` (`getDegree`), or `[]`. `getGraphIssues(graph)` validates referential integrity (dangling endpoints, missing parents, …) without throwing.
 
 ## Performance notes
 

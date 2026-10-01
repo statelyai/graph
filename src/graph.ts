@@ -1201,16 +1201,15 @@ export class GraphInstance<N = any, E = any, G = any, P = any> {
 
 function collectDescendants(graph: Graph, id: string): Set<string> {
   const idx = getIndex(graph);
-  const toDelete = new Set<string>();
-  const walk = (nodeId: string) => {
-    toDelete.add(nodeId);
-    const childIds = idx.childNodes.get(nodeId) ?? [];
-    for (const childId of childIds) {
+  const toDelete = new Set<string>([id]);
+  const stack = [id];
+  while (stack.length > 0) {
+    for (const childId of idx.childNodes.get(stack.pop()!) ?? []) {
       if (!toDelete.has(childId)) {
-        walk(childId);
+        toDelete.add(childId);
+        stack.push(childId);
       }
     }
-  };
-  walk(id);
+  }
   return toDelete;
 }
