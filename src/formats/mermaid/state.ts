@@ -175,12 +175,26 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       /^state\s+"([^"]+)"\s+as\s+(\S+)\s*\{\s*$/,
     );
     if (compositeStateAsMatch) {
-      const description = compositeStateAsMatch[1];
+      const description = unescapeMermaidLabel(compositeStateAsMatch[1]);
       const stateId = compositeStateAsMatch[2];
       const node = ensureNode(stateId);
       node.data.description = description;
       node.label = description;
       parentStack.push(stateId);
+      continue;
+    }
+
+    // The editor emits quoted aliases with the stereotype on the same line.
+    const aliasedStereotypeMatch = line.match(
+      /^state\s+"([^"]+)"\s+as\s+(\S+)\s+<<(choice|fork|join)>>\s*$/,
+    );
+    if (aliasedStereotypeMatch) {
+      const [, description, stateId, stateType] = aliasedStereotypeMatch;
+      const node = ensureNode(stateId);
+      node.data.description = unescapeMermaidLabel(description);
+      node.label = node.data.description;
+      node.data.stateType = stateType as 'choice' | 'fork' | 'join';
+      (node as any).shape = stateType;
       continue;
     }
 
@@ -200,7 +214,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
     // State with description: state "description" as stateId
     const stateAsMatch = line.match(/^state\s+"([^"]+)"\s+as\s+(\S+)\s*$/);
     if (stateAsMatch) {
-      const description = stateAsMatch[1];
+      const description = unescapeMermaidLabel(stateAsMatch[1]);
       const stateId = stateAsMatch[2];
       const node = ensureNode(stateId);
       node.data.description = description;

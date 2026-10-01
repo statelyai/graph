@@ -9,7 +9,7 @@ Converters for [Mermaid](https://mermaid.js.org/) diagram syntax. Each diagram t
 
 ## API
 
-<!-- exported symbols from src/formats/mermaid/index.ts -->
+<!-- converter value exports from src/formats/mermaid/index.ts -->
 
 ```ts
 import {
@@ -77,6 +77,9 @@ const mermaid = toMermaidSequence(graph);
 ### Flowchart
 
 Nodes with shapes, edges with arrows. Subgraphs map to compound nodes via `parentId`.
+Compact links such as `A & B --> C & D` expand across supported arrows and
+pipe edge labels. Semicolon-separated statements and quoted node labels are
+split or decoded on import.
 
 ```ts
 const graph = fromMermaidFlowchart(`flowchart TD
@@ -95,13 +98,21 @@ const graph = fromMermaidFlowchart(`flowchart TD
 const mermaid = toMermaidFlowchart(graph);
 ```
 
-**Types:** `FlowchartNodeData` (classes, link, tooltip), `FlowchartEdgeData` (stroke, arrowType, bidirectional), `FlowchartGraphData` (classDefs)
+<!-- public type fields from src/formats/mermaid/flowchart.ts -->
+
+**Types:** `FlowchartNodeData` (`classes`, deprecated `link`, `tooltip`,
+`direction`, `click`), `FlowchartClick` (`kind`, `target`, `tooltip`,
+`linkTarget`, `explicitCall`), `FlowchartEdgeData` (`stroke`, `arrowType`,
+`endMarker`, `startMarker`, `bidirectional`, `linkStyle`),
+`FlowchartGraphData` (`diagramType`, `classDefs`, `defaultLinkStyle`, `init`)
 
 ---
 
 ### State Diagram
 
 State ID is the label. Descriptions go in `data.description`. `[*]` maps to start/end pseudo-nodes.
+Quoted aliases with `<<choice>>`, `<<fork>>`, or `<<join>>` retain both their
+decoded description and state type across import and export.
 
 ```ts
 const graph = fromMermaidState(`stateDiagram-v2
@@ -122,7 +133,11 @@ const graph = fromMermaidState(`stateDiagram-v2
 const mermaid = toMermaidState(graph);
 ```
 
-**Types:** `StateNodeData` (description, stateType, isStart, isEnd), `StateEdgeData`, `StateGraphData`
+<!-- public type fields from src/formats/mermaid/state.ts -->
+
+**Types:** `StateNodeData` (`description`, `stateType`, `notes`, `isStart`,
+`isEnd`, `classes`, `direction`), `StateEdgeData`,
+`StateGraphData` (`diagramType`, `classDefs`)
 
 ---
 

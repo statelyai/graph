@@ -84,6 +84,7 @@ export type {
   SequenceEdgeData,
   SequenceGraphData,
   SequenceBlock,
+  FlowchartClick,
   FlowchartNodeData,
   FlowchartEdgeData,
   FlowchartGraphData,

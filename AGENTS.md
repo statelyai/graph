@@ -67,9 +67,12 @@ Generics order: `<TNodeData, TEdgeData, TGraphData, TPortData>`, shortened to `<
 - `graph` is always the first parameter (except `create*` factories)
 - Mutations document with `/** **Mutable.** */` JSDoc
 - Collection queries return `[]` not `undefined` when empty
+- Unknown node ids are "not found", never an error: queries/algorithms return `undefined`, `[]`, `{}`, `false`, or yield nothing (no fabricated trivial paths). Throw only for invalid arguments (bad weights/radius, `from === to` in flow) and in mutations
+- `gen*` generators must traverse `getGraphSnapshot(graph)` (or a CSR snapshot) so array-replacing mutations mid-iteration can't desync cached positions
 - Config types use `?? null` for parentId/initialNodeId, `?? ''` for strings, `?? 0` for visual numbers
 - Keep objects JSON-serializable — no functions, classes, or symbols on Graph/Node/Edge/Port
 - Tests use vitest. Existing tests must keep passing.
+- Every public function must be specified (or explicitly excluded, with a reason) in `tests/contracts.test.ts`, which runs it against edge-case fixtures (empty, self-loops, parallel/mixed/dangling edges, unknown ids, a 20k-deep chain). Algorithms must be iterative — no recursion proportional to graph size or depth
 
 ## Ports
 

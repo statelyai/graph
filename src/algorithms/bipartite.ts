@@ -176,29 +176,47 @@ export function getMaximumBipartiteMatching(graph: Graph): BipartiteMatch[] {
     return foundAugmenting;
   }
 
-  function hasAugmentedMatchFrom(u: number): boolean {
-    for (let a = offsets[u]; a < offsets[u + 1]; a++) {
-      const v = targets[a];
+  // Per-phase arc cursor per left node; a stack frame's cursor points at
+  // the arc leading to the frame above it.
+  const nextArc = new Int32Array(n);
+  const stack = new Int32Array(n);
+
+  /** Iterative layered DFS for one augmenting path from free left `root`. */
+  function augmentFrom(root: number): void {
+    let top = 0;
+    stack[0] = root;
+    while (top >= 0) {
+      const u = stack[top];
+      if (nextArc[u] === offsets[u + 1]) {
+        dist[u] = INF; // dead end for the rest of this phase
+        top--;
+        continue;
+      }
+      const v = targets[nextArc[u]];
       const w = matchRight[v];
-      if (
-        w === -1 ||
-        (dist[w] === dist[u] + 1 && hasAugmentedMatchFrom(w))
-      ) {
-        matchLeft[u] = v;
-        matchRight[v] = u;
-        matchEdge[u] = arcEdge[a];
-        return true;
+      if (w === -1) {
+        // Flip the alternating path held on the stack
+        for (let k = top; k >= 0; k--) {
+          const x = stack[k];
+          const arc = nextArc[x];
+          matchLeft[x] = targets[arc];
+          matchRight[targets[arc]] = x;
+          matchEdge[x] = arcEdge[arc];
+        }
+        return;
+      }
+      if (dist[w] === dist[u] + 1) {
+        stack[++top] = w;
+      } else {
+        nextArc[u]++;
       }
     }
-    dist[u] = INF;
-    return false;
   }
 
   while (hasAugmentingLayer()) {
+    nextArc.set(offsets.subarray(0, n));
     for (let u = 0; u < n; u++) {
-      if (colors[u] === 0 && matchLeft[u] === -1) {
-        hasAugmentedMatchFrom(u);
-      }
+      if (colors[u] === 0 && matchLeft[u] === -1) augmentFrom(u);
     }
   }
 

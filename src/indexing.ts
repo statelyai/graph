@@ -24,31 +24,15 @@ export interface GraphIndex {
    * index object identity + this version to revalidate in O(1).
    */
   version: number;
-  /**
-   * Lazy per-node degree cache (see `getDegree` in queries.ts). Stored on the
-   * index itself so a degree sweep pays one property load, not an extra
-   * WeakMap lookup, per call. Revalidated against `version` + `graph.mode`.
-   */
-  degrees?: {
-    version: number;
-    mode: Graph['mode'];
-    /** node id → degree; one hashed lookup per getDegree call */
-    byId: Map<string, number>;
-  };
 }
 
 // WeakMap cache
 
+// No WeakRef memo in front of this map: creating or dereferencing a WeakRef
+// keeps its target alive until the current job ends, so a synchronous loop
+// over many transient graphs (e.g. one subgraph per Yen spur node) would
+// retain every graph and index it touched until the loop returned.
 const indexes = new WeakMap<Graph, GraphIndex>();
-
-// One-entry memo in front of the WeakMap: point queries (getDegree,
-// getNode, …) are typically issued in bursts against one graph, and a
-// WeakRef deref + pointer compare is measurably cheaper than a WeakMap
-// lookup in such sweeps. Both refs are weak, so the memo never extends the
-// lifetime of a graph (the index itself is kept alive by the WeakMap value
-// exactly as long as its graph is).
-let lastGraphRef: WeakRef<Graph> | undefined;
-let lastIdxRef: WeakRef<GraphIndex> | undefined;
 
 // Public API
 
@@ -78,10 +62,7 @@ let lastIdxRef: WeakRef<GraphIndex> | undefined;
  * ```
  */
 export function getIndex(graph: Graph): GraphIndex {
-  const memoGraph = lastGraphRef?.deref();
-  let idx =
-    (memoGraph === graph ? lastIdxRef?.deref() : undefined) ??
-    indexes.get(graph);
+  let idx = indexes.get(graph);
   // Rebuild when the arrays were replaced (immutable-style update) or
   // counts changed — the cached index describes different arrays.
   if (
@@ -93,11 +74,6 @@ export function getIndex(graph: Graph): GraphIndex {
   ) {
     idx = buildIndex(graph);
     indexes.set(graph, idx);
-    lastIdxRef = new WeakRef(idx);
-    if (memoGraph !== graph) lastGraphRef = new WeakRef(graph);
-  } else if (memoGraph !== graph) {
-    lastGraphRef = new WeakRef(graph);
-    lastIdxRef = new WeakRef(idx);
   }
   return idx;
 }
@@ -122,10 +98,35 @@ export function getIndex(graph: Graph): GraphIndex {
  */
 export function invalidateIndex(graph: Graph): void {
   indexes.delete(graph);
-  if (lastGraphRef?.deref() === graph) {
-    lastGraphRef = undefined;
-    lastIdxRef = undefined;
-  }
+}
+
+/**
+ * Returns a shallow view of `graph` that shares its current arrays and index.
+ *
+ * Lazy generators traverse this view instead of `graph`, so a structural
+ * mutation that replaces the arrays mid-iteration (`deleteNode`,
+ * `deleteEdge`, an immutable-style update) cannot desynchronize cached
+ * positions from the arrays they index: removals made after iteration starts
+ * are not observed. O(1) — no copy, no index rebuild. (Graphs are expected
+ * to be treated as immutable while a generator over them is live; this only
+ * guarantees consistent results instead of garbage or crashes.)
+ */
+export function getGraphSnapshot<G extends Graph<any, any, any, any>>(
+  graph: G,
+): G {
+  // Read the Graph fields explicitly: a GraphInstance serves them from
+  // prototype getters, which a spread would drop.
+  const snapshot = {
+    ...graph,
+    id: graph.id,
+    mode: graph.mode,
+    initialNodeId: graph.initialNodeId,
+    nodes: graph.nodes,
+    edges: graph.edges,
+    data: graph.data,
+  };
+  indexes.set(snapshot, getIndex(graph));
+  return snapshot;
 }
 
 // Full rebuild

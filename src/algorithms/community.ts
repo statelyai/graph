@@ -1,5 +1,5 @@
 import type { Graph, GraphEdge, GraphNode } from '../types';
-import { getIndex } from '../indexing';
+import { getGraphSnapshot, getIndex } from '../indexing';
 import { mulberry32 } from './shared';
 import { throwIfAborted } from './abort';
 
@@ -347,6 +347,7 @@ export function* genGirvanNewmanCommunities<N>(
   graph: Graph<N>,
   options?: GirvanNewmanOptions,
 ): Generator<Community<N>[]> {
+  graph = getGraphSnapshot(graph);
   if (graph.nodes.length === 0 || graph.edges.length === 0) {
     return;
   }
@@ -421,43 +422,42 @@ export function getModularity<N>(
     return 0;
   }
 
-  const nodeIds = graph.nodes.map((node) => node.id);
-  const adjacency = new Map<string, Map<string, number>>();
-  const degree = Object.fromEntries(nodeIds.map((nodeId) => [nodeId, 0])) as Record<
-    string,
-    number
-  >;
-
-  for (const nodeId of nodeIds) {
-    adjacency.set(nodeId, new Map());
+  // Q = Σ_c (2·L_c − d_c² / 2m) / 2m, where L_c counts edges with both
+  // endpoints in community c (a self-loop counts once, adding 2 to its node's
+  // degree) and d_c sums the degrees of c's nodes. O(n + m) per partition.
+  const degree = new Map<string, number>(graph.nodes.map((node) => [node.id, 0]));
+  const validEdges = graph.edges.filter(
+    (edge) => degree.has(edge.sourceId) && degree.has(edge.targetId),
+  );
+  if (validEdges.length === 0) return 0;
+  for (const edge of validEdges) {
+    degree.set(edge.sourceId, degree.get(edge.sourceId)! + 1);
+    degree.set(edge.targetId, degree.get(edge.targetId)! + 1);
   }
+  const m2 = validEdges.length * 2;
 
-  for (const edge of graph.edges) {
-    adjacency.get(edge.sourceId)!.set(
-      edge.targetId,
-      (adjacency.get(edge.sourceId)!.get(edge.targetId) ?? 0) + 1,
-    );
-    adjacency.get(edge.targetId)!.set(
-      edge.sourceId,
-      (adjacency.get(edge.targetId)!.get(edge.sourceId) ?? 0) + 1,
-    );
-    degree[edge.sourceId]++;
-    degree[edge.targetId]++;
-  }
-
-  const m2 = graph.edges.length * 2;
-  let modularity = 0;
-
-  for (const community of toCommunityIds(communities)) {
-    const ids = [...community];
-    for (const i of ids) {
-      for (const j of ids) {
-        const aij = adjacency.get(i)!.get(j) ?? 0;
-        modularity += aij - (degree[i] * degree[j]) / m2;
-      }
+  const sets = toCommunityIds(communities);
+  const membership = new Map<string, number[]>();
+  sets.forEach((set, c) => {
+    for (const id of set) {
+      let list = membership.get(id);
+      if (!list) membership.set(id, (list = []));
+      list.push(c);
+    }
+  });
+  const internal = new Float64Array(sets.length);
+  for (const edge of validEdges) {
+    for (const c of membership.get(edge.sourceId) ?? []) {
+      if (sets[c].has(edge.targetId)) internal[c] += 2;
     }
   }
 
+  let modularity = 0;
+  sets.forEach((set, c) => {
+    let communityDegree = 0;
+    for (const id of set) communityDegree += degree.get(id) ?? 0;
+    modularity += internal[c] - (communityDegree * communityDegree) / m2;
+  });
   return modularity / m2;
 }
 

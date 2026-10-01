@@ -8,11 +8,13 @@ export {
   getConnectedComponents,
   getUnweightedDistances,
   getTopologicalSort,
+  genTopologicalSort,
   hasPath,
   isConnected,
   isWeaklyConnected,
   isStronglyConnected,
   isTree,
+  isArborescence,
 } from './algorithms/traversal';
 
 export {
@@ -23,6 +25,7 @@ export {
   getSimplePaths,
   genSimplePaths,
   getStronglyConnectedComponents,
+  getCycle,
   getCycles,
   genCycles,
   getAllPairsShortestPaths,

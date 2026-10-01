@@ -1,5 +1,5 @@
 import { getOutEdges, getInEdges } from './queries';
-import { getNode } from './graph';
+import { getNode, hasNode } from './graph';
 import { getEdgeMode } from './mode';
 import type {
   Graph,
@@ -57,11 +57,18 @@ function getTraversableEdges<N, E>(
 ): { edge: GraphEdge<E>; nextId: string }[] {
   const result: { edge: GraphEdge<E>; nextId: string }[] = [];
   for (const edge of getOutEdges(graph, nodeId)) {
-    result.push({ edge, nextId: edge.targetId });
+    // Dangling edges lead nowhere
+    if (hasNode(graph, edge.targetId)) {
+      result.push({ edge, nextId: edge.targetId });
+    }
   }
   for (const edge of getInEdges(graph, nodeId)) {
     // Self-loops already covered by the out-edge loop above
-    if (edge.sourceId !== edge.targetId && getEdgeMode(graph, edge) !== 'directed') {
+    if (
+      edge.sourceId !== edge.targetId &&
+      getEdgeMode(graph, edge) !== 'directed' &&
+      hasNode(graph, edge.sourceId)
+    ) {
       result.push({ edge, nextId: edge.sourceId });
     }
   }
@@ -268,6 +275,7 @@ export function* genPredefinedWalk<N, E>(
   options?: Pick<WalkOptions<E>, 'from'>,
 ): Generator<GraphStep<N, E>> {
   let currentId = resolveFrom(graph, options?.from);
+  if (!hasNode(graph, currentId)) return;
 
   for (const edgeId of edgeIds) {
     const edge = graph.edges.find((e) => e.id === edgeId);
@@ -287,7 +295,10 @@ export function* genPredefinedWalk<N, E>(
         `Edge "${edgeId}" connects "${edge.sourceId}" → "${edge.targetId}" but current position is "${currentId}".`,
       );
     }
-    const node = getNode(graph, nextId)!;
+    const node = getNode(graph, nextId);
+    if (!node) {
+      throw new Error(`Edge "${edgeId}" leads to "${nextId}", which is not in the graph.`);
+    }
     currentId = node.id;
     yield { edge, node };
   }
@@ -443,7 +454,9 @@ export function getCoverage<N, E>(
   options?: { from?: string },
 ): CoverageStats {
   const startId = options?.from ?? graph.initialNodeId ?? graph.nodes[0]?.id;
-  const visitedNodes = new Set<string>(startId ? [startId] : []);
+  const visitedNodes = new Set<string>(
+    startId !== undefined && hasNode(graph, startId) ? [startId] : [],
+  );
   const visitedEdges = new Set<string>();
 
   for (const step of steps) {

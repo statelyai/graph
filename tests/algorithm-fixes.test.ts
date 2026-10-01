@@ -171,8 +171,8 @@ describe('isTree on directed graphs (bug 3)', () => {
     expect(isTree(graph)).toBe(true);
   });
 
-  it('returns true for empty and single-node graphs', () => {
-    expect(isTree(createGraph({ nodes: [], edges: [] }))).toBe(true);
+  it('returns false for the empty graph and true for a single node', () => {
+    expect(isTree(createGraph({ nodes: [], edges: [] }))).toBe(false);
     expect(isTree(createGraph({ nodes: [{ id: 'a' }], edges: [] }))).toBe(true);
   });
 });

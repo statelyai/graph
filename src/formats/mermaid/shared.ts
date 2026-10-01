@@ -21,12 +21,14 @@ export const DIRECTION_TO_MERMAID: Record<string, string> = {
 
 /** Escape a label for Mermaid output (quotes special chars). */
 export function escapeMermaidLabel(s: string): string {
-  return s
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '#quot;')
-    .replace(/;/g, '#59;')
-    .replace(/\|/g, '#124;')
-    .replace(/#(?!quot;|59;|35;|124;)/g, '#35;');
+  const entities: Record<string, string> = {
+    '\\': '\\\\',
+    '#': '#35;',
+    '"': '#quot;',
+    ';': '#59;',
+    '|': '#124;',
+  };
+  return s.replace(/[\\#";|]/g, (char) => entities[char]!);
 }
 
 /** Unescape a Mermaid label back to plain text. */
