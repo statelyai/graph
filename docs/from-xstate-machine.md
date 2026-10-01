@@ -85,6 +85,8 @@ const routes = getSimplePaths(graph, {
 
 Note the difference from `xstate/graph`: these path functions omit the zero-step path to the initial node. Every returned path has at least one step. Add the initial state explicitly if your runner needs it.
 
+`getShortestPaths` also returns every tied shortest path to a node, where `xstate/graph` keeps one per state. Expect equal or higher path counts; use `getShortestPath` with `to` for one path per target.
+
 ## Coverage targets
 
 `getCoverageTargets` maps directly onto model-based testing criteria:
