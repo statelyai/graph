@@ -49,49 +49,103 @@ export function getFlattenedGraph<N, E, G>(graph: Graph<N, E, G>): Graph<N, E, G
     }
   }
 
-  // Resolve a node to its deepest initial child (leaf).
-  // If it's already a leaf, returns its id.
-  // If it's compound, follows initialNodeId recursively.
-  function resolveInitial(
-    nodeId: string,
-    seen: Set<string> = new Set(),
-  ): string | null {
-    if (leaves.has(nodeId)) return nodeId;
-    if (seen.has(nodeId)) return null; // malformed initialNodeId cycle
-    seen.add(nodeId);
+  // Resolve a node to its deepest initial child (leaf): a leaf resolves to
+  // itself; a compound follows initialNodeId (else its first child) down.
+  // Every node on a walked chain is memoized, so each chain is walked once.
+  const initialMemo = new Map<string, string | null>();
+  function resolveInitial(nodeId: string): string | null {
+    const path: string[] = [];
+    const seen = new Set<string>();
+    let result: string | null;
+    for (;;) {
+      if (leaves.has(nodeId)) {
+        result = nodeId;
+        break;
+      }
+      const memo = initialMemo.get(nodeId);
+      if (memo !== undefined) {
+        result = memo;
+        break;
+      }
+      if (seen.has(nodeId)) {
+        result = null; // malformed initialNodeId cycle
+        break;
+      }
+      seen.add(nodeId);
+      path.push(nodeId);
 
-    const ni = idx.nodeById.get(nodeId);
-    if (ni === undefined) return null;
-    const node = graph.nodes[ni];
-
-    if (node.initialNodeId) {
-      return resolveInitial(node.initialNodeId, seen);
+      const ni = idx.nodeById.get(nodeId);
+      if (ni === undefined) {
+        result = null;
+        break;
+      }
+      const node = graph.nodes[ni];
+      if (node.initialNodeId) {
+        nodeId = node.initialNodeId;
+        continue;
+      }
+      // No initialNodeId set — use first child
+      nodeId = (idx.childNodes.get(nodeId) ?? [])[0];
     }
-
-    // No initialNodeId set — use first child
-    const childIds = idx.childNodes.get(nodeId) ?? [];
-    if (childIds.length > 0) {
-      return resolveInitial(childIds[0], seen);
-    }
-
-    return nodeId;
+    for (const id of path) initialMemo.set(id, result);
+    return result;
   }
 
-  // Get all leaf descendants of a node
+  // Leaf descendants of every compound are a contiguous range of one
+  // preorder leaf list (one iterative pass over the hierarchy). Hierarchy
+  // keys that are not nodes (missing parents) are toured too.
+  const leafOrder: string[] = [];
+  const leafRange = new Map<string, [start: number, end: number]>();
+  const tourRoots = [...idx.childNodes.keys()].filter(
+    (key) => key === null || !idx.nodeById.has(key),
+  );
+  for (const root of tourRoots) {
+    const stackId: Array<string | null> = [root];
+    const stackChildren = [idx.childNodes.get(root) ?? []];
+    const stackIndex = [0];
+    const stackStart = [leafOrder.length];
+    while (stackId.length > 0) {
+      const top = stackId.length - 1;
+      const children = stackChildren[top];
+      if (stackIndex[top] === children.length) {
+        const id = stackId.pop()!;
+        stackChildren.pop();
+        stackIndex.pop();
+        const start = stackStart.pop()!;
+        if (id !== null) leafRange.set(id, [start, leafOrder.length]);
+        continue;
+      }
+      const childId = children[stackIndex[top]++];
+      if (leaves.has(childId)) {
+        leafOrder.push(childId);
+      } else {
+        stackId.push(childId);
+        stackChildren.push(idx.childNodes.get(childId) ?? []);
+        stackIndex.push(0);
+        stackStart.push(leafOrder.length);
+      }
+    }
+  }
+
+  // Get all leaf descendants of a node, in preorder
   function getLeafDescendants(nodeId: string): string[] {
     if (leaves.has(nodeId)) return [nodeId];
+    const range = leafRange.get(nodeId);
+    if (range) return leafOrder.slice(range[0], range[1]);
+    // Only nodes in a parent cycle are unreachable from the tour roots
     const result: string[] = [];
-    const collect = (id: string) => {
-      const childIds = idx.childNodes.get(id) ?? [];
-      for (const childId of childIds) {
-        if (leaves.has(childId)) {
-          result.push(childId);
-        } else {
-          collect(childId);
-        }
+    const seen = new Set<string>([nodeId]);
+    const stack = (idx.childNodes.get(nodeId) ?? []).slice().reverse();
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (leaves.has(id)) result.push(id);
+      else {
+        const children = idx.childNodes.get(id) ?? [];
+        for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
       }
-    };
-    collect(nodeId);
+    }
     return result;
   }
 

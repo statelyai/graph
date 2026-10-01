@@ -26,20 +26,20 @@ export interface MaxFlowResult<E = any> {
 
 export interface MinCutOptions<E = any> {
   /** Source node id. */
-  source: string;
+  from: string;
   /** Sink node id. */
-  sink: string;
+  to: string;
   /** Finite non-negative edge capacity. Defaults to `edge.weight ?? 1`. */
   getCapacity?: (edge: GraphEdge<E>) => number;
   /** Abort signal, checked once per augmenting path. Throws `signal.reason`. */
   signal?: AbortSignal;
 }
 
-export interface MinCutResult {
+export interface MinCutResult<E = any> {
   /** Total capacity of the cut (equals the max-flow value). */
   value: number;
-  /** Ids of the edges crossing the cut. */
-  cutEdges: string[];
+  /** Edges crossing the cut, in `graph.edges` order. */
+  cutEdges: GraphEdge<E>[];
   /** Node ids on each side of the cut, in `graph.nodes` order. */
   partition: { source: string[]; sink: string[] };
 }
@@ -61,29 +61,19 @@ interface MaxFlowSolution<E> extends MaxFlowResult<E> {
 
 /**
  * Shared Edmonds-Karp solver behind {@link getMaxFlow} and {@link getMinCut}.
- * `caller`/`fromOption`/`toOption` only shape the error messages.
+ * `caller` only shapes the error messages. Returns `undefined` when either
+ * endpoint is not in the graph.
  */
 function solveMaxFlow<N, E>(
   graph: Graph<N, E>,
   caller: string,
-  fromOption: string,
-  toOption: string,
   from: string,
   to: string,
   getCapacity: (edge: GraphEdge<E>) => number,
   signal?: AbortSignal,
-): MaxFlowSolution<E> {
+): MaxFlowSolution<E> | undefined {
   const idx = getIndex(graph);
-  if (!idx.nodeById.has(from)) {
-    throw new Error(
-      `${caller}: source node "${from}" not found in graph — pass an existing node id as ${fromOption}`,
-    );
-  }
-  if (!idx.nodeById.has(to)) {
-    throw new Error(
-      `${caller}: sink node "${to}" not found in graph — pass an existing node id as ${toOption}`,
-    );
-  }
+  if (!idx.nodeById.has(from) || !idx.nodeById.has(to)) return undefined;
   if (from === to) {
     throw new Error(
       `${caller}: source and sink are both "${from}" — they must be different nodes`,
@@ -109,6 +99,8 @@ function solveMaxFlow<N, E>(
   }
 
   for (const edge of graph.edges) {
+    // Dangling edges carry no flow (they still appear in `flows` as 0)
+    if (!outArcs.has(edge.sourceId) || !outArcs.has(edge.targetId)) continue;
     const capacity = assertFiniteNumber(
       getCapacity(edge as GraphEdge<E>),
       `${caller}: capacity for edge "${edge.id}"`,
@@ -227,71 +219,72 @@ function solveMaxFlow<N, E>(
  * edges crossing from the source side to the sink side of the final
  * residual graph; the sum of their capacities equals `value`.
  *
+ * Returns `undefined` when `from` or `to` is not in the graph.
+ *
  * Pass `options.signal` to cancel: the abort is checked once per augmenting
  * path and throws `signal.reason`.
  * Capacities and every accumulated flow value must remain finite.
  *
  * @example
  * ```ts
- * const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' });
+ * const flow = getMaxFlow(graph, { from: 's', to: 't' });
  * ```
  */
 export function getMaxFlow<N, E>(
   graph: Graph<N, E>,
   options: MaxFlowOptions<E>,
-): MaxFlowResult<E> {
+): MaxFlowResult<E> | undefined {
   const getCapacity =
     options.getCapacity ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-  const { value, flows, cutEdges } = solveMaxFlow(
+  const solution = solveMaxFlow(
     graph,
     'getMaxFlow',
-    'options.from',
-    'options.to',
     options.from,
     options.to,
     getCapacity,
     options.signal,
   );
+  if (!solution) return undefined;
+  const { value, flows, cutEdges } = solution;
   return { value, flows, cutEdges };
 }
 
 /**
- * Returns a minimum s-t cut between `source` and `sink` via the max-flow
+ * Returns a minimum s-t cut between `from` and `to` via the max-flow
  * min-cut theorem: runs the same Edmonds-Karp solver as {@link getMaxFlow},
  * then splits the nodes by residual reachability from the source.
  *
- * `partition.source` holds every node reachable from `source` in the final
- * residual graph; `partition.sink` holds the rest (both in `graph.nodes`
- * order). `cutEdges` are the ids of the edges crossing the cut, and their
- * total capacity equals `value` (the max-flow value).
+ * `partition.source` holds the ids of every node reachable from `from` in
+ * the final residual graph; `partition.sink` holds the rest (both in
+ * `graph.nodes` order). `cutEdges` are the edges crossing the cut (same
+ * shape as {@link getMaxFlow}'s), and their total capacity equals `value`.
+ *
+ * Returns `undefined` when `from` or `to` is not in the graph.
  *
  * Pass `options.signal` to cancel: the abort is checked once per augmenting
  * path and throws `signal.reason`.
  *
  * @example
  * ```ts
- * const { value, cutEdges, partition } = getMinCut(graph, {
- *   source: 's',
- *   sink: 't',
- * });
+ * const cut = getMinCut(graph, { from: 's', to: 't' });
  * ```
  */
 export function getMinCut<N, E>(
   graph: Graph<N, E>,
   options: MinCutOptions<E>,
-): MinCutResult {
+): MinCutResult<E> | undefined {
   const getCapacity =
     options.getCapacity ?? ((edge: GraphEdge<E>) => edge.weight ?? 1);
-  const { value, cutEdges, sourceSide } = solveMaxFlow(
+  const solution = solveMaxFlow(
     graph,
     'getMinCut',
-    'options.source',
-    'options.sink',
-    options.source,
-    options.sink,
+    options.from,
+    options.to,
     getCapacity,
     options.signal,
   );
+  if (!solution) return undefined;
+  const { value, cutEdges, sourceSide } = solution;
 
   const sourcePartition: string[] = [];
   const sinkPartition: string[] = [];
@@ -301,7 +294,7 @@ export function getMinCut<N, E>(
 
   return {
     value,
-    cutEdges: cutEdges.map((edge) => edge.id),
+    cutEdges,
     partition: { source: sourcePartition, sink: sinkPartition },
   };
 }

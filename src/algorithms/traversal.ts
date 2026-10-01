@@ -1,20 +1,17 @@
 import type {
+  ArborescenceOptions,
   Graph,
   GraphNode,
   TraversalDirection,
+  ReachabilityOptions,
+  TopologicalSortOptions,
   TraversalSearchOptions,
   UnweightedDistanceOptions,
 } from '../types';
-import { getIndex } from '../indexing';
-import {
-  getEffectiveModeKind,
-  getNeighborIds,
-  getSuccessorIds,
-} from './shared';
+import { getEffectiveModeKind } from './shared';
 import { getEdgeMode } from '../mode';
-import { genCycles, getStronglyConnectedComponents } from './paths';
-import { getCSR, getEdgeListInDegrees } from './csr';
-import { getSubgraph } from '../transforms';
+import { getCycle, getStronglyConnectedComponents } from './paths';
+import { getCSR, getEdgeListInDegrees, type GraphCSR } from './csr';
 
 function getTraversalOptions(
   startOrOptions: string | TraversalSearchOptions,
@@ -604,149 +601,98 @@ export function* dfs<N>(
   yield* genDFS(graph, startOrOptions);
 }
 
+// Cached per CSR snapshot: a new snapshot is built whenever the graph's
+// structure or mode changes, so the cached answer can never be stale.
+const acyclicCache = new WeakMap<GraphCSR, boolean>();
+
+/**
+ * Returns whether the graph has no cycle, by the rules of {@link getCycle}:
+ * directed edges are followed from source to target, non-directed edges
+ * either way without reusing an edge (so two parallel non-directed edges
+ * form a cycle), and any self-loop is a cycle. O(n + m), iterative, and
+ * cached until the graph changes.
+ */
 export function isAcyclic(graph: Graph): boolean {
-  // Dispatch on *effective* edge modes (per-edge overrides included).
-  const kind = getEffectiveModeKind(graph);
-  if (kind === 'mixed') {
-    return isAcyclicMixed(graph);
+  const csr = getCSR(graph);
+  let acyclic = acyclicCache.get(csr);
+  if (acyclic === undefined) {
+    // Dispatch on *effective* edge modes (per-edge overrides included).
+    const kind = getEffectiveModeKind(graph);
+    acyclic =
+      kind === 'mixed'
+        ? getCycle(graph) === undefined
+        : kind === 'non-directed'
+          ? !hasUndirectedCycle(csr)
+          : !hasDirectedCycle(csr);
+    acyclicCache.set(csr, acyclic);
   }
-  if (kind === 'non-directed') {
-    return isAcyclicUndirected(graph);
-  }
-  const WHITE = 0;
-  const GRAY = 1;
-  const BLACK = 2;
-  const color = new Map<string, number>();
-  for (const node of graph.nodes) color.set(node.id, WHITE);
+  return acyclic;
+}
 
-  const hasCycle = (id: string): boolean => {
-    color.set(id, GRAY);
-    for (const neighborId of getSuccessorIds(graph, id)) {
-      const current = color.get(neighborId);
-      if (current === GRAY) return true;
-      if (current === WHITE && hasCycle(neighborId)) return true;
+/** Iterative three-color DFS over the CSR out-arcs. */
+function hasDirectedCycle(csr: GraphCSR): boolean {
+  const n = csr.ids.length;
+  const color = new Uint8Array(n); // 0 unseen, 1 on stack, 2 done
+  const stackNodes = new Int32Array(n);
+  const stackArcs = new Int32Array(n);
+  for (let root = 0; root < n; root++) {
+    if (color[root] !== 0) continue;
+    let top = 0;
+    stackNodes[0] = root;
+    stackArcs[0] = csr.outOffsets[root];
+    color[root] = 1;
+    while (top >= 0) {
+      const u = stackNodes[top];
+      const a = stackArcs[top];
+      if (a === csr.outOffsets[u + 1]) {
+        color[u] = 2;
+        top--;
+        continue;
+      }
+      stackArcs[top] = a + 1;
+      const v = csr.outTargets[a];
+      if (color[v] === 1) return true;
+      if (color[v] === 0) {
+        color[v] = 1;
+        top++;
+        stackNodes[top] = v;
+        stackArcs[top] = csr.outOffsets[v];
+      }
     }
-    color.set(id, BLACK);
-    return false;
-  };
-
-  for (const node of graph.nodes) {
-    if (color.get(node.id) === WHITE && hasCycle(node.id)) return false;
   }
-  return true;
+  return false;
 }
 
 /**
- * Acyclicity for graphs mixing directed and non-directed edges.
- *
- * Polynomial fast paths first: a cycle among directed edges alone, a cycle
- * among non-directed edges alone (union-find), or all-singleton reachability
- * SCCs (then no mixed cycle can exist either). Only ambiguous multi-node
- * SCCs fall back to exact simple-cycle enumeration, restricted to that SCC.
+ * Undirected cycle check over the CSR arcs (every edge has arcs both ways).
+ * Only the edge used to reach a node is skipped, by edge index, so parallel
+ * edges and self-loops are detected as cycles.
  */
-function isAcyclicMixed(graph: Graph): boolean {
-  const idx = getIndex(graph);
-
-  // (1) Cycle using only effective-directed edges
-  const WHITE = 0;
-  const GRAY = 1;
-  const BLACK = 2;
-  const color = new Map<string, number>();
-  for (const node of graph.nodes) color.set(node.id, WHITE);
-  const hasDirectedCycle = (id: string): boolean => {
-    color.set(id, GRAY);
-    for (const eid of idx.outEdges.get(id) ?? []) {
-      const edge = graph.edges[idx.edgeById.get(eid)!];
-      if (getEdgeMode(graph, edge) !== 'directed') continue;
-      const current = color.get(edge.targetId);
-      if (current === GRAY) return true;
-      if (current === WHITE && hasDirectedCycle(edge.targetId)) return true;
-    }
-    color.set(id, BLACK);
-    return false;
-  };
-  for (const node of graph.nodes) {
-    if (color.get(node.id) === WHITE && hasDirectedCycle(node.id)) return false;
-  }
-
-  // (2) Cycle using only non-directed edges (union-find: a non-directed edge
-  // joining an already-connected pair, or a non-directed self-loop)
-  const parent = new Map<string, string>();
-  const find = (id: string): string => {
-    let root = id;
-    while (parent.get(root) !== root) root = parent.get(root)!;
-    let cursor = id;
-    while (parent.get(cursor) !== root) {
-      const next = parent.get(cursor)!;
-      parent.set(cursor, root);
-      cursor = next;
-    }
-    return root;
-  };
-  for (const node of graph.nodes) parent.set(node.id, node.id);
-  for (const edge of graph.edges) {
-    if (getEdgeMode(graph, edge) === 'directed') continue;
-    if (edge.sourceId === edge.targetId) return false;
-    const rootA = find(edge.sourceId);
-    const rootB = find(edge.targetId);
-    if (rootA === rootB) return false;
-    parent.set(rootA, rootB);
-  }
-
-  // (3) Every simple cycle lies within one mutual-reachability SCC; if all
-  // SCCs are singletons (self-loops were caught above), the graph is acyclic
-  const multiNodeSccs = getStronglyConnectedComponents(graph).filter(
-    (component) => component.length > 1,
-  );
-  if (multiNodeSccs.length === 0) return true;
-
-  // (4) Exact enumeration, restricted to each ambiguous SCC
-  for (const component of multiNodeSccs) {
-    const subgraph = getSubgraph(
-      graph,
-      component.map((node) => node.id),
-    );
-    for (const _cycle of genCycles(subgraph)) return false;
-  }
-  return true;
-}
-
-function isAcyclicUndirected(graph: Graph): boolean {
-  const idx = getIndex(graph);
-  const visited = new Set<string>();
-
-  const hasCycle = (id: string, parentId: string | null): boolean => {
-    visited.add(id);
-
-    for (const eid of idx.outEdges.get(id) ?? []) {
-      const ai = idx.edgeById.get(eid);
-      if (ai === undefined) continue;
-      const neighborId = graph.edges[ai].targetId;
-      if (!visited.has(neighborId)) {
-        if (hasCycle(neighborId, id)) return true;
-      } else if (neighborId !== parentId) {
-        return true;
+function hasUndirectedCycle(csr: GraphCSR): boolean {
+  const n = csr.ids.length;
+  const visited = new Uint8Array(n);
+  const stack = new Int32Array(n);
+  const parentEdge = new Int32Array(n);
+  for (let root = 0; root < n; root++) {
+    if (visited[root]) continue;
+    visited[root] = 1;
+    let top = 0;
+    stack[0] = root;
+    parentEdge[root] = -1;
+    while (top >= 0) {
+      const u = stack[top--];
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const edge = csr.outEdgeIndex[a];
+        if (edge === parentEdge[u]) continue;
+        const v = csr.outTargets[a];
+        if (visited[v]) return true;
+        visited[v] = 1;
+        parentEdge[v] = edge;
+        stack[++top] = v;
       }
     }
-
-    for (const eid of idx.inEdges.get(id) ?? []) {
-      const ai = idx.edgeById.get(eid);
-      if (ai === undefined) continue;
-      const neighborId = graph.edges[ai].sourceId;
-      if (!visited.has(neighborId)) {
-        if (hasCycle(neighborId, id)) return true;
-      } else if (neighborId !== parentId) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  for (const node of graph.nodes) {
-    if (!visited.has(node.id) && hasCycle(node.id, null)) return false;
   }
-  return true;
+  return false;
 }
 
 export function getConnectedComponents<N>(graph: Graph<N>): GraphNode<N>[][] {
@@ -841,65 +787,116 @@ export function getUnweightedDistances(
 }
 
 /**
- * Returns a topological ordering of the graph's nodes, or `null` if no such
- * ordering exists.
+ * Lazily yields the graph's nodes in topological order (Kahn's algorithm):
+ * every node comes after all of its predecessors. Ties follow
+ * `options.from` first, then `graph.nodes` order.
  *
  * Any edge whose effective mode (per {@link getEdgeMode}) is not `'directed'`
- * makes ordering impossible — an undirected/bidirectional edge is mutual
- * precedence, i.e. a 2-cycle — so the function returns `null`.
+ * is mutual precedence, i.e. a 2-cycle. If the graph has a cycle, iteration
+ * stops early: nodes on a cycle, or reachable from one, are never yielded.
  */
-export function getTopologicalSort<N>(graph: Graph<N>): GraphNode<N>[] | null {
-  // Kahn's algorithm over the CSR arcs with a typed-array ring queue. The
-  // CSR's cached hasNonDirected flag makes the mode bail-out O(1) per call.
+export function* genTopologicalSort<N>(
+  graph: Graph<N>,
+  options?: TopologicalSortOptions,
+): Generator<GraphNode<N>> {
+  // Kahn's algorithm over the CSR arcs with a typed-array ring queue.
   const csr = getCSR(graph);
-  if (csr.hasNonDirected) return null;
-
   const n = csr.ids.length;
   const outOffsets = csr.outOffsets;
   const outTargets = csr.outTargets;
   // Edge-list in-degrees (cached per CSR) so an edge with a dangling
-  // *source* still blocks its target, matching the previous behavior where
-  // such targets never reached degree 0.
+  // *source* still blocks its target. CSR arcs run both ways for
+  // non-directed edges, so those also block their source.
   const inDegree = getEdgeListInDegrees(graph, csr).slice();
-
-  const queue = new Int32Array(n);
-  let head = 0;
-  let tail = 0;
-  for (let i = 0; i < n; i++) {
-    if (inDegree[i] === 0) queue[tail++] = i;
+  if (csr.hasNonDirected) {
+    for (const edge of graph.edges) {
+      if (getEdgeMode(graph, edge) === 'directed') continue;
+      const s = csr.indexOf.get(edge.sourceId);
+      if (s !== undefined) inDegree[s]++;
+    }
   }
 
-  const result: GraphNode<N>[] = [];
+  const queue = new Int32Array(n);
+  const queued = new Uint8Array(n);
+  let head = 0;
+  let tail = 0;
+  const from = options?.from;
+  for (const id of typeof from === 'string' ? [from] : (from ?? [])) {
+    const i = csr.indexOf.get(id);
+    if (i !== undefined && inDegree[i] === 0 && !queued[i]) {
+      queued[i] = 1;
+      queue[tail++] = i;
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    if (inDegree[i] === 0 && !queued[i]) queue[tail++] = i;
+  }
+
   while (head < tail) {
     const u = queue[head++];
-    result.push(graph.nodes[u]);
+    yield csr.nodes[u] as GraphNode<N>;
     for (let a = outOffsets[u]; a < outOffsets[u + 1]; a++) {
       const v = outTargets[a];
       if (--inDegree[v] === 0) queue[tail++] = v;
     }
   }
-
-  if (result.length !== graph.nodes.length) return null;
-  return result;
 }
 
+/**
+ * Returns a topological ordering of the graph's nodes, or `null` if no such
+ * ordering exists (the graph has a cycle). See {@link genTopologicalSort}.
+ */
+export function getTopologicalSort<N>(
+  graph: Graph<N>,
+  options?: TopologicalSortOptions,
+): GraphNode<N>[] | null {
+  const result = [...genTopologicalSort(graph, options)];
+  return result.length === getCSR(graph).ids.length ? result : null;
+}
+
+/**
+ * Returns whether `targetId` is reachable from `sourceId` by following edges
+ * in `options.direction` (default `'outgoing'`). A node reaches itself.
+ * Unknown node ids are unreachable, so they return `false`.
+ */
 export function hasPath(
   graph: Graph,
   sourceId: string,
   targetId: string,
+  options?: ReachabilityOptions,
 ): boolean {
-  if (sourceId === targetId) return true;
+  const csr = getCSR(graph);
+  const source = csr.indexOf.get(sourceId);
+  const target = csr.indexOf.get(targetId);
+  if (source === undefined || target === undefined) return false;
+  if (source === target) return true;
 
-  const visited = new Set<string>([sourceId]);
-  const queue: string[] = [sourceId];
+  const direction = options?.direction ?? 'outgoing';
+  const visited = new Uint8Array(csr.ids.length);
+  const queue = new Int32Array(csr.ids.length);
+  visited[source] = 1;
+  queue[0] = source;
+  let head = 0;
+  let tail = 1;
 
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    for (const neighborId of getNeighborIds(graph, id)) {
-      if (neighborId === targetId) return true;
-      if (!visited.has(neighborId)) {
-        visited.add(neighborId);
-        queue.push(neighborId);
+  while (head < tail) {
+    const node = queue[head++];
+    if (direction !== 'incoming') {
+      for (let arc = csr.outOffsets[node]; arc < csr.outOffsets[node + 1]; arc++) {
+        const neighbor = csr.outTargets[arc];
+        if (neighbor === target) return true;
+        if (visited[neighbor]) continue;
+        visited[neighbor] = 1;
+        queue[tail++] = neighbor;
+      }
+    }
+    if (direction !== 'outgoing') {
+      for (let arc = csr.inOffsets[node]; arc < csr.inOffsets[node + 1]; arc++) {
+        const neighbor = csr.inOrigins[arc];
+        if (neighbor === target) return true;
+        if (visited[neighbor]) continue;
+        visited[neighbor] = 1;
+        queue[tail++] = neighbor;
       }
     }
   }
@@ -923,15 +920,68 @@ export function isStronglyConnected(graph: Graph): boolean {
 }
 
 /**
- * Returns whether the graph is a tree: connected, acyclic, and with exactly
- * `nodes.length - 1` edges (so directed diamonds and parallel edges are not
- * trees). Empty and single-node graphs are considered trees.
+ * Returns whether the graph is a tree when edge direction is ignored: it is
+ * connected and has no cycle. Parallel edges and self-loops count as cycles.
+ *
+ * Because direction is ignored, `a → c ← b` is a tree (in directed terms, a
+ * polytree). Use {@link isArborescence} for a rooted tree whose edges all
+ * point away from the root. The empty graph is not a tree.
  */
 export function isTree(graph: Graph): boolean {
-  if (graph.nodes.length === 0) return true;
-  return (
-    graph.edges.length === graph.nodes.length - 1 &&
-    isConnected(graph) &&
-    isAcyclic(graph)
-  );
+  const n = graph.nodes.length;
+  // A connected graph with n − 1 edges has no cycle, even counting parallel
+  // edges and self-loops: each of those uses an edge without connecting
+  // another node.
+  return n > 0 && graph.edges.length === n - 1 && isConnected(graph);
+}
+
+/**
+ * Returns whether the graph is an arborescence (an out-tree, or rooted
+ * directed tree): every edge is directed, exactly one root node has no
+ * incoming edge, every other node has exactly one, and every node is
+ * reachable from the root. Equivalently, a tree whose edges all point away
+ * from its root.
+ *
+ * Pass `options.from` to also require that root. The empty graph is not an
+ * arborescence.
+ */
+export function isArborescence(
+  graph: Graph,
+  options?: ArborescenceOptions,
+): boolean {
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  if (n === 0 || graph.edges.length !== n - 1 || csr.hasNonDirected) {
+    return false;
+  }
+  // Edge-list in-degrees, so an edge with a dangling source still counts
+  const inDegree = getEdgeListInDegrees(graph, csr);
+  let root = -1;
+  for (let i = 0; i < n; i++) {
+    if (inDegree[i] > 1) return false;
+    if (inDegree[i] === 0) {
+      if (root !== -1) return false;
+      root = i;
+    }
+  }
+  if (root === -1) return false;
+  if (options?.from !== undefined && csr.ids[root] !== options.from) {
+    return false;
+  }
+
+  const visited = new Uint8Array(n);
+  const queue = new Int32Array(n);
+  visited[root] = 1;
+  queue[0] = root;
+  let tail = 1;
+  for (let head = 0; head < tail; head++) {
+    const u = queue[head];
+    for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+      const v = csr.outTargets[a];
+      if (visited[v]) continue;
+      visited[v] = 1;
+      queue[tail++] = v;
+    }
+  }
+  return tail === n;
 }

@@ -37,13 +37,17 @@ export interface TSPOptions<TEdgeData = any> {
  * is always ≤ the greedy result.
  *
  * @returns `{ path, cost }`, or `undefined` if the graph is not connected
- *   (no finite tour exists) — a single-node graph returns a zero-cost tour.
+ *   (no finite tour exists) or `options.from` is not in the graph — a
+ *   single-node graph returns a zero-cost tour.
  */
 export function getTSPTour<N, E>(
   graph: Graph<N, E>,
   options?: TSPOptions<E>,
 ): TSPTour | undefined {
   const nodeIds = graph.nodes.map((node) => node.id);
+  if (options?.from !== undefined && !nodeIds.includes(options.from)) {
+    return undefined;
+  }
   const count = nodeIds.length;
   if (count === 0) return { path: [], cost: 0 };
   if (count === 1) return { path: [nodeIds[0]], cost: 0 };
@@ -60,9 +64,8 @@ export function getTSPTour<N, E>(
   // consistent with every other path algorithm.
   const dist = buildDistanceMatrix(graph, nodeIds, getWeight);
 
-  const startId = options?.from ?? nodeIds[0];
-  let startIndex = nodeIds.indexOf(startId);
-  if (startIndex === -1) startIndex = 0;
+  const startIndex =
+    options?.from === undefined ? 0 : nodeIds.indexOf(options.from);
 
   let tour = nearestNeighborTour(dist, count, startIndex);
   if (method === '2opt') {

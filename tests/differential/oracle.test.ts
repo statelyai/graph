@@ -340,11 +340,8 @@ describe('oracle: degrees', () => {
     });
   }
 
-  it('pinned divergence: undirected self-loop counts 1 for us, 2 for graphology', () => {
-    // Intentional, documented in src/queries.ts getDegree JSDoc: a
-    // non-directed self-loop counts once for us; graphology (like most
-    // libraries) counts a self-loop as 2 in undirected degree. Oracle
-    // graphs exclude self-loops so this divergence never triggers above.
+  it('undirected self-loop counts 2, matching graphology', () => {
+    // Handshake lemma: a self-loop has both endpoints at the node.
     const ours = createGraph({
       mode: 'undirected',
       nodes: [{ id: 'a' }],
@@ -352,7 +349,7 @@ describe('oracle: degrees', () => {
     });
     const theirs = toGraphology(ours, 'undirected');
 
-    expect(getDegree(ours, 'a')).toBe(1);
+    expect(getDegree(ours, 'a')).toBe(2);
     expect(theirs.degree('a')).toBe(2);
   });
 });

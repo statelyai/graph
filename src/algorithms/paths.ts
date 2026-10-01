@@ -9,16 +9,15 @@ import type {
   PathOptions,
   SinglePathOptions,
 } from '../types';
-import { getIndex } from '../indexing';
+import { getGraphSnapshot, getIndex } from '../indexing';
 import { getEdgeMode } from '../mode';
+import { getNeighborEdges, resolveFrom, resolveFromIds } from './shared';
 import {
-  getEffectiveModeKind,
-  getNeighborEdges,
-  getNeighborEdgesAll,
-  resolveFrom,
-  resolveFromIds,
-} from './shared';
-import { getArcWeights, getCSR, getEdgeOrderArcs } from './csr';
+  getArcWeights,
+  getCSR,
+  getEdgeOrderArcs,
+  type GraphCSR,
+} from './csr';
 import { throwIfAborted } from './abort';
 import { addFiniteNumbers, assertFiniteNumber } from './numeric';
 
@@ -128,7 +127,7 @@ class TypedMinHeap {
 /**
  * Result of a single-source shortest-distance search, kept in typed-array
  * form keyed by CSR node position. Paths are *not* materialized here —
- * {@link reconstructPathsAt} walks `prevArr` on demand, so abandoning a
+ * {@link genPredecessorPaths} walks `prevArr` on demand, so abandoning a
  * `genShortestPaths` iterator early never pays for paths it didn't yield.
  */
 interface ShortestDistancesResult {
@@ -360,59 +359,65 @@ function bellmanFordTyped<N, E>(
   return { source, distArr, prevArr, stopDistance: Infinity };
 }
 
-function* reconstructPathsAt<N, E>(
-  graph: Graph<N, E>,
-  prevArr: Array<number[] | undefined>,
-  sourceNode: GraphNode<N>,
+/**
+ * Yields every path from `sourcePos` to `targetPos` through predecessor
+ * pairs (`[fromPos, edgeIndex, …]` per node position, as recorded for tied
+ * shortest paths). Walks backward from the target with an explicit stack and
+ * one shared step buffer, so each path costs one O(length) reversed copy and
+ * long paths cannot overflow the call stack. Nodes already on the partial
+ * path are skipped: zero-weight ties can make the predecessors cyclic.
+ */
+function* genPredecessorPaths<N, E>(
+  getPairs: (pos: number) => number[] | undefined,
+  nodes: readonly GraphNode<N>[],
+  edges: readonly GraphEdge<E>[],
   sourcePos: number,
   targetPos: number,
 ): Generator<GraphPath<N, E>> {
-  // Walk the predecessor pairs backward from the target with one shared step
-  // buffer; each complete path is materialized exactly once (one O(length)
-  // reversed copy), instead of re-spreading the prefix at every recursion
-  // level. Track nodes on the current partial path — zero-weight cycles can
-  // make the predecessor structure cyclic via equal-distance tie
-  // predecessors, so never revisit a node already on the path being built.
+  const sourceNode = nodes[sourcePos];
+  if (targetPos === sourcePos) {
+    yield { source: sourceNode, steps: [] };
+    return;
+  }
   const stepsBackward: GraphStep<N, E>[] = [];
-  const onPath = new Set<number>();
-
-  function* walk(pos: number): Generator<GraphPath<N, E>> {
-    if (pos === sourcePos) {
+  const stackPos = [targetPos];
+  const stackPair = [0];
+  const onPath = new Set<number>([targetPos]);
+  while (stackPos.length > 0) {
+    const top = stackPos.length - 1;
+    const pos = stackPos[top];
+    const pairs = getPairs(pos);
+    const k = stackPair[top];
+    if (!pairs || k >= pairs.length) {
+      onPath.delete(pos);
+      stackPos.pop();
+      stackPair.pop();
+      if (top > 0) stepsBackward.pop();
+      continue;
+    }
+    stackPair[top] = k + 2;
+    const fromPos = pairs[k];
+    if (onPath.has(fromPos)) continue;
+    stepsBackward.push({ edge: edges[pairs[k + 1]], node: nodes[pos] });
+    if (fromPos === sourcePos) {
       const length = stepsBackward.length;
       const steps = new Array<GraphStep<N, E>>(length);
-      for (let s = 0; s < length; s++) {
-        steps[s] = stepsBackward[length - 1 - s];
-      }
+      for (let i = 0; i < length; i++) steps[i] = stepsBackward[length - 1 - i];
       yield { source: sourceNode, steps };
-      return;
-    }
-
-    const pairs = prevArr[pos];
-    if (!pairs || pairs.length === 0) return;
-
-    // CSR positions are `graph.nodes` positions, so no id lookup is needed.
-    const node = graph.nodes[pos] as GraphNode<N>;
-    onPath.add(pos);
-    for (let k = 0; k < pairs.length; k += 2) {
-      const fromPos = pairs[k];
-      if (onPath.has(fromPos)) continue;
-      stepsBackward.push({
-        edge: graph.edges[pairs[k + 1]] as GraphEdge<E>,
-        node,
-      });
-      yield* walk(fromPos);
       stepsBackward.pop();
+      continue;
     }
-    onPath.delete(pos);
+    stackPos.push(fromPos);
+    stackPair.push(0);
+    onPath.add(fromPos);
   }
-
-  yield* walk(targetPos);
 }
 
 export function* genShortestPaths<N, E>(
   graph: Graph<N, E>,
   opts?: PathOptions<E, N>,
 ): Generator<GraphPath<N, E>> {
+  graph = getGraphSnapshot(graph);
   for (const sourceId of resolveFromIds(graph, opts?.from)) {
     yield* genShortestPathsFrom(graph, sourceId, opts);
   }
@@ -431,17 +436,8 @@ function* genShortestPathsFrom<N, E>(
     opts?.to, // single-target queries early-exit the search
   );
 
-  const sourceNode =
-    source !== -1
-      ? (graph.nodes[source] as GraphNode<N>)
-      : graph.nodes.find((node) => node.id === sourceId)!;
-
-  if (source === -1) {
-    // Unknown source id: nothing is reachable; only the trivial self-path
-    // when it is explicitly requested.
-    if (opts?.to === sourceId) yield { source: sourceNode, steps: [] };
-    return;
-  }
+  // Unknown source id: there is no path, not even a trivial one.
+  if (source === -1) return;
 
   const csr = getCSR(graph);
 
@@ -456,7 +452,13 @@ function* genShortestPathsFrom<N, E>(
     ) {
       return;
     }
-    yield* reconstructPathsAt(graph, prevArr, sourceNode, source, target);
+    yield* genPredecessorPaths<N, E>(
+      (pos) => prevArr[pos],
+      graph.nodes as GraphNode<N>[],
+      graph.edges as GraphEdge<E>[],
+      source,
+      target,
+    );
     return;
   }
 
@@ -468,7 +470,13 @@ function* genShortestPathsFrom<N, E>(
     ) {
       continue;
     }
-    yield* reconstructPathsAt(graph, prevArr, sourceNode, source, target);
+    yield* genPredecessorPaths<N, E>(
+      (pos) => prevArr[pos],
+      graph.nodes as GraphNode<N>[],
+      graph.edges as GraphEdge<E>[],
+      source,
+      target,
+    );
   }
 }
 
@@ -530,16 +538,7 @@ function bellmanFordSinglePath<N, E>(
   const csr = getCSR(graph);
   const source = csr.indexOf.get(sourceId);
   const target = csr.indexOf.get(targetId);
-  if (source === undefined) {
-    // Unknown source: only the explicit self-path exists
-    return sourceId === targetId
-      ? {
-          source: graph.nodes.find((node) => node.id === sourceId)!,
-          steps: [],
-        }
-      : undefined;
-  }
-  if (target === undefined) return undefined;
+  if (source === undefined || target === undefined) return undefined;
 
   assertFiniteWeights(graph, csr, getWeight, 'Bellman-Ford');
 
@@ -846,6 +845,7 @@ export function* genSimplePaths<N, E>(
   graph: Graph<N, E>,
   opts?: PathOptions<E, N>,
 ): Generator<GraphPath<N, E>> {
+  graph = getGraphSnapshot(graph);
   for (const sourceId of resolveFromIds(graph, opts?.from)) {
     yield* genSimplePathsFrom(graph, sourceId, opts);
   }
@@ -858,44 +858,46 @@ function* genSimplePathsFrom<N, E>(
 ): Generator<GraphPath<N, E>> {
   const idx = getIndex(graph);
   const sourceNi = idx.nodeById.get(sourceId);
-  const sourceNode =
-    sourceNi !== undefined
-      ? graph.nodes[sourceNi]
-      : graph.nodes.find((node) => node.id === sourceId)!;
+  // Unknown source id: there is no path, not even a trivial one.
+  if (sourceNi === undefined) return;
+  const sourceNode = graph.nodes[sourceNi];
   const targetId = opts?.to;
-  const visited = new Set<string>();
-  const currentSteps: GraphStep<N, E>[] = [];
-
-  function* dfsCollect(nodeId: string): Generator<GraphPath<N, E>> {
-    visited.add(nodeId);
-
-    if (targetId !== undefined) {
-      if (nodeId === targetId) {
-        yield { source: sourceNode, steps: [...currentSteps] };
-        visited.delete(nodeId);
-        return;
-      }
-    } else if (currentSteps.length > 0) {
-      yield { source: sourceNode, steps: [...currentSteps] };
-    }
-
-    for (const { neighborId, edge } of getNeighborEdges(graph, nodeId)) {
-      if (!visited.has(neighborId)) {
-        const neighborNi = idx.nodeById.get(neighborId);
-        const neighborNode =
-          neighborNi !== undefined
-            ? graph.nodes[neighborNi]
-            : graph.nodes.find((node) => node.id === neighborId)!;
-        currentSteps.push({ edge: edge as GraphEdge<E>, node: neighborNode });
-        yield* dfsCollect(neighborId);
-        currentSteps.pop();
-      }
-    }
-
-    visited.delete(nodeId);
+  if (targetId === sourceId) {
+    yield { source: sourceNode, steps: [] };
+    return;
   }
 
-  yield* dfsCollect(sourceId);
+  // Iterative DFS: each frame is a node's neighbor list and the next index
+  // in it; frame k > 0 belongs to the node reached by currentSteps[k - 1].
+  const visited = new Set<string>([sourceId]);
+  const currentSteps: GraphStep<N, E>[] = [];
+  const stackNeighbors = [getNeighborEdges(graph, sourceId)];
+  const stackIndex = [0];
+  while (stackNeighbors.length > 0) {
+    const top = stackNeighbors.length - 1;
+    const neighbors = stackNeighbors[top];
+    if (stackIndex[top] === neighbors.length) {
+      stackNeighbors.pop();
+      stackIndex.pop();
+      if (top > 0) visited.delete(currentSteps.pop()!.node.id);
+      continue;
+    }
+    const { neighborId, edge } = neighbors[stackIndex[top]++];
+    if (visited.has(neighborId)) continue;
+    const neighborNi = idx.nodeById.get(neighborId);
+    if (neighborNi === undefined) continue; // dangling edge
+    currentSteps.push({ edge: edge as GraphEdge<E>, node: graph.nodes[neighborNi] });
+    if (targetId === undefined) {
+      yield { source: sourceNode, steps: [...currentSteps] };
+    } else if (neighborId === targetId) {
+      yield { source: sourceNode, steps: [...currentSteps] };
+      currentSteps.pop();
+      continue;
+    }
+    visited.add(neighborId);
+    stackNeighbors.push(getNeighborEdges(graph, neighborId));
+    stackIndex.push(0);
+  }
 }
 
 export function getSimplePath<N, E>(
@@ -982,187 +984,557 @@ export function getCycles<N, E>(graph: Graph<N, E>): GraphPath<N, E>[] {
   return [...genCycles(graph)];
 }
 
+/**
+ * Traversable arcs for cycle search, grouped by origin position in edge
+ * order: one arc per directed edge, both directions per non-directed edge
+ * (a single arc for a non-directed self-loop). Dangling edges are skipped.
+ */
+interface CycleArcs {
+  offsets: Int32Array;
+  targets: Int32Array;
+  /** arc → index into `graph.edges` */
+  edges: Int32Array;
+  /** edge index → 1 when the edge's effective mode is `'directed'` */
+  directed: Uint8Array;
+}
+
+function getCycleArcs(graph: Graph, csr: GraphCSR): CycleArcs {
+  const n = csr.ids.length;
+  const m = graph.edges.length;
+  const from = new Int32Array(m).fill(-1);
+  const to = new Int32Array(m);
+  const directed = new Uint8Array(m);
+  const counts = new Int32Array(n);
+  for (let e = 0; e < m; e++) {
+    const edge = graph.edges[e];
+    const s = csr.indexOf.get(edge.sourceId);
+    const t = csr.indexOf.get(edge.targetId);
+    if (s === undefined || t === undefined) continue;
+    from[e] = s;
+    to[e] = t;
+    directed[e] = getEdgeMode(graph, edge) === 'directed' ? 1 : 0;
+    counts[s]++;
+    if (!directed[e] && s !== t) counts[t]++;
+  }
+  const offsets = new Int32Array(n + 1);
+  for (let i = 0; i < n; i++) offsets[i + 1] = offsets[i] + counts[i];
+  const cursor = offsets.slice(0, n);
+  const targets = new Int32Array(offsets[n]);
+  const edges = new Int32Array(offsets[n]);
+  for (let e = 0; e < m; e++) {
+    const s = from[e];
+    if (s === -1) continue;
+    const t = to[e];
+    targets[cursor[s]] = t;
+    edges[cursor[s]++] = e;
+    if (!directed[e] && s !== t) {
+      targets[cursor[t]] = s;
+      edges[cursor[t]++] = e;
+    }
+  }
+  return { offsets, targets, edges, directed };
+}
+
+/**
+ * Partitions edges into the blocks (biconnected components) of the
+ * underlying undirected multigraph; every simple cycle lies inside one
+ * block. Each self-loop is a block of its own; dangling edges get -1.
+ * Returns the block id per edge and the edges of each block.
+ */
+function getCycleBlocks(
+  graph: Graph,
+  csr: GraphCSR,
+): { blockOf: Int32Array; blocks: number[][] } {
+  const n = csr.ids.length;
+  const m = graph.edges.length;
+  const blockOf = new Int32Array(m).fill(-1);
+  const blocks: number[][] = [];
+  const from = new Int32Array(m).fill(-1);
+  const to = new Int32Array(m);
+  const counts = new Int32Array(n);
+  for (let e = 0; e < m; e++) {
+    const s = csr.indexOf.get(graph.edges[e].sourceId);
+    const t = csr.indexOf.get(graph.edges[e].targetId);
+    if (s === undefined || t === undefined) continue;
+    if (s === t) {
+      blockOf[e] = blocks.length;
+      blocks.push([e]);
+      continue;
+    }
+    from[e] = s;
+    to[e] = t;
+    counts[s]++;
+    counts[t]++;
+  }
+  const offsets = new Int32Array(n + 1);
+  for (let i = 0; i < n; i++) offsets[i + 1] = offsets[i] + counts[i];
+  const cursor = offsets.slice(0, n);
+  const neighbors = new Int32Array(offsets[n]);
+  const incident = new Int32Array(offsets[n]);
+  for (let e = 0; e < m; e++) {
+    if (from[e] === -1) continue;
+    neighbors[cursor[from[e]]] = to[e];
+    incident[cursor[from[e]]++] = e;
+    neighbors[cursor[to[e]]] = from[e];
+    incident[cursor[to[e]]++] = e;
+  }
+
+  // Iterative Hopcroft–Tarjan with an edge stack. Skipping only the tree
+  // edge itself (not the parent node) keeps parallel edges in one block.
+  const disc = new Int32Array(n).fill(-1);
+  const low = new Int32Array(n);
+  const stackNode = new Int32Array(n);
+  const stackArc = new Int32Array(n);
+  const stackEdge = new Int32Array(n);
+  const edgeStack: number[] = [];
+  let time = 0;
+  for (let root = 0; root < n; root++) {
+    if (disc[root] !== -1) continue;
+    disc[root] = low[root] = time++;
+    let top = 0;
+    stackNode[0] = root;
+    stackArc[0] = offsets[root];
+    stackEdge[0] = -1;
+    while (top >= 0) {
+      const u = stackNode[top];
+      const a = stackArc[top];
+      if (a < offsets[u + 1]) {
+        stackArc[top] = a + 1;
+        const w = neighbors[a];
+        const e = incident[a];
+        if (e === stackEdge[top]) continue;
+        if (disc[w] === -1) {
+          edgeStack.push(e);
+          disc[w] = low[w] = time++;
+          top++;
+          stackNode[top] = w;
+          stackArc[top] = offsets[w];
+          stackEdge[top] = e;
+        } else if (disc[w] < disc[u]) {
+          edgeStack.push(e);
+          if (disc[w] < low[u]) low[u] = disc[w];
+        }
+        continue;
+      }
+      const treeEdge = stackEdge[top];
+      top--;
+      if (top < 0) break;
+      const parent = stackNode[top];
+      if (low[u] < low[parent]) low[parent] = low[u];
+      if (low[u] >= disc[parent]) {
+        const block: number[] = [];
+        let e: number;
+        do {
+          e = edgeStack.pop()!;
+          blockOf[e] = blocks.length;
+          block.push(e);
+        } while (e !== treeEdge);
+        blocks.push(block);
+      }
+    }
+  }
+  return { blockOf, blocks };
+}
+
+/**
+ * Lazily yields every simple cycle. Directed edges are followed from source
+ * to target; non-directed edges either way, but a cycle never reuses an
+ * edge, so two parallel non-directed edges form a 2-cycle while a single one
+ * does not. Every self-loop is a 1-cycle.
+ *
+ * Each cycle is yielded once, starting and ending at its node with the
+ * smallest id. A cycle made only of non-directed edges could be walked in
+ * either direction; it is yielded in one canonical direction.
+ *
+ * Johnson's algorithm, iterative, run per biconnected block: the total time
+ * is O((n + m) · (cycles + 1)), so taking the first few cycles stays cheap
+ * even when the total number of cycles is exponential.
+ */
 export function* genCycles<N, E>(
   graph: Graph<N, E>,
 ): Generator<GraphPath<N, E>> {
-  // Dispatch on the *effective* modes of the edges (per-edge overrides
-  // included), not just graph.mode. Genuinely mixed graphs use an exact
-  // simple-cycle search — correct, but potentially expensive on large dense
-  // mixed graphs.
-  const kind = getEffectiveModeKind(graph);
-  if (kind === 'mixed') {
-    yield* genCyclesMixed(graph);
-  } else if (kind === 'non-directed') {
-    yield* genCyclesUndirected(graph);
-  } else {
-    yield* genCyclesDirected(graph);
-  }
-}
+  graph = getGraphSnapshot(graph);
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const nodes = csr.nodes as GraphNode<N>[];
+  const graphEdges = graph.edges as GraphEdge<E>[];
+  const arcs = getCycleArcs(graph, csr);
+  const { offsets, targets } = arcs;
+  const { blockOf, blocks } = getCycleBlocks(graph, csr);
 
-function* genCyclesDirected<N, E>(
-  graph: Graph<N, E>,
-): Generator<GraphPath<N, E>> {
-  const idx = getIndex(graph);
-  const sortedIds = graph.nodes.map((node) => node.id).sort();
+  // Each cycle is searched from its node with the smallest id.
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) =>
+    csr.ids[a] < csr.ids[b] ? -1 : csr.ids[a] > csr.ids[b] ? 1 : 0,
+  );
+  const rank = new Int32Array(n);
+  for (let r = 0; r < n; r++) rank[order[r]] = r;
 
-  for (let startIndex = 0; startIndex < sortedIds.length; startIndex++) {
-    const startId = sortedIds[startIndex];
-    const allowed = new Set(sortedIds.slice(startIndex));
-    const visited = new Set<string>();
-    const steps: GraphStep<N, E>[] = [];
-    const startNi = idx.nodeById.get(startId)!;
-    const startNode = graph.nodes[startNi];
-    const found: GraphPath<N, E>[] = [];
+  // Per-start search scope: `scope[v] === scopeId` marks the strongly
+  // connected component being searched.
+  const scope = new Int32Array(n).fill(-1);
+  let scopeId = 0;
 
-    function dfsFind(currentId: string): void {
-      visited.add(currentId);
-
-      for (const eid of idx.outEdges.get(currentId) ?? []) {
-        const ai = idx.edgeById.get(eid);
-        if (ai === undefined) continue;
-        const edge = graph.edges[ai];
-        const neighborId = edge.targetId;
-
-        if (
-          neighborId === startId &&
-          (steps.length > 0 || currentId === startId)
-        ) {
-          found.push({
-            source: startNode,
-            steps: [...steps, { edge: edge as GraphEdge<E>, node: startNode }],
-          });
-        } else if (allowed.has(neighborId) && !visited.has(neighborId)) {
-          const ni = idx.nodeById.get(neighborId)!;
-          steps.push({ edge: edge as GraphEdge<E>, node: graph.nodes[ni] });
-          dfsFind(neighborId);
-          steps.pop();
-        }
+  const blocked = new Uint8Array(n);
+  const blockedBy: Array<Set<number> | undefined> = new Array(n);
+  const touched: number[] = [];
+  const unblockStack: number[] = [];
+  function unblock(node: number): void {
+    unblockStack.push(node);
+    while (unblockStack.length > 0) {
+      const w = unblockStack.pop()!;
+      if (!blocked[w]) continue;
+      blocked[w] = 0;
+      const dependents = blockedBy[w];
+      if (dependents) {
+        for (const x of dependents) unblockStack.push(x);
+        dependents.clear();
       }
-
-      visited.delete(currentId);
     }
-
-    dfsFind(startId);
-    yield* found;
   }
-}
 
-function* genCyclesUndirected<N, E>(
-  graph: Graph<N, E>,
-): Generator<GraphPath<N, E>> {
-  const idx = getIndex(graph);
-  const sortedIds = graph.nodes.map((node) => node.id).sort();
-  const seen = new Set<string>();
+  // Tarjan SCC state (iterative), reused across starts
+  const sccIndex = new Int32Array(n).fill(-1);
+  const sccLow = new Int32Array(n);
+  const sccOnStack = new Uint8Array(n);
+  const sccStack: number[] = [];
+  const sccOf = new Int32Array(n).fill(-1);
 
-  for (let startIndex = 0; startIndex < sortedIds.length; startIndex++) {
-    const startId = sortedIds[startIndex];
-    const allowed = new Set(sortedIds.slice(startIndex));
-    const visited = new Set<string>();
-    const steps: GraphStep<N, E>[] = [];
-    const startNi = idx.nodeById.get(startId)!;
-    const startNode = graph.nodes[startNi];
-    const found: GraphPath<N, E>[] = [];
+  // Explicit DFS stacks (shared by the SCC pass and the cycle search): node,
+  // next arc, arrival edge, "closed a cycle" flag, and how many directed
+  // edges the path from the start node has used.
+  const stackNode = new Int32Array(n);
+  const stackArc = new Int32Array(n);
+  const stackEdge = new Int32Array(n);
+  const stackFound = new Uint8Array(n);
+  const stackDirected = new Int32Array(n);
 
-    function dfsFind(currentId: string, arrivalEdgeId: string | null): void {
-      visited.add(currentId);
+  // Visit blocks in order of their smallest node id
+  const blockNodes = blocks.map((edges) => {
+    const set = new Set<number>();
+    for (const e of edges) {
+      set.add(csr.indexOf.get(graphEdges[e].sourceId)!);
+      set.add(csr.indexOf.get(graphEdges[e].targetId)!);
+    }
+    return [...set].sort((a, b) => rank[a] - rank[b]);
+  });
+  const blockOrder = blocks
+    .map((_, b) => b)
+    .sort((a, b) => rank[blockNodes[a][0]] - rank[blockNodes[b][0]]);
 
-      for (const { neighborId, edge } of getNeighborEdgesAll(graph, currentId)) {
-        // An undirected edge cannot be re-traversed back the way we came;
-        // skipping by edge id (not parent node) keeps parallel edges distinct,
-        // so two parallel edges between the same pair form a genuine 2-cycle.
-        if (edge.id === arrivalEdgeId) continue;
+  for (const b of blockOrder) {
+    // A single non-self-loop edge cannot form a cycle
+    const members = blockNodes[b];
+    if (blocks[b].length === 1 && members.length === 2) continue;
 
-        if (
-          neighborId === startId &&
-          (steps.length >= 1 || edge.sourceId === edge.targetId)
-        ) {
-          // Identify a cycle by its full set of traversed edge ids — distinct
-          // cycles can share the same vertex set (e.g. parallel chords).
-          const cycleEdgeIds = [...steps.map((step) => step.edge.id), edge.id]
-            .sort()
-            .join(',');
-          if (!seen.has(cycleEdgeIds)) {
-            seen.add(cycleEdgeIds);
-            found.push({
-              source: startNode,
-              steps: [...steps, { edge: edge as GraphEdge<E>, node: startNode }],
-            });
+    for (let i = 0; i < members.length; ) {
+      // Strongly connected components of this block's arcs among members
+      // ranked at or after members[i] (Johnson's restriction).
+      const minRank = rank[members[i]];
+      let counter = 0;
+      let sccCount = 0;
+      for (let k = i; k < members.length; k++) sccIndex[members[k]] = -1;
+      let nextStart = -1;
+      let nextScc = -1;
+      for (let k = i; k < members.length; k++) {
+        const root = members[k];
+        if (sccIndex[root] !== -1) continue;
+        let top = 0;
+        stackNode[0] = root;
+        stackArc[0] = offsets[root];
+        sccIndex[root] = sccLow[root] = counter++;
+        sccStack.push(root);
+        sccOnStack[root] = 1;
+        while (top >= 0) {
+          const u = stackNode[top];
+          const a = stackArc[top];
+          if (a < offsets[u + 1]) {
+            stackArc[top] = a + 1;
+            const w = targets[a];
+            if (blockOf[arcs.edges[a]] !== b || rank[w] < minRank) continue;
+            if (sccIndex[w] === -1) {
+              sccIndex[w] = sccLow[w] = counter++;
+              sccStack.push(w);
+              sccOnStack[w] = 1;
+              top++;
+              stackNode[top] = w;
+              stackArc[top] = offsets[w];
+            } else if (sccOnStack[w] && sccIndex[w] < sccLow[u]) {
+              sccLow[u] = sccIndex[w];
+            }
+            continue;
           }
-        } else if (allowed.has(neighborId) && !visited.has(neighborId)) {
-          const ni = idx.nodeById.get(neighborId)!;
-          steps.push({ edge: edge as GraphEdge<E>, node: graph.nodes[ni] });
-          dfsFind(neighborId, edge.id);
-          steps.pop();
+          if (sccLow[u] === sccIndex[u]) {
+            let size = 0;
+            let least = u;
+            let w: number;
+            do {
+              w = sccStack.pop()!;
+              sccOnStack[w] = 0;
+              sccOf[w] = sccCount;
+              size++;
+              if (rank[w] < rank[least]) least = w;
+            } while (w !== u);
+            // Nontrivial: several nodes, or one node with a self-loop here
+            const nontrivial =
+              size > 1 ||
+              (blocks[b].length === 1 && members.length === 1);
+            if (nontrivial && (nextStart === -1 || rank[least] < rank[nextStart])) {
+              nextStart = least;
+              nextScc = sccCount;
+            }
+            sccCount++;
+          }
+          top--;
+          if (top >= 0 && sccLow[u] < sccLow[stackNode[top]]) {
+            sccLow[stackNode[top]] = sccLow[u];
+          }
         }
       }
+      if (nextStart === -1) break;
 
-      visited.delete(currentId);
+      scopeId++;
+      for (let k = i; k < members.length; k++) {
+        if (sccOf[members[k]] === nextScc) scope[members[k]] = scopeId;
+      }
+      yield* searchFrom(b, nextStart);
+      i = members.indexOf(nextStart) + 1;
+    }
+  }
+
+  function* searchFrom(block: number, start: number): Generator<GraphPath<N, E>> {
+    let top = 0;
+    stackNode[0] = start;
+    stackArc[0] = offsets[start];
+    stackEdge[0] = -1;
+    stackFound[0] = 0;
+    stackDirected[0] = 0;
+    blocked[start] = 1;
+    touched.push(start);
+
+    while (top >= 0) {
+      const v = stackNode[top];
+      const a = stackArc[top];
+      if (a < offsets[v + 1]) {
+        stackArc[top] = a + 1;
+        const w = targets[a];
+        const e = arcs.edges[a];
+        if (scope[w] !== scopeId || blockOf[e] !== block) continue;
+        if (w === start) {
+          // Any closing arc (even one rejected below) means `v` reaches the
+          // start, so it must not stay blocked.
+          stackFound[top] = 1;
+          // Walking a non-directed edge straight back is not a cycle
+          if (top === 1 && e === stackEdge[1]) continue;
+          if (stackDirected[top] + arcs.directed[e] === 0) {
+            // All non-directed: keep one of the two walking directions
+            const canonical =
+              top === 0 ||
+              (top === 1
+                ? stackEdge[1] < e
+                : rank[stackNode[1]] < rank[stackNode[top]]);
+            if (!canonical) continue;
+          }
+          const startNode = nodes[start];
+          const steps = new Array<GraphStep<N, E>>(top + 1);
+          for (let i = 1; i <= top; i++) {
+            steps[i - 1] = {
+              edge: graphEdges[stackEdge[i]],
+              node: nodes[stackNode[i]],
+            };
+          }
+          steps[top] = { edge: graphEdges[e], node: startNode };
+          yield { source: startNode, steps };
+        } else if (!blocked[w]) {
+          top++;
+          stackNode[top] = w;
+          stackArc[top] = offsets[w];
+          stackEdge[top] = e;
+          stackFound[top] = 0;
+          stackDirected[top] = stackDirected[top - 1] + arcs.directed[e];
+          blocked[w] = 1;
+          touched.push(w);
+        }
+        continue;
+      }
+
+      // `v` is finished: unblock it if it closed a cycle, otherwise keep it
+      // blocked until one of its successors is unblocked.
+      const found = stackFound[top];
+      if (found) {
+        unblock(v);
+      } else {
+        for (let c = offsets[v]; c < offsets[v + 1]; c++) {
+          const w = targets[c];
+          if (scope[w] !== scopeId || blockOf[arcs.edges[c]] !== block) continue;
+          (blockedBy[w] ??= new Set()).add(v);
+        }
+      }
+      top--;
+      if (top >= 0 && found) stackFound[top] = 1;
     }
 
-    dfsFind(startId, null);
-    yield* found;
+    for (const node of touched) {
+      blocked[node] = 0;
+      blockedBy[node]?.clear();
+    }
+    touched.length = 0;
   }
 }
 
 /**
- * Exact simple-cycle enumeration for graphs mixing directed and non-directed
- * edges. Traverses directed edges source→target only and non-directed edges
- * both ways; a cycle may use each edge at most once, visits distinct nodes,
- * and is identified by its set of traversed edge ids.
+ * Returns one simple cycle, or `undefined` if the graph is acyclic, in
+ * O(n + m). Same cycle rules as {@link genCycles}: directed edges are
+ * followed from source to target, non-directed edges either way without
+ * reusing an edge, and any self-loop is a cycle. The result is
+ * deterministic, but it is not necessarily the shortest cycle or the first
+ * one {@link genCycles} yields.
+ *
+ * Use it to report why a graph is cyclic, e.g. in an error message, without
+ * enumerating cycles.
  */
-function* genCyclesMixed<N, E>(
+export function getCycle<N, E>(
   graph: Graph<N, E>,
-): Generator<GraphPath<N, E>> {
-  const idx = getIndex(graph);
-  const sortedIds = graph.nodes.map((node) => node.id).sort();
-  const seen = new Set<string>();
+): GraphPath<N, E> | undefined {
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const nodes = csr.nodes as GraphNode<N>[];
+  const edges = graph.edges as GraphEdge<E>[];
 
-  for (let startIndex = 0; startIndex < sortedIds.length; startIndex++) {
-    const startId = sortedIds[startIndex];
-    const allowed = new Set(sortedIds.slice(startIndex));
-    const visited = new Set<string>();
+  // (1) Grow a spanning forest of the non-directed edges (union-find). The
+  // first non-directed edge closing a loop in it, plus the forest path
+  // between its endpoints, is a cycle.
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (x: number): number => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  };
+  const forestHead = new Int32Array(n).fill(-1);
+  const forestNext: number[] = [];
+  const forestTarget: number[] = [];
+  const forestEdge: number[] = [];
+  const addForestArc = (u: number, v: number, e: number) => {
+    forestTarget.push(v);
+    forestEdge.push(e);
+    forestNext.push(forestHead[u]);
+    forestHead[u] = forestTarget.length - 1;
+  };
+  // Steps walking the forest from `from` to `to` (same tree).
+  const getForestSteps = (from: number, to: number): GraphStep<N, E>[] => {
+    const prevNode = new Int32Array(n).fill(-1);
+    const prevEdge = new Int32Array(n);
+    prevNode[from] = from;
+    const queue = [from];
+    for (let head = 0; prevNode[to] === -1; head++) {
+      const u = queue[head];
+      for (let a = forestHead[u]; a !== -1; a = forestNext[a]) {
+        const v = forestTarget[a];
+        if (prevNode[v] !== -1) continue;
+        prevNode[v] = u;
+        prevEdge[v] = forestEdge[a];
+        queue.push(v);
+      }
+    }
     const steps: GraphStep<N, E>[] = [];
-    const pathEdgeIds = new Set<string>();
-    const startNi = idx.nodeById.get(startId)!;
-    const startNode = graph.nodes[startNi];
-    const found: GraphPath<N, E>[] = [];
+    for (let v = to; v !== from; v = prevNode[v]) {
+      steps.push({ edge: edges[prevEdge[v]], node: nodes[v] });
+    }
+    return steps.reverse();
+  };
 
-    function dfsFind(currentId: string): void {
-      visited.add(currentId);
+  const directedEdges: number[] = [];
+  for (let e = 0; e < edges.length; e++) {
+    const edge = edges[e];
+    const s = csr.indexOf.get(edge.sourceId);
+    const t = csr.indexOf.get(edge.targetId);
+    if (s === undefined || t === undefined) continue;
+    if (getEdgeMode(graph, edge) === 'directed') {
+      directedEdges.push(e);
+      continue;
+    }
+    if (find(s) === find(t)) {
+      return {
+        source: nodes[s],
+        steps: [{ edge: edges[e], node: nodes[t] }, ...getForestSteps(t, s)],
+      };
+    }
+    parent[find(s)] = find(t);
+    addForestArc(s, t, e);
+    addForestArc(t, s, e);
+  }
 
-      for (const { neighborId, edge } of getNeighborEdges(graph, currentId)) {
-        if (pathEdgeIds.has(edge.id)) continue;
+  // (2) The non-directed edges now form a forest. Any remaining cycle uses
+  // directed edges, and it exists iff contracting each tree to one node
+  // leaves a directed cycle: inside a tree there is exactly one path from
+  // where the cycle enters to where it leaves.
+  const head = new Int32Array(n).fill(-1);
+  const next = new Int32Array(directedEdges.length);
+  for (let i = directedEdges.length - 1; i >= 0; i--) {
+    const component = find(csr.indexOf.get(edges[directedEdges[i]].sourceId)!);
+    next[i] = head[component];
+    head[component] = i;
+  }
+  const color = new Uint8Array(n); // per component root: 0 new, 1 open, 2 done
+  const stackComponent: number[] = [];
+  const stackCursor: number[] = [];
+  // Directed edge used to enter each open component (-1 for the DFS root)
+  const stackEntry: number[] = [];
+  for (let root = 0; root < n; root++) {
+    if (find(root) !== root || color[root] !== 0) continue;
+    color[root] = 1;
+    stackComponent.push(root);
+    stackCursor.push(head[root]);
+    stackEntry.push(-1);
+    while (stackComponent.length > 0) {
+      const top = stackComponent.length - 1;
+      const cursor = stackCursor[top];
+      if (cursor === -1) {
+        color[stackComponent[top]] = 2;
+        stackComponent.pop();
+        stackCursor.pop();
+        stackEntry.pop();
+        continue;
+      }
+      stackCursor[top] = next[cursor];
+      const e = directedEdges[cursor];
+      const target = find(csr.indexOf.get(edges[e].targetId)!);
+      if (color[target] === 0) {
+        color[target] = 1;
+        stackComponent.push(target);
+        stackCursor.push(head[target]);
+        stackEntry.push(e);
+        continue;
+      }
+      if (color[target] !== 1) continue;
 
-        if (
-          neighborId === startId &&
-          (steps.length >= 1 || edge.sourceId === edge.targetId)
-        ) {
-          const cycleEdgeIds = [...steps.map((step) => step.edge.id), edge.id]
-            .sort()
-            .join(',');
-          if (!seen.has(cycleEdgeIds)) {
-            seen.add(cycleEdgeIds);
-            found.push({
-              source: startNode,
-              steps: [...steps, { edge: edge as GraphEdge<E>, node: startNode }],
-            });
-          }
-        } else if (allowed.has(neighborId) && !visited.has(neighborId)) {
-          const ni = idx.nodeById.get(neighborId)!;
-          steps.push({ edge: edge as GraphEdge<E>, node: graph.nodes[ni] });
-          pathEdgeIds.add(edge.id);
-          dfsFind(neighborId);
-          pathEdgeIds.delete(edge.id);
-          steps.pop();
+      // Found: directed edges entering each open component after `target`,
+      // then `e` back into `target`. Join consecutive edges with the forest
+      // path inside the component between them.
+      const cycleEdges = [];
+      for (let i = stackComponent.indexOf(target) + 1; i <= top; i++) {
+        cycleEdges.push(stackEntry[i]);
+      }
+      cycleEdges.push(e);
+      const sourceOf = (edge: number) => csr.indexOf.get(edges[edge].sourceId)!;
+      const targetOf = (edge: number) => csr.indexOf.get(edges[edge].targetId)!;
+      const start = sourceOf(cycleEdges[0]);
+      const steps: GraphStep<N, E>[] = [];
+      for (let i = 0; i < cycleEdges.length; i++) {
+        const edge = cycleEdges[i];
+        steps.push({ edge: edges[edge], node: nodes[targetOf(edge)] });
+        const exit =
+          i + 1 < cycleEdges.length ? sourceOf(cycleEdges[i + 1]) : start;
+        if (targetOf(edge) !== exit) {
+          steps.push(...getForestSteps(targetOf(edge), exit));
         }
       }
-
-      visited.delete(currentId);
+      return { source: nodes[start], steps };
     }
-
-    dfsFind(startId);
-    yield* found;
   }
+  return undefined;
 }
 
 /**
@@ -1181,6 +1553,7 @@ export function* genAllPairsShortestPaths<N, E>(
   graph: Graph<N, E>,
   opts?: AllPairsShortestPathsOptions<E>,
 ): Generator<GraphPath<N, E>> {
+  graph = getGraphSnapshot(graph);
   const algorithm = opts?.algorithm ?? 'dijkstra';
   if (algorithm === 'floyd-warshall') {
     yield* floydWarshallAllPaths(graph, opts?.getWeight, opts?.signal);
@@ -1338,51 +1711,21 @@ function floydWarshallAllPaths<N, E>(
   }
 
   // Enumerate every tie path per pair by walking the predecessor lists
-  // backward from the target with one shared step buffer — each emitted path
-  // costs a single O(length) copy, not a spread per recursion level.
+  // backward from the target (see genPredecessorPaths).
   const results: GraphPath<N, E>[] = [];
-  const edges = graph.edges;
-  const stepsBackward: GraphStep<N, E>[] = [];
-  // Zero-weight cycles can make tie-predecessor lists cyclic; never revisit
-  // a node already on the path being built (same guard as reconstructPathsAt)
-  const onPath = new Set<number>();
-  let sourceIdx = 0;
-  let sourceNode = nodes[0] as GraphNode<N>;
-
-  const collect = (j: number): void => {
-    if (j === sourceIdx) {
-      const length = stepsBackward.length;
-      const steps = new Array<GraphStep<N, E>>(length);
-      for (let s = 0; s < length; s++) {
-        steps[s] = stepsBackward[length - 1 - s];
-      }
-      results.push({ source: sourceNode, steps });
-      return;
-    }
-    const pairs = prev[sourceIdx * nodeCount + j];
-    if (pairs === undefined || pairs.length === 0) return;
-    const targetNode = nodes[j] as GraphNode<N>;
-    onPath.add(j);
-    for (let p = 0; p < pairs.length; p += 2) {
-      const from = pairs[p];
-      if (onPath.has(from)) continue;
-      stepsBackward.push({
-        edge: edges[pairs[p + 1]] as GraphEdge<E>,
-        node: targetNode,
-      });
-      collect(from);
-      stepsBackward.pop();
-    }
-    onPath.delete(j);
-  };
-
   for (let i = 0; i < nodeCount; i++) {
-    sourceIdx = i;
-    sourceNode = nodes[i] as GraphNode<N>;
     const rowI = i * nodeCount;
     for (let j = 0; j < nodeCount; j++) {
       if (i === j || dist[rowI + j] === INF) continue;
-      collect(j);
+      for (const path of genPredecessorPaths<N, E>(
+        (pos) => prev[rowI + pos],
+        nodes as GraphNode<N>[],
+        graph.edges as GraphEdge<E>[],
+        i,
+        j,
+      )) {
+        results.push(path);
+      }
     }
   }
 

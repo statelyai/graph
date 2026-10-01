@@ -25,7 +25,7 @@ function makeClrsNetwork() {
 describe('getMaxFlow', () => {
   it('computes the known max flow of the CLRS network', () => {
     const graph = makeClrsNetwork();
-    const { value, flows } = getMaxFlow(graph, { from: 's', to: 't' });
+    const { value, flows } = getMaxFlow(graph, { from: 's', to: 't' })!;
 
     expect(value).toBe(23);
     // Flow conservation at the sink: everything arrives via v3→t and v4→t.
@@ -40,7 +40,7 @@ describe('getMaxFlow', () => {
 
   it('returns the min cut whose capacity equals the flow value', () => {
     const graph = makeClrsNetwork();
-    const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' });
+    const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' })!;
 
     expect(cutEdges.map((edge) => edge.id).sort()).toEqual([
       'v1v3',
@@ -63,7 +63,7 @@ describe('getMaxFlow', () => {
     const { value, flows, cutEdges } = getMaxFlow(graph, {
       from: 's',
       to: 't',
-    });
+    })!;
     expect(value).toBe(0);
     expect(cutEdges).toEqual([]);
     expect(flows).toEqual({ xt: 0 });
@@ -84,7 +84,7 @@ describe('getMaxFlow', () => {
     const { value, flows, cutEdges } = getMaxFlow(graph, {
       from: 's',
       to: 't',
-    });
+    })!;
     expect(value).toBe(4);
     expect(flows.e1).toBe(-4);
     expect(flows.e2).toBe(4);
@@ -102,7 +102,7 @@ describe('getMaxFlow', () => {
       ],
     });
 
-    const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' });
+    const { value, cutEdges } = getMaxFlow(graph, { from: 's', to: 't' })!;
     expect(value).toBe(4);
     expect(cutEdges.map((edge) => edge.id)).toEqual(['sa']);
   });
@@ -119,7 +119,7 @@ describe('getMaxFlow', () => {
     const { value, flows, cutEdges } = getMaxFlow(graph, {
       from: 's',
       to: 't',
-    });
+    })!;
     expect(value).toBe(8);
     expect(flows).toEqual({ p1: 3, p2: 5 });
     expect(cutEdges.map((edge) => edge.id).sort()).toEqual(['p1', 'p2']);
@@ -135,22 +135,18 @@ describe('getMaxFlow', () => {
       from: 's',
       to: 't',
       getCapacity: (edge) => edge.data.cap,
-    });
+    })!;
     expect(value).toBe(9);
   });
 
-  it('throws when the source node is missing', () => {
+  it('returns undefined when the source node is missing', () => {
     const graph = createGraph({ nodes: [{ id: 't' }] });
-    expect(() => getMaxFlow(graph, { from: 'nope', to: 't' })).toThrow(
-      /source node "nope" not found/,
-    );
+    expect(getMaxFlow(graph, { from: 'nope', to: 't' })).toBeUndefined();
   });
 
-  it('throws when the sink node is missing', () => {
+  it('returns undefined when the sink node is missing', () => {
     const graph = createGraph({ nodes: [{ id: 's' }] });
-    expect(() => getMaxFlow(graph, { from: 's', to: 'nope' })).toThrow(
-      /sink node "nope" not found/,
-    );
+    expect(getMaxFlow(graph, { from: 's', to: 'nope' })).toBeUndefined();
   });
 
   it('throws when source and sink are the same node', () => {
@@ -176,27 +172,31 @@ describe('getMinCut', () => {
   it('returns the known min cut of the CLRS network', () => {
     const graph = makeClrsNetwork();
     const { value, cutEdges, partition } = getMinCut(graph, {
-      source: 's',
-      sink: 't',
-    });
+      from: 's',
+      to: 't',
+    })!;
 
     // Hand-verified (CLRS Fig. 26.1): cut ({s,v1,v2,v4},{v3,t}) of capacity
     // 12 + 7 + 4 = 23.
     expect(value).toBe(23);
-    expect([...cutEdges].sort()).toEqual(['v1v3', 'v4t', 'v4v3']);
+    expect(cutEdges.map((edge) => edge.id).sort()).toEqual([
+      'v1v3',
+      'v4t',
+      'v4v3',
+    ]);
     expect(partition.source).toEqual(['s', 'v1', 'v2', 'v4']);
     expect(partition.sink).toEqual(['v3', 't']);
   });
 
   it('matches the max-flow value and the cut capacity', () => {
     const graph = makeClrsNetwork();
-    const cut = getMinCut(graph, { source: 's', sink: 't' });
-    const flow = getMaxFlow(graph, { from: 's', to: 't' });
+    const cut = getMinCut(graph, { from: 's', to: 't' })!;
+    const flow = getMaxFlow(graph, { from: 's', to: 't' })!;
 
     expect(cut.value).toBe(flow.value);
+    expect(cut.cutEdges).toEqual(flow.cutEdges);
     const cutCapacity = cut.cutEdges.reduce(
-      (sum, edgeId) =>
-        sum + (graph.edges.find((edge) => edge.id === edgeId)!.weight ?? 1),
+      (sum, edge) => sum + (edge.weight ?? 1),
       0,
     );
     expect(cutCapacity).toBe(cut.value);
@@ -204,7 +204,7 @@ describe('getMinCut', () => {
 
   it('partitions every node exactly once', () => {
     const graph = makeClrsNetwork();
-    const { partition } = getMinCut(graph, { source: 's', sink: 't' });
+    const { partition } = getMinCut(graph, { from: 's', to: 't' })!;
 
     expect(
       [...partition.source, ...partition.sink].sort(),
@@ -218,9 +218,9 @@ describe('getMinCut', () => {
     });
 
     const { value, cutEdges, partition } = getMinCut(graph, {
-      source: 's',
-      sink: 't',
-    });
+      from: 's',
+      to: 't',
+    })!;
     expect(value).toBe(0);
     expect(cutEdges).toEqual([]);
     expect(partition.source).toEqual(['s']);
@@ -234,25 +234,21 @@ describe('getMinCut', () => {
     });
 
     const { value, cutEdges } = getMinCut(graph, {
-      source: 's',
-      sink: 't',
+      from: 's',
+      to: 't',
       getCapacity: (edge) => edge.data.cap,
-    });
+    })!;
     expect(value).toBe(9);
-    expect(cutEdges).toEqual(['st']);
+    expect(cutEdges.map((edge) => edge.id)).toEqual(['st']);
   });
 
-  it('throws with getMinCut-specific messages on invalid options', () => {
+  it('returns undefined for missing endpoints and throws when they coincide', () => {
     const graph = createGraph({ nodes: [{ id: 's' }, { id: 't' }] });
 
-    expect(() => getMinCut(graph, { source: 'nope', sink: 't' })).toThrow(
-      /getMinCut: source node "nope" not found in graph — pass an existing node id as options\.source/,
-    );
-    expect(() => getMinCut(graph, { source: 's', sink: 'nope' })).toThrow(
-      /getMinCut: sink node "nope" not found .* options\.sink/,
-    );
-    expect(() => getMinCut(graph, { source: 's', sink: 's' })).toThrow(
-      /must be different nodes/,
+    expect(getMinCut(graph, { from: 'nope', to: 't' })).toBeUndefined();
+    expect(getMinCut(graph, { from: 's', to: 'nope' })).toBeUndefined();
+    expect(() => getMinCut(graph, { from: 's', to: 's' })).toThrow(
+      /getMinCut: source and sink are both "s"/,
     );
   });
 });

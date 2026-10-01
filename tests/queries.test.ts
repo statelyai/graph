@@ -309,7 +309,7 @@ describe('depth', () => {
 
   it('returns -1 for nonexistent node', () => {
     const g = makeDeepHierarchy();
-    expect(getDepth(g, 'nope')).toBe(-1);
+    expect(getDepth(g, 'nope')).toBeUndefined();
   });
 });
 

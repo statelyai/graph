@@ -1,72 +1,6 @@
 import type { Graph, GraphNode, GraphEdge, GraphPort } from './types';
-import { getIndex, type GraphIndex } from './indexing';
+import { getIndex } from './indexing';
 import { getEdgeMode } from './mode';
-
-// Non-directed self-loop counts per node, cached per index version + graph
-// mode (mode affects edges without a per-edge override) — the same
-// revalidation scheme as the CSR snapshot. This is what makes getDegree O(1):
-// degree = |out| + |in| − (non-directed self-loops), exactly, because a
-// non-self-loop edge appears in exactly one of a node's two lists and a
-// self-loop in both.
-interface SelfLoopCacheEntry {
-  version: number;
-  mode: Graph['mode'];
-  counts: Map<string, number>;
-}
-
-const nonDirectedSelfLoopCache = new WeakMap<GraphIndex, SelfLoopCacheEntry>();
-
-function getNonDirectedSelfLoopCounts(
-  graph: Graph,
-  idx: GraphIndex,
-): Map<string, number> {
-  const cached = nonDirectedSelfLoopCache.get(idx);
-  if (
-    cached &&
-    cached.version === idx.version &&
-    cached.mode === graph.mode
-  ) {
-    return cached.counts;
-  }
-  const counts = new Map<string, number>();
-  for (const edge of graph.edges) {
-    if (
-      edge.sourceId === edge.targetId &&
-      getEdgeMode(graph, edge) !== 'directed'
-    ) {
-      counts.set(edge.sourceId, (counts.get(edge.sourceId) ?? 0) + 1);
-    }
-  }
-  nonDirectedSelfLoopCache.set(idx, {
-    version: idx.version,
-    mode: graph.mode,
-    counts,
-  });
-  return counts;
-}
-
-/**
- * Per-node degree map, cached on the index per version so a degree sweep over
- * all nodes costs a single hashed lookup per call instead of re-deriving
- * adjacency-list lengths (and self-loop corrections) each time.
- */
-function getDegrees(graph: Graph, idx: GraphIndex): Map<string, number> {
-  const cached = idx.degrees;
-  if (cached && cached.version === idx.version && cached.mode === graph.mode) {
-    return cached.byId;
-  }
-  const byId = new Map<string, number>();
-  // outEdges/inEdges are seeded together per node, so their key order matches
-  for (const [id, outList] of idx.outEdges) {
-    byId.set(id, outList.length + (idx.inEdges.get(id)?.length ?? 0));
-  }
-  for (const [id, count] of getNonDirectedSelfLoopCounts(graph, idx)) {
-    const existing = byId.get(id);
-    if (existing !== undefined) byId.set(id, existing - count);
-  }
-  idx.degrees = { version: idx.version, mode: graph.mode, byId };
-  return byId;
-}
 
 // --- Edge queries ---
 
@@ -306,10 +240,10 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
 // --- Degree queries ---
 
 /**
- * Returns the total degree of a node (number of incident edge endpoints).
- * Each incident edge whose effective mode is not `'directed'` is counted
- * once (a non-directed self-loop counts once; a directed self-loop counts
- * twice — once in, once out).
+ * Returns the total degree of a node: the number of incident edge endpoints.
+ * Parallel edges count separately and every self-loop counts twice, directed
+ * or not (both of its endpoints are at the node), so the degrees of all
+ * nodes sum to `2 × edges.length` (the handshake lemma).
  *
  * @example
  * ```ts
@@ -326,19 +260,11 @@ export function getNeighbors<N>(graph: Graph<N>, nodeId: string): GraphNode<N>[]
  */
 export function getDegree(graph: Graph, nodeId: string): number {
   const idx = getIndex(graph);
-  // O(1) per call (amortized): an incident non-self-loop edge contributes
-  // exactly one entry across the two lists regardless of mode, a directed
-  // self-loop both entries (counts twice, intended), and a non-directed
-  // self-loop both entries but should count once — the cached per-node
-  // degree array folds all of that in.
-  const degree = getDegrees(graph, idx).get(nodeId);
-  if (degree !== undefined) return degree;
-  // Unknown node id: preserve the adjacency-list formula
-  const out = idx.outEdges.get(nodeId);
-  const inE = idx.inEdges.get(nodeId);
-  const selfLoops = getNonDirectedSelfLoopCounts(graph, idx);
+  // Every edge appears once in its source's out-list and once in its
+  // target's in-list, so this counts endpoints regardless of edge mode.
   return (
-    (out?.length ?? 0) + (inE?.length ?? 0) - (selfLoops.get(nodeId) ?? 0)
+    (idx.outEdges.get(nodeId)?.length ?? 0) +
+    (idx.inEdges.get(nodeId)?.length ?? 0)
   );
 }
 
@@ -523,19 +449,27 @@ export function getDescendants<N>(
   const idx = getIndex(graph);
   const result: GraphNode<N>[] = [];
   const seen = new Set<string>([nodeId]);
-  const collect = (id: string) => {
-    const childIds = idx.childNodes.get(id) ?? [];
-    for (const childId of childIds) {
-      if (seen.has(childId)) continue; // parent cycle: stop at first repeat
-      seen.add(childId);
-      const ci = idx.nodeById.get(childId);
-      if (ci !== undefined) {
-        result.push(graph.nodes[ci]);
-        collect(childId);
-      }
+  // Iterative preorder: each frame is a child list and the next index in it
+  const stackIds: string[][] = [idx.childNodes.get(nodeId) ?? []];
+  const stackIndex: number[] = [0];
+  while (stackIds.length > 0) {
+    const top = stackIds.length - 1;
+    const childIds = stackIds[top];
+    if (stackIndex[top] === childIds.length) {
+      stackIds.pop();
+      stackIndex.pop();
+      continue;
     }
-  };
-  collect(nodeId);
+    const childId = childIds[stackIndex[top]++];
+    if (seen.has(childId)) continue; // parent cycle: stop at first repeat
+    seen.add(childId);
+    const ci = idx.nodeById.get(childId);
+    if (ci !== undefined) {
+      result.push(graph.nodes[ci]);
+      stackIds.push(idx.childNodes.get(childId) ?? []);
+      stackIndex.push(0);
+    }
+  }
   return result;
 }
 
@@ -577,8 +511,8 @@ export function getRoots<N>(graph: Graph<N>): GraphNode<N>[] {
  */
 export function isCompound(graph: Graph, nodeId: string): boolean {
   const idx = getIndex(graph);
-  const childIds = idx.childNodes.get(nodeId) ?? [];
-  return childIds.length > 0;
+  if (!idx.nodeById.has(nodeId)) return false;
+  return (idx.childNodes.get(nodeId)?.length ?? 0) > 0;
 }
 
 /**
@@ -597,12 +531,12 @@ export function isCompound(graph: Graph, nodeId: string): boolean {
  * ```
  */
 export function isLeaf(graph: Graph, nodeId: string): boolean {
-  return !isCompound(graph, nodeId);
+  return getIndex(graph).nodeById.has(nodeId) && !isCompound(graph, nodeId);
 }
 
 /**
  * Depth of a node in the hierarchy (root = 0).
- * Returns -1 if the node is not found.
+ * Returns `undefined` if the node is not found.
  *
  * If the parent chain contains a cycle (authored `parentId` cycles are not
  * rejected by `createGraph`), the walk stops at the first repeated node and
@@ -622,11 +556,11 @@ export function isLeaf(graph: Graph, nodeId: string): boolean {
  * getDepth(graph, 'grandchild'); // => 2
  * ```
  */
-export function getDepth(graph: Graph, nodeId: string): number {
+export function getDepth(graph: Graph, nodeId: string): number | undefined {
   const idx = getIndex(graph);
   let d = 0;
   let ni = idx.nodeById.get(nodeId);
-  if (ni === undefined) return -1;
+  if (ni === undefined) return undefined;
   let current = graph.nodes[ni];
   const seen = new Set<string>([nodeId]);
   while (current.parentId) {

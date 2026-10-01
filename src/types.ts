@@ -493,11 +493,30 @@ export interface TraversalOptions {
 
 export type TraversalDirection = 'outgoing' | 'incoming' | 'undirected';
 
-/** Options for unweighted shortest-hop distances. */
-export interface UnweightedDistanceOptions {
+/** Options for {@link isArborescence}. */
+export interface ArborescenceOptions {
+  /** Required root node id. Omit to accept any root. */
+  from?: string;
+}
+
+/** Options for {@link getTopologicalSort} and {@link genTopologicalSort}. */
+export interface TopologicalSortOptions {
+  /**
+   * Node ids to emit first, in the given order, among the nodes that have no
+   * predecessors. Ids that are unknown or have predecessors are ignored; all
+   * other nodes still follow in `graph.nodes` order.
+   */
+  from?: string | readonly string[];
+}
+
+/** Options for reachability queries such as {@link hasPath}. */
+export interface ReachabilityOptions {
   /** Edge direction to follow. Default: `'outgoing'`. */
   direction?: TraversalDirection;
 }
+
+/** Options for unweighted shortest-hop distances. */
+export interface UnweightedDistanceOptions extends ReachabilityOptions {}
 
 /** Options for lazy breadth-first and depth-first graph traversal. */
 export interface TraversalSearchOptions {

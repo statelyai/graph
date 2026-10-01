@@ -21,7 +21,7 @@ export interface DominatorTreeOptions {
  * the Cooper–Harvey–Kennedy iterative algorithm.
  *
  * Each reachable node maps to its immediate dominator's id; the root maps
- * to `null`. Unreachable nodes are omitted. Traversal is mode-aware:
+ * to `null`. Unreachable nodes are omitted, and an unknown root yields `{}`. Traversal is mode-aware:
  * undirected/bidirectional edges are traversable both ways.
  *
  * For statecharts this answers "which states must every path from the
@@ -44,11 +44,7 @@ export function getDominatorTree(
 ): Record<string, string | null> {
   const root = resolveFrom(graph, options);
   const idx = getIndex(graph);
-  if (!idx.nodeById.has(root)) {
-    throw new Error(
-      `getDominatorTree: root node "${root}" not found in graph — pass an existing node id as options.from`,
-    );
-  }
+  if (!idx.nodeById.has(root)) return {};
 
   // --- Reverse postorder over the reachable subgraph (mode-aware) ---
   const postorder: string[] = [];

@@ -247,12 +247,12 @@ describe('mode-aware neighbor and degree queries', () => {
     expect(getSuccessors(g, 'b').map((n) => n.id)).toEqual(['a']);
   });
 
-  it('getDegree respects per-edge mode for self-loops', () => {
+  it('getDegree counts every self-loop twice, regardless of mode', () => {
     const g = createGraph({
       nodes: [{ id: 'a' }],
       edges: [{ id: 'loop', sourceId: 'a', targetId: 'a', mode: 'undirected' }],
     });
-    expect(getDegree(g, 'a')).toBe(1); // non-directed self-loop counts once
+    expect(getDegree(g, 'a')).toBe(2); // both endpoints are at `a`
 
     const g2 = createGraph({
       nodes: [{ id: 'a' }],

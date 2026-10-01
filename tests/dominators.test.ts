@@ -152,10 +152,8 @@ describe('getDominatorTree', () => {
     });
   });
 
-  it('throws when the root node does not exist', () => {
+  it('returns an empty tree when the root node does not exist', () => {
     const graph = createGraph({ nodes: [{ id: 'a' }] });
-    expect(() => getDominatorTree(graph, { from: 'nope' })).toThrow(
-      /root node "nope" not found/,
-    );
+    expect(getDominatorTree(graph, { from: 'nope' })).toEqual({});
   });
 });
