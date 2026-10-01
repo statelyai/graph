@@ -64,7 +64,11 @@ function getTraversableEdges<N, E>(
   }
   for (const edge of getInEdges(graph, nodeId)) {
     // Self-loops already covered by the out-edge loop above
-    if (edge.sourceId !== edge.targetId && getEdgeMode(graph, edge) !== 'directed') {
+    if (
+      edge.sourceId !== edge.targetId &&
+      getEdgeMode(graph, edge) !== 'directed' &&
+      hasNode(graph, edge.sourceId)
+    ) {
       result.push({ edge, nextId: edge.sourceId });
     }
   }

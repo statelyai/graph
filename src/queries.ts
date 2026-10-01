@@ -346,6 +346,8 @@ export function getChildren<N>(
   nodeId: string | null,
 ): GraphNode<N>[] {
   const idx = getIndex(graph);
+  // Orphans whose parentId names a missing node are not its children
+  if (nodeId !== null && !idx.nodeById.has(nodeId)) return [];
   const childIds = idx.childNodes.get(nodeId) ?? [];
   return childIds.map((id) => graph.nodes[idx.nodeById.get(id)!]).filter(Boolean);
 }
@@ -447,6 +449,8 @@ export function getDescendants<N>(
   nodeId: string,
 ): GraphNode<N>[] {
   const idx = getIndex(graph);
+  // Orphans whose parentId names a missing node are not its descendants
+  if (!idx.nodeById.has(nodeId)) return [];
   const result: GraphNode<N>[] = [];
   const seen = new Set<string>([nodeId]);
   // Iterative preorder: each frame is a child list and the next index in it

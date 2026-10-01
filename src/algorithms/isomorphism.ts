@@ -189,7 +189,6 @@ export function isIsomorphic<N, E>(
   options?: IsomorphismOptions<N, E>,
 ): boolean {
   if (graphA.nodes.length !== graphB.nodes.length) return false;
-  if (graphA.edges.length !== graphB.edges.length) return false;
 
   const signatureIds = new Map<string, number>();
   const a = getIsomorphismView(graphA, signatureIds);

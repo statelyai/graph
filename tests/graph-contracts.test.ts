@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as api from '../src/index';
 import { addEdge, createGraph, deleteNode } from '../src/graph';
 import {
   genCycles,
@@ -293,5 +294,53 @@ describe('trees', () => {
     expect(isTree(make([['a', 'b'], ['b', 'a']], ['a', 'b']))).toBe(false);
     expect(isTree(make([], []))).toBe(false);
     expect(isTree(make([], ['a']))).toBe(true);
+  });
+});
+
+describe('review regressions', () => {
+  it('lazy generators accept a GraphInstance', () => {
+    const instance = api.GraphInstance.from(
+      createGraph({
+        nodes: [{ id: 'a' }, { id: 'b' }],
+        edges: [
+          { id: 'ab', sourceId: 'a', targetId: 'b' },
+          { id: 'ba', sourceId: 'b', targetId: 'a' },
+        ],
+      }),
+    );
+    expect([...genCycles(instance as any)]).toHaveLength(1);
+  });
+
+  it('random walks never step onto a missing source of a non-directed edge', () => {
+    const graph = createGraph({
+      nodes: [{ id: 'a' }],
+      edges: [{ id: 'za', sourceId: 'zz', targetId: 'a', mode: 'undirected' }],
+    });
+    expect([...api.genRandomWalk(graph, { from: 'a', seed: 1 })]).toEqual([]);
+  });
+
+  it('isIsomorphic ignores dangling edges even when their counts differ', () => {
+    const a = createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }] });
+    const b = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'ghost', sourceId: 'ghost', targetId: 'a' },
+      ],
+    });
+    expect(api.isIsomorphic(a, b)).toBe(true);
+  });
+
+  it('getCycle stays linear when the cycle crosses many undirected components', () => {
+    // A ring of k two-node undirected components linked by directed edges
+    const k = 20_000;
+    const nodes = Array.from({ length: 2 * k }, (_, i) => ({ id: `n${i}` }));
+    const edges = [];
+    for (let i = 0; i < k; i++) {
+      edges.push({ id: `u${i}`, sourceId: `n${2 * i}`, targetId: `n${2 * i + 1}`, mode: 'undirected' as const });
+      edges.push({ id: `d${i}`, sourceId: `n${2 * i + 1}`, targetId: `n${(2 * i + 2) % (2 * k)}` });
+    }
+    const cycle = getCycle(createGraph({ nodes, edges }))!;
+    expect(cycle.steps).toHaveLength(2 * k);
   });
 });

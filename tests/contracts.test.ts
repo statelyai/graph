@@ -138,8 +138,12 @@ const fixtures: Record<FixtureName, Fixture> = {
     b: 'c',
   },
   unknownIds: {
+    // `orphan` names the unknown id as its parent
     graph: () =>
-      createGraph({ nodes: nodes('a', 'b'), edges: [edge('ab', 'a', 'b')] }),
+      createGraph({
+        nodes: [...nodes('a', 'b'), { id: 'orphan', parentId: 'zz1' }],
+        edges: [edge('ab', 'a', 'b')],
+      }),
     a: 'zz1',
     b: 'zz2',
   },

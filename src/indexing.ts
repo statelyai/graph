@@ -114,7 +114,17 @@ export function invalidateIndex(graph: Graph): void {
 export function getGraphSnapshot<G extends Graph<any, any, any, any>>(
   graph: G,
 ): G {
-  const snapshot = { ...graph };
+  // Read the Graph fields explicitly: a GraphInstance serves them from
+  // prototype getters, which a spread would drop.
+  const snapshot = {
+    ...graph,
+    id: graph.id,
+    mode: graph.mode,
+    initialNodeId: graph.initialNodeId,
+    nodes: graph.nodes,
+    edges: graph.edges,
+    data: graph.data,
+  };
   indexes.set(snapshot, getIndex(graph));
   return snapshot;
 }

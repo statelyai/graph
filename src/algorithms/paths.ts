@@ -1422,10 +1422,12 @@ export function getCycle<N, E>(
     forestNext.push(forestHead[u]);
     forestHead[u] = forestTarget.length - 1;
   };
-  // Steps walking the forest from `from` to `to` (same tree).
+  // Steps walking the forest from `from` to `to` (same tree). The scratch
+  // arrays are shared across calls and only the visited entries are reset,
+  // so the calls for one cycle cost O(n) in total, not O(n) each.
+  const prevNode = new Int32Array(n).fill(-1);
+  const prevEdge = new Int32Array(n);
   const getForestSteps = (from: number, to: number): GraphStep<N, E>[] => {
-    const prevNode = new Int32Array(n).fill(-1);
-    const prevEdge = new Int32Array(n);
     prevNode[from] = from;
     const queue = [from];
     for (let head = 0; prevNode[to] === -1; head++) {
@@ -1442,6 +1444,7 @@ export function getCycle<N, E>(
     for (let v = to; v !== from; v = prevNode[v]) {
       steps.push({ edge: edges[prevEdge[v]], node: nodes[v] });
     }
+    for (const v of queue) prevNode[v] = -1;
     return steps.reverse();
   };
 
