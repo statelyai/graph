@@ -58,6 +58,7 @@ Generics order: `<TNodeData, TEdgeData, TGraphData, TPortData>`, shortened to `<
 - **`algorithms.ts`** — traversal, components, cycles, paths, ordering, MST
 - **`transforms.ts`** — `getFlattenedGraph()` (statechart decomposition)
 - **`formats/`** — DOT, GraphML, adjacency list, edge list
+- **`xstate/`** — `createGraphFromMachine()` XState adapter (`@statelyai/graph/xstate`, optional `xstate` peer)
 - **`indexing.ts`** — transparent WeakMap indexing, auto-rebuilt on access
 - **`types.ts`** — all type definitions
 

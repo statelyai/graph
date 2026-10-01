@@ -60,6 +60,7 @@ const publicFiles = [
   'src/algorithms.ts',
   'src/schemas.ts',
   'src/layout/index.ts',
+  'src/xstate/index.ts',
 ];
 
 function isPrefixed(name: string): boolean {

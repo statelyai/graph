@@ -35,6 +35,8 @@ export default defineConfig({
     'src/layout/d3-hierarchy.ts',
     'src/layout/webcola.ts',
     'src/layout/cytoscape.ts',
+    // XState adapter (optional peer)
+    'src/xstate/index.ts',
   ],
   exports: {
     customExports(exports) {

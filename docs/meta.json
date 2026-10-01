@@ -2,6 +2,7 @@
   "title": "Graph",
   "pages": [
     "index",
+    "from-xstate-machine",
     "algorithms",
     "layout",
     "react-flow-elk-pipeline",
