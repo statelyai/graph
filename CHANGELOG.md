@@ -1,5 +1,11 @@
 # @statelyai/graph
 
+## 2.5.1
+
+### Patch Changes
+
+- [#45](https://github.com/statelyai/graph/pull/45) [`bdf0447`](https://github.com/statelyai/graph/commit/bdf0447bc698da1ac8d7cb229e6b1c958227108b) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Improve README: explain why to choose `@statelyai/graph` and publish the updated README to npm.
+
 ## 2.5.0
 
 ### Minor Changes
