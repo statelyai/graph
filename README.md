@@ -1,10 +1,21 @@
 # @statelyai/graph
 
-A TypeScript library for creating, analyzing, and exchanging graphs as plain JSON. Build workflows, analyze dependencies, or move graph data between tools using standalone functions.
+Graphs as plain JSON, with the algorithms, formats, and layout engines to do real work with them.
 
-Built by [Stately](https://stately.ai), where we make visual tools for complex systems.
+A graph is just `{ nodes, edges }` data, and every operation is a standalone, tree-shakable function. Built and used by [Stately](https://stately.ai) to power its visual tooling for complex systems.
 
 **[Documentation](https://stately.ai/docs/packages/graph)**
+
+## Why @statelyai/graph?
+
+<!-- claims derived from src/index.ts, package.json#exports, tests/contracts.test.ts, and docs/benchmarks.md -->
+
+- **Your graph is just data.** No class instances, no import/export step. Save it with `JSON.stringify()`, diff it, or send it to a worker as-is; lookups are indexed transparently.
+- **One model for real diagrams.** Directed and undirected edges (even mixed), nested nodes, named ports, and positions and sizes: what node editors, statecharts, and architecture diagrams need, and most graph libraries leave out.
+- **Fast.** Fastest in most of our [cross-library benchmarks](./docs/benchmarks.md) against graphology, ngraph, graphlib, and cytoscape. For example, it builds a 100k-node graph 9–15× faster than graphology.
+- **Algorithms you can trust.** Shortest paths, centrality, communities, flow, matching, isomorphism, and more. Every query and algorithm is tested against edge cases such as self-loops, parallel edges, and unknown ids, and algorithms are iterative, so deep graphs won't overflow the stack.
+- **Works with your tools.** Convert to and from 14 formats, including Graphviz DOT, Mermaid, GraphML, D2, React Flow, and Cytoscape. Lay out with 8 engines, including ELK, dagre, and Graphviz. Turn XState machines into graphs. Each adapter is an optional subpath import.
+- **Typed end to end.** Generic data types for nodes, edges, ports, and the graph itself.
 
 ## Installation
 
@@ -43,18 +54,7 @@ if (path) {
 }
 ```
 
-Your graph is a plain object: save it with `JSON.stringify()`, clone it, or send it to a worker.
-
-## What it provides
-
-<!-- capability overview derived from src/index.ts and package.json#exports; intentionally non-exhaustive -->
-
-- **Flexible graphs:** directed, undirected, nested, and visual graphs, with node data and ports.
-- **Graph operations:** query, validate, transform, and edit graphs with mutable or immutable functions.
-- **Algorithms:** traversal, shortest paths, dependency ordering, centrality, and community detection.
-- **Interoperability:** format converters and layout adapters for tools such as Graphviz, ELK, and React Flow.
-
-See the [docs](https://stately.ai/docs/packages/graph) for guides, API details, and adapter dependencies. For contributions, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+For guides, API details, and adapter dependencies, see the [docs](https://stately.ai/docs/packages/graph). To contribute, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Inspiration
 
