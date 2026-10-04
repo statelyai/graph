@@ -13,7 +13,7 @@ A graph is just `{ nodes, edges }` data, and every operation is a standalone, tr
 - **Your graph is just data.** No class instances, no import/export step. Save it with `JSON.stringify()`, diff it, or send it to a worker as-is; lookups are indexed transparently.
 - **One model for real diagrams.** Directed and undirected edges (even mixed), nested nodes, named ports, and positions and sizes: what node editors, statecharts, and architecture diagrams need, and most graph libraries leave out.
 - **Fast.** Fastest in most of our [cross-library benchmarks](./docs/benchmarks.md) against graphology, ngraph, graphlib, and cytoscape. For example, it builds a 100k-node graph 9–15× faster than graphology.
-- **Algorithms you can trust.** Shortest paths, centrality, communities, flow, matching, isomorphism, and more. Every public function is tested against edge cases such as self-loops, parallel edges, and unknown ids, and algorithms are iterative, so deep graphs won't overflow the stack.
+- **Algorithms you can trust.** Shortest paths, centrality, communities, flow, matching, isomorphism, and more. Every query and algorithm is tested against edge cases such as self-loops, parallel edges, and unknown ids, and algorithms are iterative, so deep graphs won't overflow the stack.
 - **Works with your tools.** Convert to and from 14 formats, including Graphviz DOT, Mermaid, GraphML, D2, React Flow, and Cytoscape. Lay out with 8 engines, including ELK, dagre, and Graphviz. Turn XState machines into graphs. Each adapter is an optional subpath import.
 - **Typed end to end.** Generic data types for nodes, edges, ports, and the graph itself.
 
