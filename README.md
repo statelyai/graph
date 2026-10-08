@@ -54,6 +54,36 @@ if (path) {
 }
 ```
 
+## Optional peer dependencies
+
+The core (`@statelyai/graph`) and the pure-JSON formats have no runtime
+dependencies. Each adapter subpath that wraps a third-party library declares it
+as an **optional** peer dependency, so you only install the ones you use. If the
+peer isn't installed, importing that subpath throws a module-resolution error
+for the peer — install it and the import works.
+
+| Subpath import | Peer dependency to install |
+| --- | --- |
+| `@statelyai/graph/dot` | `dotparser` |
+| `@statelyai/graph/graphml`, `@statelyai/graph/gexf` | `fast-xml-parser` |
+| `@statelyai/graph/cytoscape`, `@statelyai/graph/layout/cytoscape` | `cytoscape` |
+| `@statelyai/graph/xstate` | `xstate` |
+| `@statelyai/graph/elk`, `@statelyai/graph/layout/elk` | `elkjs` |
+| `@statelyai/graph/layout/dagre` | `@dagrejs/dagre` |
+| `@statelyai/graph/layout/d3-force` | `d3-force` |
+| `@statelyai/graph/layout/d3-hierarchy` | `d3-hierarchy` |
+| `@statelyai/graph/layout/graphviz` | `@hpcc-js/wasm-graphviz` |
+| `@statelyai/graph/layout/forceatlas2` | `graphology`, `graphology-layout-forceatlas2` |
+| `@statelyai/graph/layout/webcola` | `webcola` |
+| `@statelyai/graph/schemas` (Zod schemas) | `zod` |
+
+For example, the `/dot` converter (`toDOT`, `fromDOT`, `dotConverter`) needs
+`dotparser`:
+
+```bash
+npm install @statelyai/graph dotparser
+```
+
 For guides, API details, and adapter dependencies, see the [docs](https://stately.ai/docs/packages/graph). To contribute, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Inspiration

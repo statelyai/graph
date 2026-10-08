@@ -59,6 +59,32 @@ describe('getLouvainCommunities', () => {
     expect(score).toBeCloseTo(11 / 26, 10);
   });
 
+  // Regression (issue #47): getLouvainCommunities' bare-id output must score
+  // correctly when passed straight to getModularity, without remapping ids
+  // onto node objects first (previously returned a silent, wrong 0).
+  it('scores getLouvainCommunities bare-id output directly', () => {
+    const graph = makeTwoCliquesWithBridge();
+    const communities = getLouvainCommunities(graph);
+
+    const direct = getModularity(graph, communities);
+    const viaNodes = getModularity(graph, toNodeCommunities(graph, communities));
+
+    expect(direct).toBeCloseTo(11 / 26, 10);
+    expect(direct).toBeCloseTo(viaNodes, 10);
+  });
+
+  it('matches the issue #47 repro: two separated communities score 0.5', () => {
+    const graph = createGraph({
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      edges: [
+        { id: 'ab', sourceId: 'a', targetId: 'b' },
+        { id: 'cd', sourceId: 'c', targetId: 'd' },
+      ],
+    });
+    const communities = getLouvainCommunities(graph);
+    expect(getModularity(graph, communities)).toBeCloseTo(0.5, 10);
+  });
+
   it('matches or beats the label propagation partition modularity', () => {
     const graph = makeTwoCliquesWithBridge();
 

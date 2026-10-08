@@ -572,6 +572,47 @@ flowchart TD
       expect(nodeA.parentId).toBe('sub1');
     });
   });
+
+  // Regression: node ids that collide with the flowchart shape grammar (e.g.
+  // a synthetic `(root)` id) must be escaped on emit so the output doesn't
+  // read as shape syntax, and must decode back to the original id on parse.
+  describe('node id escaping', () => {
+    const SHAPE_DELIMITER_IDS = ['(root)', 'a[b]', 'x{y}', 'a|b', 'p;q', 'left>right', 'a/b', 'c\\d', 'a&b', 'a,b', 'has space'];
+
+    it('does not emit raw shape delimiters in a bare node id', () => {
+      const graph = fromMermaidFlowchart('flowchart TD\n    a --> b');
+      graph.nodes[0].id = '(root)';
+      graph.edges[0].sourceId = '(root)';
+      const out = toMermaidFlowchart(graph);
+      // The raw `(root)` token (which a spec parser reads as a round node with
+      // empty id) must not appear; the escaped entity form must.
+      expect(out).not.toMatch(/(^|\s)\(root\)(\s|$)/m);
+      expect(out).toContain('#40;root#41;');
+    });
+
+    it.each(SHAPE_DELIMITER_IDS)('round-trips the id %j through emit → parse', (id) => {
+      const graph = fromMermaidFlowchart('flowchart TD\n    a --> b');
+      graph.nodes[0].id = id;
+      graph.edges[0].sourceId = id;
+
+      const roundTripped = fromMermaidFlowchart(toMermaidFlowchart(graph));
+      expect(roundTripped.nodes.map((n) => n.id).sort()).toEqual([id, 'b'].sort());
+      expect(roundTripped.edges[0].sourceId).toBe(id);
+      expect(roundTripped.edges[0].targetId).toBe('b');
+    });
+
+    it('round-trips a special-char id used as a subgraph parent', () => {
+      const graph = fromMermaidFlowchart('flowchart TD\n    a --> b');
+      // Make node `a` a subgraph parent of `b` and give it a colliding id.
+      graph.nodes[0].id = '(root)';
+      graph.edges[0].sourceId = '(root)';
+      graph.nodes[1].parentId = '(root)';
+
+      const roundTripped = fromMermaidFlowchart(toMermaidFlowchart(graph));
+      const child = roundTripped.nodes.find((n) => n.id === 'b')!;
+      expect(child.parentId).toBe('(root)');
+    });
+  });
 });
 
 describe('edge label escaping', () => {

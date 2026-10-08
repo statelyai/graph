@@ -5,6 +5,8 @@ import {
   prepareLines,
   escapeMermaidLabel,
   unescapeMermaidLabel,
+  escapeMermaidId,
+  unescapeMermaidId,
   generateEdgeId,
   MERMAID_TO_DIRECTION,
   DIRECTION_TO_MERMAID,
@@ -141,8 +143,10 @@ function parseNodeDecl(text: string): {
     const label = text.slice(opIdx + opener.length, text.length - closer.length);
     return { id, label: getDecodedNodeLabel(label.trim()), shape: shapeName, ...(className && { className }) };
   }
-  // Bare node ID (no brackets)
-  if (/^[a-zA-Z_][\w]*$/.test(text)) {
+  // Bare node ID (no brackets). Accept entity-encoded ids (`#NN;`) too, so
+  // ids escaped by escapeMermaidId on emit (e.g. `(root)` → `#40;root#41;`)
+  // parse back as a single bare id rather than falling through to null.
+  if (/^[\w#;]+$/.test(text)) {
     return { id: text, label: '', shape: 'rectangle', ...(className && { className }) };
   }
   return null;
@@ -692,12 +696,28 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
     }
   }
 
+  // Ids were kept entity-encoded throughout the pass so every internal
+  // reference (node map keys, parentId, edge endpoints, class targets) stayed
+  // mutually consistent. Decode them once here, at the boundary, back to their
+  // raw form (e.g. `#40;root#41;` → `(root)`).
+  const decodedNodes = Array.from(nodeMap.values()).map((node) => ({
+    ...node,
+    id: unescapeMermaidId(node.id),
+    parentId: node.parentId == null ? node.parentId : unescapeMermaidId(node.parentId),
+  }));
+  const decodedEdges = edges.map((edge) => ({
+    ...edge,
+    id: unescapeMermaidId(edge.id),
+    sourceId: unescapeMermaidId(edge.sourceId),
+    targetId: unescapeMermaidId(edge.targetId),
+  }));
+
   return {
     id: '',
     mode: 'directed',
     initialNodeId: null,
-    nodes: Array.from(nodeMap.values()),
-    edges,
+    nodes: decodedNodes,
+    edges: decodedEdges,
     data: {
       diagramType: 'flowchart',
       ...(Object.keys(classDefs).length > 0 && { classDefs }),
@@ -758,7 +778,7 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
       if (isParent.has(node.id)) {
         // Emit as subgraph
         const label = node.label ? `[${escapeMermaidLabel(node.label)}]` : '';
-        lines.push(`${indent}subgraph ${node.id}${label}`);
+        lines.push(`${indent}subgraph ${escapeMermaidId(node.id)}${label}`);
         // Emit direction if set on this subgraph
         if (node.data?.direction) {
           const subDir = DIRECTION_TO_MERMAID[node.data.direction] ?? 'TD';
@@ -773,7 +793,7 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
         const label = node.label
           ? `${brackets[0]}${escapeMermaidLabel(node.label)}${brackets[1]}`
           : '';
-        lines.push(`${indent}${node.id}${label}`);
+        lines.push(`${indent}${escapeMermaidId(node.id)}${label}`);
       }
     }
   }
@@ -813,7 +833,7 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
       labelStr = `|${escapeMermaidLabel(edge.label)}|`;
     }
     lines.push(
-      `    ${edge.sourceId} ${arrow}${labelStr} ${edge.targetId}`,
+      `    ${escapeMermaidId(edge.sourceId)} ${arrow}${labelStr} ${escapeMermaidId(edge.targetId)}`,
     );
   }
 
@@ -828,7 +848,7 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
     }
   }
   for (const [cls, nodeIds] of classAssignments) {
-    lines.push(`    class ${nodeIds.join(',')} ${cls}`);
+    lines.push(`    class ${nodeIds.map(escapeMermaidId).join(',')} ${cls}`);
   }
 
   // Emit linkStyle directives with recomputed indices. Group edges that share
@@ -864,15 +884,15 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
       if (click.kind === 'href') {
         const target = click.linkTarget ? ` ${click.linkTarget}` : '';
         lines.push(
-          `    click ${node.id} href "${escapeMermaidLabel(click.target)}"${tip}${target}`,
+          `    click ${escapeMermaidId(node.id)} href "${escapeMermaidLabel(click.target)}"${tip}${target}`,
         );
       } else {
         const kw = click.explicitCall ? 'call ' : '';
-        lines.push(`    click ${node.id} ${kw}${click.target}${tip}`);
+        lines.push(`    click ${escapeMermaidId(node.id)} ${kw}${click.target}${tip}`);
       }
     } else if (node.data?.link) {
       const tip = node.data.tooltip ? ` "${escapeMermaidLabel(node.data.tooltip)}"` : '';
-      lines.push(`    click ${node.id} "${escapeMermaidLabel(node.data.link)}"${tip}`);
+      lines.push(`    click ${escapeMermaidId(node.id)} "${escapeMermaidLabel(node.data.link)}"${tip}`);
     }
   }
 

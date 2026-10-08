@@ -29,6 +29,13 @@ export interface GreedyModularityOptions {
 
 type Community<N = any> = GraphNode<N>[];
 
+/**
+ * A community as accepted by {@link getModularity}: either full node objects
+ * (as returned by most community algorithms) or bare node ids (as returned by
+ * {@link getLouvainCommunities}). Mixing the two within a community is allowed.
+ */
+type CommunityInput<N = any> = ReadonlyArray<GraphNode<N> | string>;
+
 function getUndirectedNeighbors(
   graph: Graph,
   nodeId: string,
@@ -209,9 +216,16 @@ function cloneWithEdges<N, E, G, P>(
 }
 
 function toCommunityIds<N>(
-  communities: Community<N>[],
+  communities: CommunityInput<N>[],
 ): Set<string>[] {
-  return communities.map((community) => new Set(community.map((node) => node.id)));
+  return communities.map(
+    (community) =>
+      new Set(
+        community.map((member) =>
+          typeof member === 'string' ? member : member.id,
+        ),
+      ),
+  );
 }
 
 /**
@@ -413,10 +427,21 @@ export function getGirvanNewmanCommunities<N>(
  * Returns the modularity score for a partition of communities.
  *
  * Community algorithms in this module treat the graph as undirected.
+ *
+ * Communities may be given either as full node objects (the shape returned by
+ * most community algorithms here) or as bare node ids — the shape returned by
+ * {@link getLouvainCommunities} — so the output of any community function can
+ * be scored directly without first remapping ids back onto node objects.
+ *
+ * @example
+ * ```ts
+ * const communities = getLouvainCommunities(graph); // string[][]
+ * const q = getModularity(graph, communities);      // scored directly
+ * ```
  */
 export function getModularity<N>(
   graph: Graph<N>,
-  communities: Community<N>[],
+  communities: CommunityInput<N>[],
 ): number {
   if (graph.edges.length === 0 || communities.length === 0) {
     return 0;
