@@ -577,7 +577,23 @@ flowchart TD
   // a synthetic `(root)` id) must be escaped on emit so the output doesn't
   // read as shape syntax, and must decode back to the original id on parse.
   describe('node id escaping', () => {
-    const SHAPE_DELIMITER_IDS = ['(root)', 'a[b]', 'x{y}', 'a|b', 'p;q', 'left>right', 'a/b', 'c\\d', 'a&b', 'a,b', 'has space'];
+    const SHAPE_DELIMITER_IDS = [
+      '(root)',
+      '(root)-child',
+      'a[b]',
+      'x{y}',
+      'a|b',
+      'p;q',
+      'left>right',
+      'a/b',
+      'c\\d',
+      'a&b',
+      'a,b',
+      'has space',
+      'has\ttab',
+      'has\nnewline',
+      'has\rcarriage-return',
+    ];
 
     it('does not emit raw shape delimiters in a bare node id', () => {
       const graph = fromMermaidFlowchart('flowchart TD\n    a --> b');
@@ -585,9 +601,10 @@ flowchart TD
       graph.edges[0].sourceId = '(root)';
       const out = toMermaidFlowchart(graph);
       // The raw `(root)` token (which a spec parser reads as a round node with
-      // empty id) must not appear; the escaped entity form must.
+      // empty id) and entity semicolons must not appear in a bare Mermaid id.
       expect(out).not.toMatch(/(^|\s)\(root\)(\s|$)/m);
-      expect(out).toContain('#40;root#41;');
+      expect(out).not.toContain('#40;');
+      expect(out).toMatch(/^\s+__stately_id_[0-9a-f]+\b/m);
     });
 
     it.each(SHAPE_DELIMITER_IDS)('round-trips the id %j through emit → parse', (id) => {
@@ -611,6 +628,11 @@ flowchart TD
       const roundTripped = fromMermaidFlowchart(toMermaidFlowchart(graph));
       const child = roundTripped.nodes.find((n) => n.id === 'b')!;
       expect(child.parentId).toBe('(root)');
+    });
+
+    it('decodes a default subgraph label derived from an escaped id', () => {
+      const graph = fromMermaidFlowchart('flowchart TD\n    subgraph __stately_id_00280072006f006f00740029\n        child\n    end');
+      expect(graph.nodes.find((node) => node.id === '(root)')?.label).toBe('(root)');
     });
   });
 });

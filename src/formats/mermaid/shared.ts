@@ -27,66 +27,56 @@ export function escapeMermaidLabel(s: string): string {
     '"': '#quot;',
     ';': '#59;',
     '|': '#124;',
+    '\t': '#9;',
+    '\n': '#10;',
+    '\r': '#13;',
+    '<': '#60;',
+    '>': '#62;',
   };
-  return s.replace(/[\\#";|]/g, (char) => entities[char]!);
+  return s.replace(/[\\#";|\t\n\r<>]/g, (char) => entities[char]!);
 }
 
 /** Unescape a Mermaid label back to plain text. */
 export function unescapeMermaidLabel(s: string): string {
   return s
     .replace(/#quot;/g, '"')
-    .replace(/#59;/g, ';')
-    .replace(/#124;/g, '|')
-    .replace(/#35;/g, '#');
+    .replace(/#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)));
 }
 
-/**
- * Characters that, left raw in a bare node id, collide with the flowchart
- * grammar — the shape delimiters enumerated by `SHAPE_OPENERS` (`()[]{}>/\`),
- * plus the statement/label separators the emitter already escapes in labels
- * (`"`, `;`, `|`, `#`) and the compact-link / class-list separators (`&`, `,`)
- * and whitespace. They are encoded as Mermaid HTML entity codes so the id
- * carries no raw delimiter and round-trips through a spec-compliant parser.
- *
- * `#` is listed so a literal `#` in an id survives (it would otherwise look
- * like the start of an entity on decode); because every replacement is a
- * distinct `#…;` entity, encoding and decoding are order-independent.
- */
-const ID_ENTITIES: Record<string, string> = {
-  '\\': '#92;',
-  '#': '#35;',
-  '"': '#quot;',
-  ';': '#59;',
-  '|': '#124;',
-  '&': '#38;',
-  ',': '#44;',
-  ' ': '#32;',
-  '(': '#40;',
-  ')': '#41;',
-  '[': '#91;',
-  ']': '#93;',
-  '{': '#123;',
-  '}': '#125;',
-  '<': '#60;',
-  '>': '#62;',
-  '/': '#47;',
-};
-
-const ID_ENTITY_PATTERN = /[\\#";|&, ()[\]{}<>/]/g;
+const ENCODED_ID_PREFIX = '__stately_id_';
+const SAFE_MERMAID_ID = /^[A-Za-z0-9_]+$/;
 
 /**
  * Escape a node id for Mermaid output so characters that collide with the
- * flowchart shape grammar (e.g. an id like `(root)`) cannot be misread as
- * shape syntax by a spec-compliant Mermaid parser. Inverse of
- * {@link unescapeMermaidId}. Ids with no special characters pass through
- * unchanged.
+ * flowchart grammar (e.g. an id like `(root)`) cannot be misread as shape or
+ * statement syntax by a spec-compliant Mermaid parser. Unsafe UTF-16 code
+ * units are encoded into a namespaced bare identifier. Inverse of
+ * {@link unescapeMermaidId}. Safe ids pass through unchanged.
  */
 export function escapeMermaidId(s: string): string {
-  return s.replace(ID_ENTITY_PATTERN, (char) => ID_ENTITIES[char]!);
+  if (SAFE_MERMAID_ID.test(s) && !s.startsWith(ENCODED_ID_PREFIX)) return s;
+
+  let encoded = '';
+  for (let index = 0; index < s.length; index++) {
+    encoded += s.charCodeAt(index).toString(16).padStart(4, '0');
+  }
+  return `${ENCODED_ID_PREFIX}${encoded}`;
 }
 
 /** Decode a node id escaped by {@link escapeMermaidId} back to its raw form. */
 export function unescapeMermaidId(s: string): string {
+  if (s.startsWith(ENCODED_ID_PREFIX)) {
+    const encoded = s.slice(ENCODED_ID_PREFIX.length);
+    if (encoded.length > 0 && encoded.length % 4 === 0 && /^[0-9a-f]+$/i.test(encoded)) {
+      let decoded = '';
+      for (let index = 0; index < encoded.length; index += 4) {
+        decoded += String.fromCharCode(Number.parseInt(encoded.slice(index, index + 4), 16));
+      }
+      return decoded;
+    }
+  }
+
+  // Accept entity-encoded ids emitted by pre-release converter versions.
   return s
     .replace(/#quot;/g, '"')
     .replace(/#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)));

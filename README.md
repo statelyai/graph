@@ -66,9 +66,9 @@ for the peer — install it and the import works.
 | --- | --- |
 | `@statelyai/graph/dot` | `dotparser` |
 | `@statelyai/graph/graphml`, `@statelyai/graph/gexf` | `fast-xml-parser` |
-| `@statelyai/graph/cytoscape`, `@statelyai/graph/layout/cytoscape` | `cytoscape` |
+| `@statelyai/graph/layout/cytoscape` | `cytoscape` |
 | `@statelyai/graph/xstate` | `xstate` |
-| `@statelyai/graph/elk`, `@statelyai/graph/layout/elk` | `elkjs` |
+| `@statelyai/graph/layout/elk` | `elkjs` |
 | `@statelyai/graph/layout/dagre` | `@dagrejs/dagre` |
 | `@statelyai/graph/layout/d3-force` | `d3-force` |
 | `@statelyai/graph/layout/d3-hierarchy` | `d3-hierarchy` |

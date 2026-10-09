@@ -143,9 +143,8 @@ function parseNodeDecl(text: string): {
     const label = text.slice(opIdx + opener.length, text.length - closer.length);
     return { id, label: getDecodedNodeLabel(label.trim()), shape: shapeName, ...(className && { className }) };
   }
-  // Bare node ID (no brackets). Accept entity-encoded ids (`#NN;`) too, so
-  // ids escaped by escapeMermaidId on emit (e.g. `(root)` → `#40;root#41;`)
-  // parse back as a single bare id rather than falling through to null.
+  // Bare node ID (no brackets). Accept entity-encoded ids (`#NN;`) from
+  // pre-release converter versions too.
   if (/^[\w#;]+$/.test(text)) {
     return { id: text, label: '', shape: 'rectangle', ...(className && { className }) };
   }
@@ -462,7 +461,7 @@ export function fromMermaidFlowchart(input: string): MermaidFlowchartGraph {
     const subgraphMatch = line.match(/^subgraph\s+(\S+?)(?:\s*\[(.+)\])?\s*$/);
     if (subgraphMatch) {
       const subId = subgraphMatch[1];
-      const subLabel = subgraphMatch[2]?.trim() ?? subId;
+      const subLabel = subgraphMatch[2]?.trim() ?? unescapeMermaidId(subId);
       ensureNode(subId, subLabel);
       parentStack.push(subId);
       continue;
@@ -775,10 +774,12 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
   function writeNodes(parentId: string | null, indent: string) {
     const children = childrenMap.get(parentId) ?? [];
     for (const node of children) {
+      const mermaidId = escapeMermaidId(node.id);
+      const displayLabel = node.label || (mermaidId === node.id ? '' : node.id);
       if (isParent.has(node.id)) {
         // Emit as subgraph
-        const label = node.label ? `[${escapeMermaidLabel(node.label)}]` : '';
-        lines.push(`${indent}subgraph ${escapeMermaidId(node.id)}${label}`);
+        const label = displayLabel ? `[${escapeMermaidLabel(displayLabel)}]` : '';
+        lines.push(`${indent}subgraph ${mermaidId}${label}`);
         // Emit direction if set on this subgraph
         if (node.data?.direction) {
           const subDir = DIRECTION_TO_MERMAID[node.data.direction] ?? 'TD';
@@ -790,10 +791,10 @@ export function toMermaidFlowchart(graph: MermaidFlowchartGraph): string {
         // Emit as node
         const shape = (node as any).shape ?? 'rectangle';
         const brackets = SHAPE_TO_BRACKETS[shape] ?? ['[', ']'];
-        const label = node.label
-          ? `${brackets[0]}${escapeMermaidLabel(node.label)}${brackets[1]}`
+        const label = displayLabel
+          ? `${brackets[0]}${escapeMermaidLabel(displayLabel)}${brackets[1]}`
           : '';
-        lines.push(`${indent}${escapeMermaidId(node.id)}${label}`);
+        lines.push(`${indent}${mermaidId}${label}`);
       }
     }
   }
