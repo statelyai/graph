@@ -1,5 +1,11 @@
 # @statelyai/graph
 
+## 2.5.2
+
+### Patch Changes
+
+- [#50](https://github.com/statelyai/graph/pull/50) [`8093620`](https://github.com/statelyai/graph/commit/8093620a830985a787ddd306ed60b4e9383f09d8) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Emit renderer-safe Mermaid flowchart identifiers while preserving arbitrary graph node IDs and their displayed labels.
+
 ## 2.5.1
 
 ### Patch Changes
