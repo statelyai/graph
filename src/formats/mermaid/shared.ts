@@ -27,17 +27,59 @@ export function escapeMermaidLabel(s: string): string {
     '"': '#quot;',
     ';': '#59;',
     '|': '#124;',
+    '\t': '#9;',
+    '\n': '#10;',
+    '\r': '#13;',
+    '<': '#60;',
+    '>': '#62;',
   };
-  return s.replace(/[\\#";|]/g, (char) => entities[char]!);
+  return s.replace(/[\\#";|\t\n\r<>]/g, (char) => entities[char]!);
 }
 
 /** Unescape a Mermaid label back to plain text. */
 export function unescapeMermaidLabel(s: string): string {
   return s
     .replace(/#quot;/g, '"')
-    .replace(/#59;/g, ';')
-    .replace(/#124;/g, '|')
-    .replace(/#35;/g, '#');
+    .replace(/#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)));
+}
+
+const ENCODED_ID_PREFIX = '__stately_id_';
+const SAFE_MERMAID_ID = /^[A-Za-z0-9_]+$/;
+
+/**
+ * Escape a node id for Mermaid output so characters that collide with the
+ * flowchart grammar (e.g. an id like `(root)`) cannot be misread as shape or
+ * statement syntax by a spec-compliant Mermaid parser. Unsafe UTF-16 code
+ * units are encoded into a namespaced bare identifier. Inverse of
+ * {@link unescapeMermaidId}. Safe ids pass through unchanged.
+ */
+export function escapeMermaidId(s: string): string {
+  if (SAFE_MERMAID_ID.test(s) && !s.startsWith(ENCODED_ID_PREFIX)) return s;
+
+  let encoded = '';
+  for (let index = 0; index < s.length; index++) {
+    encoded += s.charCodeAt(index).toString(16).padStart(4, '0');
+  }
+  return `${ENCODED_ID_PREFIX}${encoded}`;
+}
+
+/** Decode a node id escaped by {@link escapeMermaidId} back to its raw form. */
+export function unescapeMermaidId(s: string): string {
+  if (s.startsWith(ENCODED_ID_PREFIX)) {
+    const encoded = s.slice(ENCODED_ID_PREFIX.length);
+    if (encoded.length > 0 && encoded.length % 4 === 0 && /^[0-9a-f]+$/i.test(encoded)) {
+      let decoded = '';
+      for (let index = 0; index < encoded.length; index += 4) {
+        decoded += String.fromCharCode(Number.parseInt(encoded.slice(index, index + 4), 16));
+      }
+      return decoded;
+    }
+  }
+
+  // Accept entity-encoded ids emitted by pre-release converter versions.
+  return s
+    .replace(/#quot;/g, '"')
+    .replace(/#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)));
 }
 
 // --- ID generation ---

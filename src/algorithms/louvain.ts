@@ -28,10 +28,14 @@ export interface LouvainOptions<E = any> {
  * Returns communities of node ids, each community sorted lexicographically
  * and communities sorted by their first id.
  *
+ * The returned bare-id communities can be passed straight to
+ * {@link getModularity} to score the partition — no id → node remapping needed.
+ *
  * @example
  * ```ts
  * const communities = getLouvainCommunities(graph);
  * // [['a', 'b', 'c'], ['d', 'e', 'f']]
+ * const q = getModularity(graph, communities);
  * ```
  *
  * Pass `options.signal` to cancel: the abort is checked once per pass and

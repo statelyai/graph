@@ -159,9 +159,15 @@ const SHAPE_TO_DOT: Record<string, string> = {
 /**
  * Converts a graph to a DOT (Graphviz) format string.
  *
+ * @remarks
+ * Exported from the `@statelyai/graph/dot` subpath, which requires the optional
+ * peer dependency `dotparser` (`npm install dotparser`). It is not re-exported
+ * from the package root.
+ *
  * @example
  * ```ts
- * import { createGraph, toDOT } from '@statelyai/graph';
+ * import { createGraph } from '@statelyai/graph';
+ * import { toDOT } from '@statelyai/graph/dot';
  *
  * const graph = createGraph({
  *   nodes: { a: {}, b: {} },
@@ -372,9 +378,14 @@ function nodeFromAttrs(
 /**
  * Parses a DOT (Graphviz) format string into a graph.
  *
+ * @remarks
+ * Exported from the `@statelyai/graph/dot` subpath, which requires the optional
+ * peer dependency `dotparser` (`npm install dotparser`). It is not re-exported
+ * from the package root.
+ *
  * @example
  * ```ts
- * import { fromDOT } from '@statelyai/graph';
+ * import { fromDOT } from '@statelyai/graph/dot';
  *
  * const graph = fromDOT(`
  *   digraph {
@@ -654,9 +665,15 @@ export function fromDOT(dot: string): Graph {
 /**
  * Bidirectional converter for DOT (Graphviz) format.
  *
+ * @remarks
+ * Exported from the `@statelyai/graph/dot` subpath, which requires the optional
+ * peer dependency `dotparser` (`npm install dotparser`). It is not re-exported
+ * from the package root.
+ *
  * @example
  * ```ts
- * import { dotConverter, createGraph } from '@statelyai/graph';
+ * import { createGraph } from '@statelyai/graph';
+ * import { dotConverter } from '@statelyai/graph/dot';
  *
  * const graph = createGraph({
  *   nodes: { a: {}, b: {} },
