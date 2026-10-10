@@ -2,11 +2,10 @@
 
 Converter for [Cytoscape.js](https://js.cytoscape.org/) JSON format — the standard interchange format for the Cytoscape.js graph visualization library.
 
-**Requires peer dependency:** `cytoscape`
+<!-- runtime dependencies derived from src/formats/cytoscape/index.ts -->
 
-```bash
-npm install cytoscape
-```
+The converter uses plain JSON and does not require the `cytoscape` runtime.
+Install `cytoscape` only when passing the converted data to Cytoscape.js.
 
 ## Resources
 
