@@ -36,6 +36,11 @@ export default defineConfig({
     'src/formats/drawio/index.ts',
     'src/formats/pajek/index.ts',
     'src/formats/plantuml/index.ts',
+    'src/formats/dgml/index.ts',
+    'src/formats/cx2/index.ts',
+    'src/formats/graphson/index.ts',
+    'src/formats/rdf/index.ts',
+    'src/formats/rdf/syntax.ts',
 
     // Layout — contract + per-engine adapters (optional peers)
     'src/layout/index.ts',

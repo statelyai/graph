@@ -117,3 +117,12 @@ Bare exports interpret recognized import carriers by default. Use
 `{ nativeCarrier: false }` when Graph data is user-authored and could match the
 private carrier schema. Document projection pins importer state to its external
 source before unwrapping it, preserving foreign lookalikes.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+Strict document edge patches require either an unchanged native edge record
+sequence or a unique explicit `data.id` independently present in both baseline and
+current source. A new edge with `data.id: "e0"` cannot validate an older generated
+`e0` identity. Ambiguous insertion/removal/reordering/record changes reject with
+`ambiguous-native-identity` and the field path. Stable explicit IDs permit independent
+native updates; source-only changes and stable node-label patches remain supported.

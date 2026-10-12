@@ -1,0 +1,7 @@
+{
+  "producer": "Apache TinkerPop TinkerFactory.createModern() via GraphSONMapper V3_0 +TinkerIoRegistryV3 +GraphSONXModuleV3",
+  "version": "3.8.2",
+  "source": "https://github.com/apache/tinkerpop/blob/3.8.2/tinkergraph-gremlin/src/main/java/org/apache/tinkerpop/gremlin/tinkergraph/structure/TinkerFactory.java",
+  "license": "Apache-2.0",
+  "sha256": "f678fc9e890591c0e94e90e02ea1a2143489f07add58ea54a1c41f9c8eabe96a"
+}

@@ -46,6 +46,78 @@ export interface FormatSupportEntry {
 
 export const FORMAT_SUPPORT_MATRIX: FormatSupportEntry[] = [
   {
+    id: "graphson",
+    importPath: "@statelyai/graph/graphson",
+    preservation: { graph: "partial", native: "partial", document: "partial" },
+    features: {
+      directed: "full",
+      undirected: "none",
+      hierarchy: "none",
+      ports: "none",
+      visual: "none",
+      style: "none",
+      weight: "partial",
+      roundTrip: "partial",
+    },
+    notes: [
+      "Explicit GraphSON3 typed tinker:graph object profile, backed by TinkerIoRegistryV3. Directed identities and raw typed properties retain Int64/BigInteger/BigDecimal wrappers, multi/meta-properties and typed maps/sets. Fresh Graph data uses documented JSON-string properties and a Graph-only string sidecar; unsupported modes/IDs/labels reject. Source-exact documents and bounded label/property patches are distinct from complete TinkerPop type-system coverage.",
+    ],
+  },
+  {
+    id: "dgml",
+    importPath: "@statelyai/graph/dgml",
+    preservation: { graph: "partial", native: "partial", document: "partial" },
+    features: {
+      directed: "full",
+      undirected: "none",
+      hierarchy: "partial",
+      ports: "none",
+      visual: "none",
+      style: "partial",
+      weight: "none",
+      roundTrip: "partial",
+    },
+    notes: [
+      "DGML groups/Contains hierarchy and directed links use positional native IDs dgml_link_N; fresh export is strict unless edgeIds:positional explicitly accepts identity loss. Implicit endpoint provenance and signed64 lexical magnitudes are retained. The published Microsoft XSD verifies selected profiles but rejects dynamic custom property attributes; no Windows renderer conformance claim. Documents retain exact source with bounded native edits.",
+    ],
+  },
+  {
+    id: "cx2",
+    importPath: "@statelyai/graph/cx2",
+    preservation: { graph: "partial", native: "partial", document: "partial" },
+    features: {
+      directed: "full",
+      undirected: "none",
+      hierarchy: "none",
+      ports: "none",
+      visual: "partial",
+      style: "none",
+      weight: "none",
+      roundTrip: "partial",
+    },
+    notes: [
+      "Scoped NDEx CX2 uses safe canonical numeric identities, typed declarations/defaults/aliases, directed multigraphs and complete x/y coordinates. Visual/custom aspects remain opaque. Null typed attributes and late declarations reject projection; actual NDEx3.12 defaults/null omission are characterized. Documents retain exact source and bounded native labels/properties.",
+    ],
+  },
+  {
+    id: "rdf",
+    importPath: "@statelyai/graph/rdf",
+    preservation: { graph: "partial", native: "partial", document: "partial" },
+    features: {
+      directed: "full",
+      undirected: "none",
+      hierarchy: "none",
+      ports: "none",
+      visual: "none",
+      style: "none",
+      weight: "none",
+      roundTrip: "partial",
+    },
+    notes: [
+      "Explicit RDF1.1 dataset maps subject/object terms to nodes, predicates to directed edges and graph names to edge data; lexical forms, datatypes, language case and scoped blank identity remain intact without coercion/reasoning. DTO core is dependency-free; optional n3 syntax supports N-Triples/N-Quads/Turtle/TriG. JSON-LD/RDF1.2/executable reasoning are deferred. Exact-source documents and strict supported patches do not imply arbitrary Graph encoding.",
+    ],
+  },
+  {
     id: 'adjacency-matrix', importPath: '@statelyai/graph/adjacency-matrix',
     preservation: { graph: 'partial', native: 'partial', document: 'none' },
     features: { directed: 'full', undirected: 'partial', hierarchy: 'none', ports: 'none', visual: 'partial', style: 'partial', weight: 'partial', roundTrip: 'partial' },

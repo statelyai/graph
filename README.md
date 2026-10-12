@@ -14,7 +14,7 @@ A graph is just `{ nodes, edges }` data, and every operation is a standalone, tr
 - **One model for real diagrams.** Directed and undirected edges (even mixed), nested nodes, named ports, and positions and sizes: what node editors, statecharts, and architecture diagrams need, and most graph libraries leave out.
 - **Fast.** Fastest in most of our [cross-library benchmarks](./docs/benchmarks.md) against graphology, ngraph, graphlib, and cytoscape. For example, it builds a 100k-node graph 9–15× faster than graphology.
 - **Algorithms you can trust.** Shortest paths, centrality, communities, flow, matching, isomorphism, and more. Every query and algorithm is tested against edge cases such as self-loops, parallel edges, and unknown ids, and algorithms are iterative, so deep graphs won't overflow the stack.
-- **Works with your tools.** Convert to and from 14 formats, including Graphviz DOT, Mermaid, GraphML, D2, React Flow, and Cytoscape. Lay out with 8 engines, including ELK, dagre, and Graphviz. Turn XState machines into graphs. Each adapter is an optional subpath import.
+- **Works with your tools.** Convert to and from graph formats including Graphviz DOT, Mermaid, GraphML, D2, React Flow, and Cytoscape. Lay out with 8 engines, including ELK, dagre, and Graphviz. Turn XState machines into graphs. Each adapter is an optional subpath import.
 - **Typed end to end.** Generic data types for nodes, edges, ports, and the graph itself.
 
 ## Installation
@@ -67,6 +67,7 @@ supported mappings; they do not establish conformance to an entire format.
 | --- | --- | --- | --- |
 | Adjacency list, Cytoscape, D3, DOT, ELK, GEXF, GML, GraphML, JGF, TGF, xyflow | Partial | Partial | None |
 | CSV/TSV, Graphology export JSON, Graphlib JSON, NetworkX node-link JSON, adjacency matrix, Matrix Market, Graphviz JSON, draw.io, Pajek, scoped PlantUML | Partial | Partial | None |
+| GraphSON3 typed TinkerGraph objects, DGML, CX2, RDF1.1 dataset/syntax profiles | Partial | Partial | Partial scoped sources |
 | Edge list | Partial | Full for endpoint tuples | None |
 | D2 | Partial | Partial | Partial comments |
 | Mermaid architecture, block, C4, class, ER, flowchart, GitGraph, ishikawa, mindmap, requirement, Sankey, sequence, state, UseCase | Partial | Partial | Partial annotations |
@@ -80,7 +81,9 @@ without making them native features. Use a GraphDocument when those details matt
 Additional adapters: [adjacency matrix](src/formats/adjacency-matrix/README.md),
 [Matrix Market](src/formats/matrix-market/README.md),
 [Graphviz JSON](src/formats/graphviz-json/README.md), [draw.io](src/formats/drawio/README.md),
-[Pajek](src/formats/pajek/README.md), [PlantUML](src/formats/plantuml/README.md).
+[Pajek](src/formats/pajek/README.md), [PlantUML](src/formats/plantuml/README.md),
+[GraphSON](src/formats/graphson/README.md), [DGML](src/formats/dgml/README.md),
+[CX2](src/formats/cx2/README.md), [RDF](src/formats/rdf/README.md).
 
 ```ts
 import { getFormatSupportEntry } from '@statelyai/graph/format-support';
@@ -121,12 +124,21 @@ const exactSource = graphMLDocumentConverter.to(persisted);
 
 CSV/TSV use explicit node and edge tables with a serializable schema; default optional cells encode JSON, including visible labels. Graphology, Graphlib and NetworkX subpaths convert their native JSON profiles without runtime library dependencies. Mapping limits: [CSV/TSV](src/formats/csv/README.md), [Graphology](src/formats/graphology/README.md), [Graphlib](src/formats/graphlib/README.md), [NetworkX](src/formats/networkx/README.md).
 
+GraphSON uses an explicit typed TinkerGraph object profile; DGML and CX2 preserve
+scoped native declarations. RDF maps subject/object terms to nodes and statements
+to directed edges, retaining predicate and graph terms. The dependency-free
+`/rdf` dataset API is separate from optional N3-backed `/rdf/syntax`. These
+domain mappings reject incompatible Graph state rather than guessing.
+
 Every native converter subpath offers a `*DocumentConverter` registration. The
 `@statelyai/graph/document` factory also accepts explicit custom codecs, including
 VisualGraph codecs. Documents retain exact original text/native JSON values on
 no-op export, including comments, extensions and unsupported constructs, after
 JSON persistence. Projection can be partial or unavailable and carries explicit
 diagnostics. This guarantees source retention, not full semantic interpretation.
+
+Ambiguous source identity edits reject when generated IDs cannot establish correspondence;
+matching private lineage does not override live native identity.
 
 Supported Graph edits patch native source and must pass reparse proof. Unsupported
 or conflicting edits throw instead of replaying stale source. Native source edits

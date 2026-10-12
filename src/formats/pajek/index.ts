@@ -170,8 +170,25 @@ function toRawPajek(graph: Graph): string {
   const lines = [PREFIX + 'document ' + JSON.stringify(capsule), ...(name ? [name.trimEnd()] : []), `*Vertices ${graph.nodes.length}`, ...nodeLines, mode === 'directed' ? '*Arcs' : '*Edges', ...edgeLines];
   return lines.join('\n') + '\n';
 }
+/** Include comments/capsules: occurrence metadata does not establish stable identity. */
+function getRelationshipSequence(source: string): string[] {
+  const tokens = source.split(/(\r\n|\n|\r)/), records: string[] = [];
+  let relationships = false;
+  for (let index = 0; index < tokens.length; index += 2) {
+    const line = tokens[index], trimmed = line.trimStart();
+    if (trimmed.startsWith('*')) relationships = /^\*(?:arcs|edges)(?:\s|$)/i.test(trimmed);
+    if (relationships || trimmed.startsWith('%')) records.push(line + (tokens[index + 1] ?? ''));
+  }
+  return records;
+}
+
 function getPajekPatch(context: GraphDocumentPatchContext<string>, options: PajekImportOptions): GraphDocumentPatchResult<string> {
   const invalid = getLabelChangeError(context.changes); if (invalid) return invalid;
+  const edgeChange = context.changes.find((change) => change.entity === 'edge');
+  if (edgeChange && !isJSONEqual(getRelationshipSequence(context.baselineSource), getRelationshipSequence(context.source))) {
+    return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: edgeChange.path,
+      message: 'Pajek relationship identity is ambiguous after native relationship/comment sequence changes, including occurrence-indexed capsules' }] };
+  }
   const parsed = getParsed(context.source, options.metadata === 'native'), graph = fromPajek(context.source, options);
   const nodes = new Map(graph.nodes.map((node, index) => [node.id, index + 1])), edges = new Map(graph.edges.map((edge, index) => [edge.id, parsed.edges[index]]));
   const edits: TextEdit[] = [];
@@ -183,11 +200,6 @@ function getPajekPatch(context: GraphDocumentPatchContext<string>, options: Paje
       edits.push(token ? { start: token.start, end: token.end, text } : row ? { start: row.tokens[0].end, end: row.tokens[0].end, text: ` ${text}` } : { start: parsed.insertion, end: parsed.insertion, text: `${id} ${text}\n` });
     } else {
       const row = edges.get(change.id!); if (!row) return getUnsupported(change, 'Pajek: edge row unavailable');
-      if (!row.metadata) {
-        const baseline = fromPajek(context.baselineSource, options), index = baseline.edges.findIndex((edge) => edge.id === change.id), before = getParsed(context.baselineSource, options.metadata === 'native').edges[index];
-        const comparable = (entry: Row) => { const label = getEdgeFields(entry).label; return entry.tokens.filter((token) => token !== label).map((token) => token.value); };
-        if (!before || !isJSONEqual(comparable(before), comparable(row))) return getUnsupported(change, 'Pajek: native edge identity is ambiguous after independent attribute/topology edits; use explicit entity metadata or edit source');
-      }
       const token = getEdgeFields(row).label;
       edits.push(token ? { start: token.start, end: token.end, text } : { start: row.end, end: row.end, text: ` l ${text}` });
     }

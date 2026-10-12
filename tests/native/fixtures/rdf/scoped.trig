@@ -1,0 +1,9 @@
+# Terms, lexical forms, graph scopes and empty named graphs.
+@base <http://example.org/> .
+@prefix e: <urn:example:> .
+e:empty {}
+GRAPH [] {}
+<relative> {}
+e:first { _:shared e:p "01"^^<http://www.w3.org/2001/XMLSchema#integer> . }
+e:second { _:shared e:p "abc"^^<http://www.w3.org/2001/XMLSchema#integer>; e:language "hello"@EN . }
+{ e:s e:list ("one" "two"); e:quoted "{ fake:graph {} }"; e:unicode "α😀\n\t\r\u0000" . }

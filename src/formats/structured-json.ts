@@ -161,8 +161,53 @@ export function getValidatedGraph(graph: Graph, format: string): void {
   }
 }
 
+/** A generated key must never gain identity from a later explicit key. */
+function getDocumentEdgeIdentityError(context: any, format: string): any {
+  if (format !== 'graphology' && format !== 'networkx') return undefined;
+  const before = context.baselineSource, current = context.source;
+  const baselineRecords = before.edges ?? before.links ?? [];
+  const currentRecords = current.edges ?? current.links ?? [];
+  if (isJSONEqual(baselineRecords, currentRecords)) return undefined;
+  if (format === 'networkx' && !before.multigraph && !current.multigraph) return undefined;
+  const getValueKey = (value: any): string => JSON.stringify([
+    typeof value === 'boolean' ? 'number' : typeof value,
+    typeof value === 'boolean' ? Number(value) : value,
+  ]);
+  const getIdentity = (record: any, source: any): string | undefined => {
+    if (format === 'graphology') return typeof record.key === 'string' ? record.key : undefined;
+    if (!source.multigraph || !Object.hasOwn(record, 'key') || record.key === undefined) return undefined;
+    const pair = [getValueKey(record.source), getValueKey(record.target)];
+    if (!source.directed) pair.sort();
+    return JSON.stringify([pair, getValueKey(record.key)]);
+  };
+  const getIndex = (records: any[], source: any, graph: Graph) => {
+    const identities = new Map<string, string | undefined>();
+    const counts = new Map<string, number>();
+    records.forEach((record, index) => {
+      const identity = getIdentity(record, source);
+      if (graph.edges[index]) identities.set(graph.edges[index].id, identity);
+      if (identity !== undefined) counts.set(identity, (counts.get(identity) ?? 0) + 1);
+    });
+    return { identities, counts };
+  };
+  const baseline = getIndex(baselineRecords, before, context.baselineGraph);
+  const native = getIndex(currentRecords, current, context.sourceGraph);
+  for (const change of context.changes) {
+    if (change.entity !== 'edge') continue;
+    const identity = baseline.identities.get(change.id);
+    if (identity === undefined || identity !== native.identities.get(change.id)
+      || baseline.counts.get(identity) !== 1 || native.counts.get(identity) !== 1) {
+      return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: change.path,
+        message: `${format}: generated edge identity is ambiguous after the native edge sequence changed; a unique explicit identity must exist in both sources` }] };
+    }
+  }
+  return undefined;
+}
+
 /** Native document edits use only demonstrated attributes, never private snapshots alone. */
 export function getAttributeDocumentPatch(context: any, format: string, toNative: (graph: Graph) => any): any {
+  const identityError = getDocumentEdgeIdentityError(context, format);
+  if (identityError) return identityError;
   for (const change of context.changes) {
     const fields = getFields(change.entity);
     if ((!fields.includes(change.field) && change.field !== 'data') || ['id', 'parentId', 'initialNodeId', 'sourcePort', 'targetPort', 'ports'].includes(change.field)) return { ok: false, diagnostics: [{ code: 'unsupported-native-edit', severity: 'error', path: change.path, message: `${format}: ${change.field} cannot be patched without changing native structure` }] };

@@ -9,3 +9,10 @@ tests/native/fixtures/graphviz/schema/LICENSE.txt -text -whitespace
 # Decoded draw.io payload snapshots intentionally retain source whitespace and EOF.
 tests/native/fixtures/drawio/page-first.mxgraph.xml -text -whitespace
 tests/native/fixtures/drawio/page-second.mxgraph.xml -text -whitespace
+
+# Official DGML schema retains upstream bytes.
+tests/native/fixtures/dgml/*.xsd -text -whitespace
+
+# Authored RDF/GraphSON fixture hashes require stable LF bytes.
+tests/native/fixtures/rdf/scoped.trig -text
+tests/native/fixtures/graphson/modern.json -text

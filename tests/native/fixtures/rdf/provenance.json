@@ -1,0 +1,29 @@
+{
+  "retrieved": "2026-10-12",
+  "profile": "RDF 1.1 N-Triples/N-Quads/Turtle/TriG",
+  "parser": "n3 2.13.12",
+  "oracle": "RDFLib 7.6.0 actual parsers and rdflib.compare.isomorphic",
+  "sources": [
+    "https://www.w3.org/TR/rdf11-concepts/",
+    "https://www.w3.org/TR/turtle/",
+    "https://www.w3.org/TR/trig/",
+    "https://www.w3.org/TR/n-triples/",
+    "https://www.w3.org/TR/n-quads/",
+    "https://github.com/rdfjs/N3.js",
+    "https://rdflib.readthedocs.io/en/stable/apidocs/rdflib.compare/"
+  ],
+  "fixtures": [
+    {
+      "file": "scoped.trig",
+      "origin": "Authored fixture, MIT repository license; parsed independently, not an official W3C test copy",
+      "sha256": "50d76c60686c70a46752e411da875219ac9a8cbb632fbabea589311b87b2b01f"
+    }
+  ],
+  "limitations": [
+    "RDFLib Memory store omits empty named graphs; the actual native RDFSink.newGraph callback is observed before storage.",
+    "RDFLib store equality folds language tag case; public Graph/ConjunctiveGraph.add events are observed before that collapse; RDFSink.newGraph and Graph/ConjunctiveGraph.add are observed without modifying reader grammar or native term equality. Exact lexical/tag descriptors feed independent graph isomorphism.",
+    "RDFLib literal normalization disabled to preserve explicit numeric lexical forms. Turtle numeric shorthand may already normalize upstream; author profile emits quoted typed lexical literals.",
+    "Dataset isomorphism encodes subject/predicate/object/graph roles and graph existence into an RDF graph, sharing native blank identities; RDFLib computes the bijection.",
+    "RDF 1.2/JSON-LD/N3 entailment are not implemented."
+  ]
+}

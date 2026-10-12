@@ -286,6 +286,9 @@ export function getStructuredDocumentPatch(context: any, format: string): any {
       if (!tokens[i].trim()) continue;
       if (edges) edgeLines.push(i); else nodeLines.set(tokens[i].trimStart().split(/\s/)[0], i);
     }
+    const getEdgeRecords = (text: string) => { let inEdges = false; const records: string[] = []; for (const line of text.split(/\r\n|\n|\r/)) { if (line.trim() === '#') { inEdges = true; continue; } if (inEdges && line.trim()) records.push(line); } return records; };
+    const edgeChange = context.changes.find((change: any) => change.entity === 'edge');
+    if (edgeChange && !isJSONEqual(getEdgeRecords(context.baselineSource), edgeLines.map((index) => tokens[index]))) return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: edgeChange.path, message: 'TGF generated edge identity is ambiguous after the native edge record sequence changed' }] };
     for (const key of getChanges(baselineGraph, graph)) if (key !== 'nodes' && key !== 'edges') return getFailure(key);
     for (const [collection, records] of [['nodes', nodeLines], ['edges', edgeLines]] as const) {
       for (let i = 0; i < graph[collection].length; i++) {
@@ -302,6 +305,30 @@ export function getStructuredDocumentPatch(context: any, format: string): any {
       }
     }
     return { ok: true, source: tokens.join('') };
+  }
+  if (format === 'd3' || format === 'cytoscape') {
+    const getEdgeRecords = (native: any): any[] => format === 'd3' ? native.links ?? native.edges ?? [] : (Array.isArray(native.elements) ? native.elements : [...native.elements?.nodes ?? [], ...native.elements?.edges ?? []]).filter((record: any) => record.data && 'source' in record.data && 'target' in record.data);
+    const getDeclaredIds = (records: any[]) => { const ids = new Map<string, number>(); for (const record of records) { const id = format === 'd3' ? record.id : record.data.id; if (typeof id === 'string') ids.set(id, (ids.get(id) ?? 0) + 1); } return ids; };
+    const baselineRecords = getEdgeRecords(context.baselineSource), currentRecords = getEdgeRecords(source);
+    const sameSequence = isJSONEqual(baselineRecords, currentRecords), baselineIds = getDeclaredIds(baselineRecords), currentIds = getDeclaredIds(currentRecords);
+    for (const change of context.changes) if (change.entity === 'edge' && !sameSequence && (baselineIds.get(change.id) !== 1 || currentIds.get(change.id) !== 1)) return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: change.path, message: `${format} generated edge identity is ambiguous after the native edge record sequence changed; a unique explicit ID must exist in both sources` }] };
+  }
+  if (format === 'jgf') {
+    const baselineRecords = context.baselineSource.graph.edges ?? [];
+    const currentRecords = source.graph.edges ?? [];
+    if (!isJSONEqual(baselineRecords, currentRecords)) {
+      const getIds = (records: any[]) => {
+        const ids = new Map<string, number>();
+        for (const record of records) if (typeof record.id === 'string') ids.set(record.id, (ids.get(record.id) ?? 0) + 1);
+        return ids;
+      };
+      const baselineIds = getIds(baselineRecords), currentIds = getIds(currentRecords);
+      for (const change of context.changes) if (change.entity === 'edge'
+        && (baselineIds.get(change.id) !== 1 || currentIds.get(change.id) !== 1)) {
+        return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: change.path,
+          message: 'JGF generated edge identity is ambiguous after the native edge sequence changed; a unique explicit ID must exist in both sources' }] };
+      }
+    }
   }
   const nodes = new Map<string, any>(), edges = new Map<string, any>();
   const root = format === 'jgf' ? source.graph : source;

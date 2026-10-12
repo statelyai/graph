@@ -50,7 +50,7 @@ Document no-op output retains **exact source text**, including comments and
 unsupported dialects, after JSON persistence; original file encoding lies outside this string API.
 Unsupported projection has
 `graph: null` and diagnostics. Safe patches update literal vertex/edge labels or
-insert missing labels locally; independent source comments/attributes survive.
+insert missing labels locally; unedited source text survives within the identity limits below.
 Same-field conflicts reject. Structure, weights, data, geometry, styles and null
 label requests require explicit regeneration and loss diagnostics through
 `.getUpdate(document, { mode: 'regenerate' })`. Strict `.to` never silently flattens
@@ -70,3 +70,7 @@ label and reads a fixed count of physical vertex rows. It cannot certify repeate
 label identity, missing-label semantics, comments inside vertex records or mixed
 section semantics. These independent readers prove the tested bounded dialect,
 not complete Pajek project compatibility.
+
+<!-- document identity guards from src/formats/pajek/index.ts and tests/document-identity-additional.test.ts -->
+
+Pending edge-label edits require unchanged raw relationship sections and comment sequences, including private capsules. Endpoint/occurrence metadata cannot identify physical rows after insertion, removal, reordering or independent record/comment edits; these operations reject with `ambiguous-native-identity`. This conservative guard also rejects independent comment edits during an edge patch. Source-only updates and stable vertex-ID patches remain supported.

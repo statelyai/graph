@@ -58,7 +58,8 @@ function getValues(block: Block, key: string): Token[] {
 }
 
 function getId(block: Block): string | undefined {
-  for (const token of getValues(block, 'stately')) {
+  const privateTokens = getValues(block, 'stately');
+  for (const token of privateTokens.length === 1 ? privateTokens : []) {
     try {
       const value = JSON.parse(token.value);
       if (value?.format === 'stately' && value.version === 1 && typeof value.originalId === 'string') return value.originalId;
@@ -75,19 +76,31 @@ export function getGMLDocumentProjection(source: string, from: (source: string) 
   return { graph: from(source), diagnostics: [{ code: 'projection-partial', message: 'The Graph view is partial; comments, ordering and extensions remain in the native source', severity: 'warning' }] };
 }
 
+function getGMLIdentities(blocks: Block[]) {
+  const graphIndex = blocks[0].entries.find((entry) => entry.key === 'graph' && entry.block !== undefined)?.block;
+  if (graphIndex === undefined) return undefined;
+  const selected = new Set([graphIndex]);
+  for (let index = graphIndex + 1; index < blocks.length; index++) if (blocks[index].parent !== null && selected.has(blocks[index].parent!) && blocks[index].key === 'node') selected.add(index);
+  const identities = new Map<string, Block[]>();
+  for (const [index, block] of blocks.entries()) {
+    if (!['node', 'edge'].includes(block.key) || !(block.key === 'node' ? selected.has(index) : block.parent === graphIndex)) continue;
+    const id = getId(block); if (id === undefined) continue;
+    const key = JSON.stringify([block.key, id]), entries = identities.get(key) ?? []; entries.push(block); identities.set(key, entries);
+  }
+  return identities;
+}
+
 /** Update literal labels within a unique native entity block; reject richer edits. */
 export function getGMLDocumentPatch(context: GraphDocumentPatchContext<string>, decode: (value: string) => string, encode: (value: string) => string): GraphDocumentPatchResult<string> {
   const invalid = getLabelChangeError(context.changes);
   if (invalid) return invalid;
   const blocks = getBlocks(context.source, decode);
-  const graphIndex = blocks[0].entries.find((entry) => entry.key === 'graph' && entry.block !== undefined)?.block;
-  if (graphIndex === undefined) return getUnsupported(context.changes[0], 'Cannot locate the GML graph');
-  const selected = new Set([graphIndex]);
-  for (let index = graphIndex + 1; index < blocks.length; index++) if (blocks[index].parent !== null && selected.has(blocks[index].parent!) && blocks[index].key === 'node') selected.add(index);
+  const current = getGMLIdentities(blocks), baseline = getGMLIdentities(getBlocks(context.baselineSource, decode));
+  if (!current) return getUnsupported(context.changes[0], 'Cannot locate the GML graph');
   const edits: TextEdit[] = [];
   for (const change of context.changes) {
-    const candidates = blocks.filter((block, index) => block.key === change.entity && getId(block) === change.id && (change.entity === 'node' ? selected.has(index) : block.parent === graphIndex));
-    if (candidates.length !== 1) return getUnsupported(change, 'GML label editing requires a unique explicit native entity ID (or versioned originalId)');
+    const key = JSON.stringify([change.entity, change.id]), candidates = current.get(key) ?? [];
+    if (candidates.length !== 1 || baseline?.get(key)?.length !== 1) return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', message: 'GML label editing requires a unique explicit native entity ID (or versioned originalId) in both baseline and current source', path: change.path, severity: 'error' }] };
     const block = candidates[0], labels = getValues(block, 'label');
     if (labels.length > 1 || (labels.length === 1 && !labels[0].quoted)) return getUnsupported(change, 'GML label must be a single quoted string');
     const label = change.after as string;

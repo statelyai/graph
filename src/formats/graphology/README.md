@@ -27,3 +27,7 @@ Documents retain the complete original JSON source, order, unknown fields and pr
 
 <!-- independent native tests from tests/native/primary-json.test.ts and core tests from tests/formats/primary-json.test.ts -->
 Native proof: Graphology 0.26.0 import/query/export checks mixed modes, parallel edges, self-loops, isolates, empty IDs, attributes, edits and a 2,000-node graph. [Official serialization API](https://graphology.github.io/serialization.html).
+
+<!-- document identity guards from src/formats/structured-json.ts and tests/document-identity-additional.test.ts -->
+
+Pending Graph edge edits require a unique explicit native key in both the baseline and current source when the native edge sequence changes. Generated keys cannot acquire identity from a later explicit key. Without those keys, insertion, removal, reordering or edge-record changes reject with `ambiguous-native-identity`. Unchanged sequences, source-only updates and stable node-ID edits remain supported.

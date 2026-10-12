@@ -66,6 +66,10 @@ describe('format support matrix', () => {
 
     expect(ids).toEqual(
       expect.arrayContaining([
+        'graphson',
+        'dgml',
+        'cx2',
+        'rdf',
         'adjacency-list',
         'adjacency-matrix',
         'matrix-market',
@@ -169,7 +173,7 @@ describe('format support matrix', () => {
       expect(entry.preservation, entry.id).toEqual({
         graph: 'partial',
         native: entry.id === 'edge-list' ? 'full' : 'partial',
-        document: entry.id === 'd2' || entry.id.startsWith('mermaid/') ? 'partial' : 'none',
+        document: ['d2', 'graphson', 'dgml', 'cx2', 'rdf'].includes(entry.id) || entry.id.startsWith('mermaid/') ? 'partial' : 'none',
       });
       expect(entry.features.roundTrip, entry.id).toBe(entry.preservation?.graph);
     }

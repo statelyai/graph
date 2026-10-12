@@ -138,3 +138,7 @@ Bare exports interpret recognized import carriers by default. Use
 `{ nativeCarrier: false }` when Graph data is user-authored and could match the
 private carrier schema. Document projection pins importer state to its external
 source before unwrapping it, preserving foreign lookalikes.
+
+<!-- document identity guards from src/formats/preservation.ts and tests/document-identity-additional.test.ts -->
+
+Pending Graph edge edits require a unique explicit native edge ID in both baseline and current source when the native edge sequence changes. Generated positional IDs cannot acquire identity from a later explicit ID. Without those IDs, insertion, removal, reordering or edge-record changes reject with `ambiguous-native-identity`. Unchanged sequences, source-only updates and stable node-ID edits remain supported.
