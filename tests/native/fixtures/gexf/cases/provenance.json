@@ -1,0 +1,13 @@
+{
+  "created": "2026-10-12",
+  "author": "@statelyai/graph native regression fixtures",
+  "license": "Repository MIT license; authored examples, not upstream schema copies.",
+  "specification": "https://gexf.net/schema.html",
+  "files": [
+    {
+      "file": "scopes-mutual.gexf",
+      "sha256": "7eca9a99099faef3e9c69cd9b47c4caca557c1edbb443d72e2cb5f841cb79e71"
+    }
+  ],
+  "notes": "Core-namespace viz matches the published1.3 XSD; public viz-namespace example differs."
+}

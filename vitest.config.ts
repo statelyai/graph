@@ -1,3 +1,42 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
-export default defineConfig({});
+export default defineConfig({
+  test: {
+    exclude: [...configDefaults.exclude, 'tests/native/**'],
+    coverage: {
+      include: ['src/formats/**/*.ts'],
+      reporter: ['text', 'json-summary'],
+      reportOnFailure: true,
+      thresholds: {
+        lines: 95, statements: 91, functions: 93, branches: 84,
+        'src/formats/d2/parser.ts': { lines: 91, branches: 75 },
+        'src/formats/d2/emitter.ts': { lines: 91, branches: 77 },
+        'src/formats/mermaid/flowchart.ts': { lines: 90, branches: 79 },
+        'src/formats/mermaid/class-diagram.ts': { lines: 91, branches: 78 },
+        'src/formats/mermaid/sequence.ts': { lines: 95, branches: 83 },
+        'src/formats/graphml/index.ts': { lines: 99, branches: 93 },
+        'src/formats/gexf/index.ts': { lines: 98, branches: 92 },
+        'src/formats/elk/index.ts': { lines: 99, branches: 93 },
+        'src/formats/csv/index.ts': { lines: 97, branches: 82 },
+        'src/formats/csv/table.ts': { lines: 99, branches: 92 },
+        'src/formats/graphology/index.ts': { lines: 98, branches: 85 },
+        'src/formats/graphlib/index.ts': { lines: 98, branches: 91 },
+        'src/formats/networkx/index.ts': { lines: 98, branches: 94 },
+        'src/formats/adjacency-matrix/core.ts': { lines: 97, branches: 86 },
+        'src/formats/adjacency-matrix/index.ts': { lines: 97, branches: 90 },
+        'src/formats/matrix-market/index.ts': { lines: 95, branches: 81 },
+        'src/formats/graphviz-json/index.ts': { lines: 99, branches: 86 },
+        'src/formats/drawio/index.ts': { lines: 99, branches: 80 },
+        'src/formats/pajek/index.ts': { lines: 97, branches: 81 },
+        'src/formats/plantuml/index.ts': { lines: 99, branches: 81 },
+        'src/formats/mermaid/architecture.ts': { lines: 99, branches: 86 },
+        'src/formats/mermaid/requirement.ts': { lines: 99, branches: 87 },
+        'src/formats/mermaid/sankey.ts': { lines: 99, branches: 86 },
+        'src/formats/mermaid/git-graph.ts': { lines: 99, branches: 88 },
+        'src/formats/mermaid/c4.ts': { lines: 97, branches: 79 },
+        'src/formats/mermaid/use-case.ts': { lines: 99, branches: 83 },
+        'src/formats/mermaid/profile-shared.ts': { lines: 99, branches: 85 },
+      },
+    },
+  },
+});

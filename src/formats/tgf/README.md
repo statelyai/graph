@@ -2,6 +2,16 @@
 
 Converter for [TGF](https://en.wikipedia.org/wiki/Trivial_Graph_Format) (Trivial Graph Format) — a minimal newline-delimited text format.
 
+## Preservation
+
+<!-- preservation contract for tgf derived from src/formats/support.ts and converter implementation -->
+
+Graph round-trip: **partial**. Native semantic round-trip: **partial**.
+Source document preservation: **none**. These are separate guarantees;
+selected-field round-trip tests do not prove unrestricted losslessness.
+
+Imports CRLF, LF and CR line endings and whitespace-separated endpoints. Export rejects IDs containing whitespace and multiline labels because TGF cannot encode them unambiguously. Node IDs and textual labels are supported; edge IDs, metadata, ports, hierarchy and geometry remain outside this representation.
+
 ## Resources
 
 - [TGF on Wikipedia](https://en.wikipedia.org/wiki/Trivial_Graph_Format)
@@ -74,3 +84,16 @@ const graph = tgfConverter.from(tgf);
 ```
 
 > **Note:** TGF is a lossy format. Node `data`, `parentId`, visual properties, and edge `data` are discarded on export.
+
+
+## Native documents
+
+<!-- tgfDocumentConverter derived from src/formats/tgf/index.ts and src/formats/document/index.ts -->
+
+`tgfDocumentConverter.from(source)` creates a plain JSON document with the
+original source and a separate Graph projection. `.to(document)` preserves exact
+source when unchanged, including after JSON serialization. Supported edits patch
+verified native fields; unsupported edits throw with diagnostics. `.getUpdate(document)`
+returns a diagnostic-bearing result. Native semantic projection remains partial.
+
+Original line endings, separator whitespace and declaration spacing stay intact. Node and edge labels can be edited on verified declaration lines. Embedded newlines, structural changes and fields outside TGF reject.

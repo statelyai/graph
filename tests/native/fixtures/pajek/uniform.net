@@ -1,0 +1,10 @@
+% Authored unique-label interoperability fixture.
+*Network Native fixture
+*Vertices 3
+1 "Alpha & α" 0.1 0.2 ellipse ic Red
+2 "" 0.5 0.6 box
+3 "isolated" 0 0 ellipse
+*Arcs
+1 2 2.5 l "edge"
+1 2 -3
+1 1 0

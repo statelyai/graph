@@ -1,0 +1,1 @@
+digraph G { subgraph cluster_group { a [label="A"]; b; } {rank=same; a; c;} a:n -> c:s [label="E"]; isolated; }

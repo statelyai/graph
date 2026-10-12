@@ -1,0 +1,11 @@
+# Preserve official vendored schema bytes; their upstream whitespace is hash checked.
+tests/native/fixtures/graphml/1.0/*.xsd -text -whitespace
+tests/native/fixtures/gexf/1.2draft/*.xsd -text
+tests/native/fixtures/gexf/1.3/*.xsd -text
+tests/native/fixtures/drawio/mxfile.xsd -text
+tests/native/fixtures/graphviz/schema/graphviz_json_schema.json -text -whitespace
+tests/native/fixtures/graphviz/schema/LICENSE.txt -text -whitespace
+
+# Decoded draw.io payload snapshots intentionally retain source whitespace and EOF.
+tests/native/fixtures/drawio/page-first.mxgraph.xml -text -whitespace
+tests/native/fixtures/drawio/page-second.mxgraph.xml -text -whitespace

@@ -1,0 +1,17 @@
+{
+  "directed": true,
+  "multigraph": true,
+  "graph": { "name": "Native graph", "id": "ordinary attribute", "metadata": { "vendor": [1, null, "α"] } },
+  "nodes": [
+    { "id": 1, "label": "numeric one", "color": "#ff00ff", "vendor": { "keep": true } },
+    { "id": "1", "label": "string one" },
+    { "id": false, "label": "" },
+    { "id": "isolated", "metadata": [null, 42] }
+  ],
+  "edges": [
+    { "source": 1, "target": "1", "key": "shared", "weight": 2.5, "label": "numeric→string", "vendor": { "x": [1, 2] } },
+    { "source": 1, "target": "1", "key": 2, "weight": 3 },
+    { "source": "1", "target": false, "key": "shared", "label": "repeated key, different pair" },
+    { "source": false, "target": false, "key": "loop", "weight": -1 }
+  ]
+}

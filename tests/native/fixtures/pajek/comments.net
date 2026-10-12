@@ -1,0 +1,8 @@
+% before vertices
+*Vertices 2
+1 "one"
+2 "two"
+% before arcs
+*Arcs
+1 2 1
+% after arc

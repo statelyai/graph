@@ -1,0 +1,76 @@
+{
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "summary": {
+    "directed": false,
+    "multigraph": false,
+    "graph": {
+      "description": "legacy links spelling; key is an ordinary simple-edge attribute"
+    },
+    "nodes": [
+      {
+        "id": "left",
+        "attributes": {
+          "label": null
+        }
+      },
+      {
+        "id": "right",
+        "attributes": {
+          "label": ""
+        }
+      },
+      {
+        "id": "alone",
+        "attributes": {}
+      }
+    ],
+    "edges": [
+      {
+        "source": "left",
+        "target": "right",
+        "attributes": {
+          "key": "ordinary",
+          "weight": 0,
+          "custom": [
+            false,
+            null
+          ]
+        }
+      }
+    ]
+  },
+  "roundTrip": {
+    "directed": false,
+    "multigraph": false,
+    "graph": {
+      "description": "legacy links spelling; key is an ordinary simple-edge attribute"
+    },
+    "nodes": [
+      {
+        "label": null,
+        "id": "left"
+      },
+      {
+        "label": "",
+        "id": "right"
+      },
+      {
+        "id": "alone"
+      }
+    ],
+    "links": [
+      {
+        "key": "ordinary",
+        "weight": 0,
+        "custom": [
+          false,
+          null
+        ],
+        "source": "left",
+        "target": "right"
+      }
+    ]
+  }
+}

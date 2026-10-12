@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/gephi/gexf",
+  "commit": "66efb132569f61e5e8a313d78144484238ac7315",
+  "retrieved": "2026-10-12",
+  "license": "CC BY 4.0",
+  "files": [
+    {
+      "file": "LICENSE.md",
+      "url": "https://raw.githubusercontent.com/gephi/gexf/66efb132569f61e5e8a313d78144484238ac7315/LICENSE.md",
+      "sha256": "5cf5523f3b93ea82470e997d7aeba53de25cdd130afa215c9fe617f423317d01"
+    }
+  ],
+  "changes": "Unmodified upstream license bytes."
+}

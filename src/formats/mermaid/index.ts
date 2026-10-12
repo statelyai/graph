@@ -1,4 +1,5 @@
 // Sequence diagram
+export type { MermaidSourceData } from './shared';
 export {
   fromMermaidSequence,
   toMermaidSequence,
@@ -10,6 +11,8 @@ export type {
   SequenceEdgeData,
   SequenceGraphData,
   SequenceBlock,
+  SequenceNote,
+  SequenceEvent,
 } from './sequence';
 
 // Flowchart
@@ -103,3 +106,29 @@ export type {
   IshikawaEdgeData,
   IshikawaGraphData,
 } from './ishikawa';
+
+export {
+  mermaidFlowchartDocumentConverter,
+  mermaidSequenceDocumentConverter,
+  mermaidStateDocumentConverter,
+  mermaidClassDocumentConverter,
+  mermaidERDocumentConverter,
+  mermaidBlockDocumentConverter,
+  mermaidMindmapDocumentConverter,
+  mermaidIshikawaDocumentConverter,
+} from './document';
+
+// Additional native graph profiles
+export { fromMermaidArchitecture, toMermaidArchitecture, mermaidArchitectureConverter } from './architecture';
+export type { ArchitectureNodeData, ArchitectureEdgeData, ArchitectureGraphData, MermaidArchitectureGraph } from './architecture';
+export { fromMermaidRequirement, toMermaidRequirement, mermaidRequirementConverter } from './requirement';
+export type { RequirementKind, RequirementNodeData, RequirementEdgeData, RequirementGraphData, MermaidRequirementGraph } from './requirement';
+export { fromMermaidSankey, toMermaidSankey, mermaidSankeyConverter } from './sankey';
+export type { SankeyGraphData, MermaidSankeyGraph, MermaidSankeyOptions } from './sankey';
+export { fromMermaidGitGraph, toMermaidGitGraph, mermaidGitGraphConverter } from './git-graph';
+export type { GitGraphNodeData, GitGraphEdgeData, GitGraphData, GitGraphAction, MermaidGitGraph } from './git-graph';
+export { fromMermaidC4, toMermaidC4, mermaidC4Converter } from './c4';
+export type { C4DiagramType, C4NodeData, C4EdgeData, C4GraphData, MermaidC4Graph } from './c4';
+export { fromMermaidUseCase, toMermaidUseCase, mermaidUseCaseConverter } from './use-case';
+export type { UseCaseNodeData, UseCaseEdgeData, UseCaseGraphData, MermaidUseCaseGraph } from './use-case';
+export { mermaidArchitectureDocumentConverter, mermaidRequirementDocumentConverter, mermaidSankeyDocumentConverter, mermaidGitGraphDocumentConverter, mermaidC4DocumentConverter, mermaidUseCaseDocumentConverter } from './document';

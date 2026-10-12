@@ -1,0 +1,43 @@
+{
+  "oracle": "mermaid@12.1.0",
+  "retrieved": "2026-10-12",
+  "provenance": "Task-authored fixtures against primary Mermaid syntax docs; independent native parser and database assertions. Scoped profiles, no unrestricted grammar claim.",
+  "fixtures": [
+    {
+      "format": "architecture",
+      "documentation": "https://mermaid.js.org/syntax/architecture.html",
+      "source": "architecture-beta\ngroup api(cloud)[API]\nservice db(database)[Database] in api\nservice web(server)[Web] in api\njunction hub in api\ndb:R --> L:web\nweb:B -- T:hub",
+      "sha256": "f1b6dc9a6ec9f511a13610d13549a9ecbc362d4402b4b53b7f3c08a0b08a3bb5"
+    },
+    {
+      "format": "requirement",
+      "documentation": "https://mermaid.js.org/syntax/requirementDiagram.html",
+      "source": "requirementDiagram\nrequirement secure {\nid: R1\ntext: \"Secure 東京\"\nrisk: high\nverifymethod: test\n}\nelement app {\ntype: software\ndocref: \"spec v1\"\n}\napp - satisfies -> secure",
+      "sha256": "adac5e3a7ce411afdfd81b35c6af04498c5e992ca79c14cea093c13f06d030ea"
+    },
+    {
+      "format": "sankey",
+      "documentation": "https://mermaid.js.org/syntax/sankey.html",
+      "source": "sankey-beta\nSource,Store,2.5\nStore,Target,2",
+      "sha256": "132e63f9d6eca42ae3d0ba9776e84b804a2ef29d7f3a4c06747e6a2b0bd07a2c"
+    },
+    {
+      "format": "git",
+      "documentation": "https://mermaid.js.org/syntax/gitgraph.html",
+      "source": "gitGraph\ncommit id: \"a\"\nbranch develop order: 2\ncommit id: \"b\" tag: \"β\"\ncheckout main\ncommit id: \"c\" type: HIGHLIGHT\nmerge develop id: \"m\"",
+      "sha256": "364bfc7f3056d20ab619503a5b82fce7cb1659a87153e594483ee57137d1536c"
+    },
+    {
+      "format": "c4",
+      "documentation": "https://mermaid.js.org/syntax/c4.html",
+      "source": "C4Container\nPerson(user, \"User\", \"Customer\")\nContainer_Boundary(api, \"API\") {\nContainer(web, \"Web\", \"JS\", \"Frontend\")\nContainerDb(db, \"Store\", \"SQL\", \"Database\")\n}\nRel(user, web, \"Uses\", \"HTTPS\")\nRel(web, db, \"Reads\", \"SQL\")",
+      "sha256": "8c05486e60b04befc18977b8d6f45010e8bc296801a810e244eb6e550464a4ba"
+    },
+    {
+      "format": "usecase",
+      "documentation": "https://mermaid.js.org/syntax/usecase.html",
+      "source": "usecase-beta\nactor User(\"User\")\nsystemBoundary app[\"App\"]\nLogin(\"Login\")\nManage[\"Manage\"]\nend\nUser --> Login\nManage ..> : include Login",
+      "sha256": "388119ee419677c59b5e700ec60c6b44fba20b4125b365b9be507c69ac23ed39"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "retrieved": "2026-10-12",
+  "entry": "gexf.xsd",
+  "license": "CC BY 4.0; ../LICENSE.md",
+  "files": [
+    {
+      "file": "gexf.xsd",
+      "url": "https://gexf.net/1.2draft/gexf.xsd",
+      "retrievedFrom": "https://gexf.net/1.2draft/gexf.xsd",
+      "sha256": "625811d177108edaa21ab9e32d0f1e0dc7a7754d75258d74c3eabd5e6a31a596",
+      "resolverRewrites": [
+        {
+          "from": "data.xsd",
+          "to": "data.xsd"
+        },
+        {
+          "from": "dynamics.xsd",
+          "to": "dynamics.xsd"
+        },
+        {
+          "from": "hierarchy.xsd",
+          "to": "hierarchy.xsd"
+        },
+        {
+          "from": "phylogenics.xsd",
+          "to": "phylogenics.xsd"
+        },
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "data.xsd",
+      "url": "https://gexf.net/1.2draft/data.xsd",
+      "retrievedFrom": "https://gexf.net/1.2draft/data.xsd",
+      "sha256": "4913c4d0cdcefd1c5115efdcbff16a02bfdec4dbe62bef3e7d777974b5a3aab9",
+      "resolverRewrites": [
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "dynamics.xsd",
+      "url": "https://gexf.net/1.2draft/dynamics.xsd",
+      "retrievedFrom": "https://gexf.net/1.2draft/dynamics.xsd",
+      "sha256": "712f9badf9f693bdd442806facaf24e8dd46ec3fc6d62b26d4ea503e75abf9fa",
+      "resolverRewrites": [
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "hierarchy.xsd",
+      "url": "https://gexf.net/1.2draft/hierarchy.xsd",
+      "retrievedFrom": "https://gexf.net/1.2draft/hierarchy.xsd",
+      "sha256": "5f903a5d9e3b534eac79ed08d9c5117e78441649045aca2d9ac7c55278c5570e",
+      "resolverRewrites": [
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "phylogenics.xsd",
+      "url": "https://gexf.net/1.2draft/phylogenics.xsd",
+      "retrievedFrom": "https://gexf.net/1.2draft/phylogenics.xsd",
+      "sha256": "d1af4ef6bf1c8c0563ab8ffb9a2bae11d5e6a7d26fe822d42deb922a1a759928",
+      "resolverRewrites": [
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "viz.xsd",
+      "url": "https://gexf.net/1.2draft/viz.xsd",
+      "retrievedFrom": "https://gexf.net/1.2draft/viz.xsd",
+      "sha256": "636927859fca8187e1f7fb6ea32f0c450c7141d53d6d3088155069f76e478fe2",
+      "resolverRewrites": [
+        {
+          "from": "gexf.xsd",
+          "to": "gexf.xsd"
+        }
+      ]
+    }
+  ],
+  "changes": "Schema bytes are unmodified. Test resolver replaces only schemaLocation URLs in memory with vendored filenames; semantic schema components unchanged."
+}

@@ -248,7 +248,7 @@ describe('GraphML', () => {
     const graph = fromGraphML(xml);
     expect(graph.nodes[0].ports).toEqual([
       { name: 'a', direction: 'inout', data: null },
-      { name: 'a.b', direction: 'inout', data: null },
+      { name: 'a.b', direction: 'inout', data: {_graphml:{format:'@statelyai/graph/graphml',version:1,parentPort:'a',wrapped:true,userData:null}} },
       { name: 'c', direction: 'inout', data: null },
     ]);
   });

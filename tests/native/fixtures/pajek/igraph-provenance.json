@@ -1,0 +1,44 @@
+{
+  "generated": "2026-10-12",
+  "oracle": "igraph",
+  "version": "1.0.0",
+  "python": "3.14.8",
+  "license": "Authored inputs and generated native outputs; igraph is GPL-2.0-or-later (dev-only reader).",
+  "documentation": "https://igraph.org/c/html/develop/igraph-Foreign.html#igraph_read_graph_pajek",
+  "command": ".venv-native/bin/python scripts/native/igraph_oracle.py < JSON request (operation=pajek)",
+  "profile": "C-backed uniform .net reader, identity independent of labels, comments, native attributes and parallel weighted edges. Mixed sections collapse to a global mode; temporal/project formats unsupported.",
+  "files": [
+    {
+      "file": "uniform.net",
+      "sha256": "419aa778ed953c24be560cd556eb05b11ca8e5f3c93cf2c146e1fdd5d9abed2e"
+    },
+    {
+      "file": "uniform.igraph.json",
+      "sha256": "9930c06764a5cd5f993ea5cd606735b3b645acf4e9e02380943137a59c4cf81f"
+    },
+    {
+      "file": "duplicate-labels.net",
+      "sha256": "3a9fa4d31df30857cbac47ffe1b2856d88f0c184bb93ba1dd6e12bdf2d55c9d9"
+    },
+    {
+      "file": "duplicate-labels.igraph.json",
+      "sha256": "3b4db5bd927035b213c3563f21df12d17fd2be0c6ad69882fff9e41719d3a225"
+    },
+    {
+      "file": "comments.net",
+      "sha256": "2eb34dbc448fc73ca7bc040b69e7f2ba6e8445109127a2d6106367ab01545d2a"
+    },
+    {
+      "file": "comments.igraph.json",
+      "sha256": "077341e8935f446590b9078ef32c6b315eef4eb46ffbd9f4aaa328cefb7b62f2"
+    },
+    {
+      "file": "mixed.net",
+      "sha256": "80dc3651837a90d2121faad7c01d0a3daabd114c46f0dca18d9ff74413c31f4d"
+    },
+    {
+      "file": "mixed.igraph.json",
+      "sha256": "9ba8141c509bf35b29f6a139d55d2f53628731436da5f1a982162a113cd4fef1"
+    }
+  ]
+}

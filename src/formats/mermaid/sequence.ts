@@ -1,8 +1,12 @@
 import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
+import { getEdgeMode } from '../../mode';
 import {
   validateInput,
   prepareLines,
+  getMermaidPreamble,
+  type MermaidSourceData,
+  getMermaidProperties,
   escapeMermaidLabel,
   unescapeMermaidLabel,
   generateEdgeId,
@@ -10,14 +14,29 @@ import {
 
 // --- Types ---
 
+export interface SequenceNote {
+  /** Stable identity for ordered events; shared by convenience copies on participants. */
+  id?: string;
+  position: 'left' | 'right' | 'over';
+  text: string;
+  over?: string[];
+}
+
 export interface SequenceNodeData {
   actorType: 'participant' | 'actor' | 'boundary' | 'control' | 'entity' | 'database' | 'collections' | 'queue';
   alias?: string;
   created?: boolean;
   destroyed?: boolean;
-  notes?: Array<{ position: 'left' | 'right' | 'over'; text: string; over?: string[] }>;
+  notes?: SequenceNote[];
   box?: { title?: string; color?: string };
+  configuration?: Record<string, string | number | boolean>;
 }
+
+export type SequenceEvent = (
+  | { kind: 'note'; nodeId: string; noteId?: string; /** Legacy documents only. */ noteIndex?: number }
+  | { kind: 'create'; nodeId: string }
+  | { kind: 'destroy'; nodeId: string }
+) & { beforeEdgeId?: string; afterEdgeId?: string; placement?: 'after'; beforeBlockOpen?: boolean };
 
 export interface SequenceEdgeData {
   kind: 'message' | 'activation' | 'deactivation';
@@ -67,9 +86,13 @@ export type SequenceBlock =
   | { type: 'break'; label: string; edgeIds: string[] }
   | { type: 'rect'; color: string; edgeIds: string[] };
 
-export interface SequenceGraphData {
+export interface SequenceGraphData extends MermaidSourceData {
   diagramType: 'sequence';
   autonumber?: boolean;
+  autonumberStart?: number;
+  autonumberIncrement?: number;
+  /** Events refer to live graph entities, never frozen message snapshots. */
+  events?: SequenceEvent[];
   blocks?: SequenceBlock[];
   // TODO: actor links/menus (link Alice: Dashboard @ url) not yet supported
   // TODO: rect background highlighting partially supported via blocks
@@ -154,7 +177,9 @@ const MESSAGE_RE = new RegExp(
  */
 export function fromMermaidSequence(input: string): MermaidSequenceGraph {
   validateInput(input, 'Mermaid sequence');
-  const { lines } = prepareLines(input);
+  const prepared = prepareLines(input);
+  const { lines } = prepared;
+  let source = prepared.source;
 
   // Validate header
   const header = lines[0]?.trim();
@@ -165,8 +190,15 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
   const nodeMap = new Map<string, SequenceNode>();
   const edges: SequenceEdge[] = [];
   const blocks: SequenceBlock[] = [];
+  const events: SequenceEvent[] = [];
+  const pendingEvents: SequenceEvent[] = [];
+  const eventScopes = new Map<SequenceEvent, string>();
+  const edgeScopes = new Map<string, string>();
   let autonumber = false;
+  let autonumberStart: number | undefined;
+  let autonumberIncrement: number | undefined;
   let edgeCounter = 0;
+  let noteCounter = 0;
   let seqNum = 0;
   let currentBox: { title?: string; color?: string } | null = null;
 
@@ -197,6 +229,16 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
   }
 
   function addEdge(edge: SequenceEdge): void {
+    const scope = getSequenceScope();
+    edgeScopes.set(edge.id, scope);
+    for (const event of pendingEvents.splice(0)) {
+      event.beforeEdgeId = edge.id;
+      const eventScope = eventScopes.get(event);
+      if (eventScope !== scope) {
+        if (event.afterEdgeId && eventScope === edgeScopes.get(event.afterEdgeId)) event.placement = 'after';
+        else event.beforeBlockOpen = true;
+      }
+    }
     edges.push(edge);
     // Add to current block if inside one
     if (blockStack.length > 0) {
@@ -211,30 +253,47 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
     }
   }
 
+  function addEvent(event: SequenceEvent): void {
+    if (edges.length) event.afterEdgeId = edges[edges.length - 1].id;
+    events.push(event);
+    pendingEvents.push(event);
+    eventScopes.set(event, getSequenceScope());
+  }
+
+  function getSequenceScope(): string {
+    return blockStack.map((block) => `${block.type}:${block.label}:${block.branches?.length ?? 0}:${block.options?.length ?? 0}`).join('/');
+  }
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
     // autonumber
-    if (line === 'autonumber') {
+    const autonumberMatch = line.match(/^autonumber(?:\s+([\d.]+)(?:\s+([\d.]+))?)?$/);
+    if (autonumberMatch) {
       autonumber = true;
+      if (autonumberMatch[1]) { autonumberStart = Number(autonumberMatch[1]); seqNum = autonumberStart - (autonumberMatch[2] ? Number(autonumberMatch[2]) : 1); }
+      if (autonumberMatch[2]) autonumberIncrement = Number(autonumberMatch[2]);
       continue;
     }
 
     // participant / actor / boundary / control / entity / database / collections / queue declaration
     const participantMatch = line.match(
-      /^(participant|actor|boundary|control|entity|database|collections|queue)\s+(\S+?)(?:\s+as\s+(.+))?$/,
+      /^(participant|actor|boundary|control|entity|database|collections|queue)\s+([^\s@]+)(?:@\{([\s\S]+)\})?(?:\s+as\s+(.+))?$/,
     );
     if (participantMatch) {
-      const actorType = participantMatch[1] as SequenceNodeData['actorType'];
+      const configuration = participantMatch[3] ? getMermaidProperties(participantMatch[3]) : undefined;
+      const configuredType = configuration?.type;
+      const actorType = (typeof configuredType === 'string' && ['participant', 'actor', 'boundary', 'control', 'entity', 'database', 'collections', 'queue'].includes(configuredType) ? configuredType : participantMatch[1]) as SequenceNodeData['actorType'];
       const id = participantMatch[2];
-      const alias = participantMatch[3]?.trim();
+      const alias = participantMatch[4]?.trim() ?? (configuration?.alias === undefined ? undefined : String(configuration.alias));
       ensureNode(id, actorType);
       const node = nodeMap.get(id)!;
       node.data.actorType = actorType;
+      if (configuration) node.data.configuration = configuration;
       if (alias) {
-        node.data.alias = alias;
-        node.label = alias;
+        node.data.alias = unescapeMermaidLabel(alias);
+        node.label = unescapeMermaidLabel(alias);
       }
       // Apply current box if inside one
       if (currentBox) {
@@ -255,6 +314,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
         node.data.alias = alias;
         node.label = alias;
       }
+      addEvent({ kind: 'create', nodeId: id });
       continue;
     }
 
@@ -263,6 +323,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
       const id = destroyMatch[1];
       ensureNode(id);
       nodeMap.get(id)!.data.destroyed = true;
+      addEvent({ kind: 'destroy', nodeId: id });
       continue;
     }
 
@@ -281,7 +342,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
         label: '',
         data: {
           kind: kind as 'activation' | 'deactivation',
-          ...(autonumber && { sequenceNumber: ++seqNum }),
+          ...(autonumber && { sequenceNumber: seqNum += autonumberIncrement ?? 1 }),
         },
       });
       continue;
@@ -393,8 +454,9 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
       const posRaw = noteMatch[1].toLowerCase();
       const position: 'left' | 'right' | 'over' = posRaw === 'left of' ? 'left' : posRaw === 'right of' ? 'right' : 'over';
       const actorsPart = noteMatch[2].trim();
-      const text = noteMatch[3].trim();
+      const text = unescapeMermaidLabel(noteMatch[3].trim());
       const actorIds = actorsPart.split(',').map((s) => s.trim());
+      const noteId = `note_${noteCounter++}`;
 
       // Store note on each referenced actor
       for (const actorId of actorIds) {
@@ -402,11 +464,13 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
         const node = nodeMap.get(actorId)!;
         if (!node.data.notes) node.data.notes = [];
         node.data.notes.push({
+          id: noteId,
           position,
           text,
           ...(position === 'over' && actorIds.length > 1 ? { over: actorIds } : {}),
         });
       }
+      addEvent({ kind: 'note', nodeId: actorIds[0], noteId });
       continue;
     }
     // Also handle Note without colon (skip, no inline text)
@@ -462,7 +526,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
         ...(arrowInfo.bidirectional && { bidirectional: true }),
         ...(centralSource && { centralSource: true }),
         ...(centralTarget && { centralTarget: true }),
-        ...(autonumber && { sequenceNumber: ++seqNum }),
+        ...(autonumber && { sequenceNumber: seqNum += autonumberIncrement ?? 1 }),
       };
 
       addEdge({
@@ -471,6 +535,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
         sourceId,
         targetId,
         label: unescapeMermaidLabel(messageText),
+        mode: arrowInfo.bidirectional ? 'bidirectional' : 'directed',
         data,
       });
 
@@ -500,7 +565,7 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
       continue;
     }
 
-    // Ignore unrecognized lines (title, etc.)
+    ((source ??= {}).unknownStatements ??= []).push(line);
   }
 
   return {
@@ -511,7 +576,11 @@ export function fromMermaidSequence(input: string): MermaidSequenceGraph {
     edges,
     data: {
       diagramType: 'sequence',
+      ...(source && { source }),
       ...(autonumber && { autonumber: true }),
+      ...(autonumberStart !== undefined && { autonumberStart }),
+      ...(autonumberIncrement !== undefined && { autonumberIncrement }),
+      ...(events.length && { events }),
       ...(blocks.length > 0 && { blocks }),
     },
   };
@@ -608,65 +677,104 @@ const ARROW_MAP: Record<string, Record<string, string>> = {
  * // "sequenceDiagram\n    participant Alice\n    ..."
  */
 export function toMermaidSequence(graph: MermaidSequenceGraph): string {
-  const lines: string[] = ['sequenceDiagram'];
+  const lines: string[] = [...getMermaidPreamble(graph.data ?? {}), 'sequenceDiagram'];
   const gd = graph.data;
 
   if (gd?.autonumber) {
-    lines.push('    autonumber');
+    lines.push(`    autonumber${gd.autonumberStart !== undefined ? ` ${gd.autonumberStart}` : ''}${gd.autonumberIncrement !== undefined ? ` ${gd.autonumberIncrement}` : ''}`);
   }
 
-  // Group nodes by box for emission
-  const boxGroups = new Map<string, { box: NonNullable<SequenceNodeData['box']>; nodes: typeof graph.nodes }>();
-  const noBoxNodes: typeof graph.nodes = [];
-  for (const node of graph.nodes) {
-    const box = node.data?.box;
-    if (box) {
-      const key = JSON.stringify(box);
-      if (!boxGroups.has(key)) boxGroups.set(key, { box, nodes: [] });
-      boxGroups.get(key)!.nodes.push(node);
-    } else {
-      noBoxNodes.push(node);
-    }
-  }
+  const events = gd?.events;
+  const eventNodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const eventCreates = new Set(events?.filter((event) => event.kind === 'create').map((event) => event.nodeId));
+  const eventDestroys = new Set(events?.filter((event) => event.kind === 'destroy').map((event) => event.nodeId));
 
-  function emitParticipant(node: typeof graph.nodes[0], indent: string) {
+  function getParticipantText(node: typeof graph.nodes[0]): string {
     const d = node.data;
-    const keyword = d?.actorType ?? 'participant';
-    const alias = d?.alias ? ` as ${escapeMermaidLabel(d.alias)}` : '';
-    if (d?.created) {
-      lines.push(`${indent}create ${keyword} ${node.id}${alias}`);
-    } else {
-      lines.push(`${indent}${keyword} ${node.id}${alias}`);
-    }
+    const actorType = d?.actorType ?? 'participant';
+    const keyword = actorType === 'actor' ? 'actor' : 'participant';
+    const configuration = { ...(d?.configuration ?? {}) };
+    if (actorType !== 'participant' && actorType !== 'actor') configuration.type = actorType;
+    else delete configuration.type;
+    // Canonical label edits take precedence over the original JSON alias.
+    delete configuration.alias;
+    const aliasLabel = node.label != null && node.label !== node.id ? node.label : d?.alias;
+    const alias = aliasLabel ? ` as ${escapeMermaidLabel(aliasLabel)}` : '';
+    const config = Object.keys(configuration).length ? `@{ ${JSON.stringify(configuration).slice(1, -1)} }` : '';
+    return `${keyword} ${node.id}${config}${alias}`;
   }
 
-  // Emit boxed participants first, then unboxed
-  for (const { box, nodes: boxNodes } of boxGroups.values()) {
-    const colorStr = box.color ? ` ${box.color}` : '';
-    const titleStr = box.title ? ` ${box.title}` : '';
-    lines.push(`    box${colorStr}${titleStr}`);
-    for (const node of boxNodes) {
-      emitParticipant(node, '        ');
-    }
-    lines.push('    end');
-  }
-  for (const node of noBoxNodes) {
-    emitParticipant(node, '    ');
-  }
-
-  // Emit notes after participant declarations
+  // Consecutive groups preserve native participant order.
+  let activeBox = '';
   for (const node of graph.nodes) {
-    if (node.data?.notes) {
-      for (const note of node.data.notes) {
-        if (note.position === 'over' && note.over && note.over.length > 1) {
-          lines.push(`    Note over ${note.over.join(',')}: ${escapeMermaidLabel(note.text)}`);
-        } else {
-          const posStr = note.position === 'left' ? 'left of' : note.position === 'right' ? 'right of' : 'over';
-          lines.push(`    Note ${posStr} ${node.id}: ${escapeMermaidLabel(note.text)}`);
+    if (eventCreates.has(node.id)) continue;
+    const boxKey = node.data?.box ? JSON.stringify(node.data.box) : '';
+    if (boxKey !== activeBox) {
+      if (activeBox) lines.push('    end');
+      activeBox = boxKey;
+      if (node.data?.box) lines.push(`    box${node.data.box.color ? ` ${node.data.box.color}` : ''}${node.data.box.title ? ` ${node.data.box.title}` : ''}`);
+    }
+    const participantIndent = activeBox ? '        ' : '    ';
+    // Legacy Graphs containing lifecycle flags but no ordered events.
+    lines.push(`${participantIndent}${node.data?.created ? 'create ' : ''}${getParticipantText(node)}`);
+  }
+  if (activeBox) lines.push('    end');
+
+  function addNote(nodeId: string, note: NonNullable<SequenceNodeData['notes']>[number], noteIndent: string): void {
+    const participants = note.position === 'over' && note.over?.length ? note.over : [nodeId];
+    if (participants.some((id) => !eventNodes.has(id))) throw new Error('Mermaid sequence: note references a missing participant');
+    const position = note.position === 'left' ? 'left of' : note.position === 'right' ? 'right of' : 'over';
+    lines.push(`${noteIndent}Note ${position} ${participants.join(',')}: ${escapeMermaidLabel(note.text)}`);
+  }
+
+  if (!events) {
+    const spanningOwners = new Map<string, string>();
+    for (const node of graph.nodes) {
+      for (const note of node.data?.notes ?? []) {
+        if (note.over?.length) {
+          const key = JSON.stringify(note);
+          const owner = spanningOwners.get(key);
+          if (owner && owner !== node.id) continue;
+          spanningOwners.set(key, node.id);
         }
+        addNote(node.id, note, '    ');
       }
     }
   }
+
+  const liveEdgeIds = new Set(graph.edges.map((edge) => edge.id));
+  const eventsBefore = new Map<string, SequenceEvent[]>();
+  const eventsAfter = new Map<string, SequenceEvent[]>();
+  const leadingEvents: SequenceEvent[] = [];
+  for (const event of events ?? []) {
+    if (!eventNodes.has(event.nodeId)) throw new Error(`Mermaid sequence: event participant "${event.nodeId}" not found`);
+    if (event.placement !== 'after' && event.beforeEdgeId && liveEdgeIds.has(event.beforeEdgeId)) {
+      const list = eventsBefore.get(event.beforeEdgeId) ?? [];
+      list.push(event);
+      eventsBefore.set(event.beforeEdgeId, list);
+    } else if (event.afterEdgeId && liveEdgeIds.has(event.afterEdgeId)) {
+      const list = eventsAfter.get(event.afterEdgeId) ?? [];
+      list.push(event);
+      eventsAfter.set(event.afterEdgeId, list);
+    } else if (event.beforeEdgeId || event.afterEdgeId) {
+      throw new Error('Mermaid sequence: event anchors no longer exist; update graph.data.events');
+    } else leadingEvents.push(event);
+  }
+
+  function addSequenceEvent(event: SequenceEvent, eventIndent: string): void {
+    const node = eventNodes.get(event.nodeId)!;
+    if (event.kind === 'create') {
+      if (node.data?.created !== false) lines.push(`${eventIndent}create ${getParticipantText(node)}`);
+    } else if (event.kind === 'destroy') {
+      if (node.data?.destroyed !== false) lines.push(`${eventIndent}destroy ${node.id}`);
+    } else {
+      const note = event.noteId ? node.data?.notes?.find((entry) => entry.id === event.noteId)
+        : event.noteIndex === undefined ? undefined : node.data?.notes?.[event.noteIndex];
+      if (!note) throw new Error('Mermaid sequence: ordered note no longer exists; update graph.data.events');
+      addNote(node.id, note, eventIndent);
+    }
+  }
+  for (const event of leadingEvents) addSequenceEvent(event, '    ');
 
   // Build edge-to-block index for reconstructing block nesting
   const blocks = gd?.blocks ?? [];
@@ -791,6 +899,9 @@ export function toMermaidSequence(graph: MermaidSequenceGraph): string {
   const indent = () => '    '.repeat(depth);
 
   for (const edge of graph.edges) {
+    for (const event of eventsBefore.get(edge.id) ?? []) {
+      if (event.beforeBlockOpen) addSequenceEvent(event, indent());
+    }
     // Emit block-open / branch events before this edge
     const befores = beforeEdge.get(edge.id);
     if (befores) {
@@ -824,8 +935,11 @@ export function toMermaidSequence(graph: MermaidSequenceGraph): string {
       }
     }
 
-    const d = edge.data;
-    if (!d) continue;
+    for (const event of eventsBefore.get(edge.id) ?? []) {
+      if (!event.beforeBlockOpen) addSequenceEvent(event, indent());
+    }
+
+    const d = edge.data ?? { kind: 'message' as const };
 
     if (d.kind === 'activation') {
       lines.push(`${indent()}activate ${edge.sourceId}`);
@@ -836,7 +950,9 @@ export function toMermaidSequence(graph: MermaidSequenceGraph): string {
       const stroke = d.stroke ?? 'solid';
       const arrowType = d.arrowType ?? 'filled';
       let arrow: string;
-      if (d.bidirectional) {
+      const mode = edge.mode ?? (graph.mode !== 'directed' ? getEdgeMode(graph, edge) : d.bidirectional ? 'bidirectional' : getEdgeMode(graph, edge));
+      if (mode === 'undirected') throw new Error('Mermaid sequence: undirected messages cannot be represented');
+      if (mode === 'bidirectional') {
         arrow = stroke === 'dotted' ? '<<-->>' : '<<->>';
       } else {
         arrow = ARROW_MAP[stroke]?.[arrowType] ?? '->>';
@@ -851,6 +967,8 @@ export function toMermaidSequence(graph: MermaidSequenceGraph): string {
       );
     }
 
+    for (const event of eventsAfter.get(edge.id) ?? []) addSequenceEvent(event, indent());
+
     // Emit block-close events after this edge
     const afters = afterEdge.get(edge.id);
     if (afters) {
@@ -861,6 +979,9 @@ export function toMermaidSequence(graph: MermaidSequenceGraph): string {
     }
   }
 
+  for (const node of graph.nodes) {
+    if (node.data?.destroyed && !eventDestroys.has(node.id)) lines.push(`    destroy ${node.id}`);
+  }
   return lines.join('\n');
 }
 

@@ -3,6 +3,7 @@ export {
   getFormatSupportEntry,
 } from './formats/support';
 export type {
+  FormatPreservationCapabilities,
   FormatSupportEntry,
   FormatSupportFeatures,
   FormatSupportLevel,

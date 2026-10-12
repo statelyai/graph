@@ -3,6 +3,10 @@ import { createFormatConverter } from '../converter';
 import {
   validateInput,
   prepareLines,
+  getMermaidPreamble,
+  type MermaidSourceData,
+  MERMAID_TO_DIRECTION,
+  DIRECTION_TO_MERMAID,
   escapeMermaidLabel,
   unescapeMermaidLabel,
   generateEdgeId,
@@ -15,6 +19,7 @@ export interface ERNodeData {
     type: string;
     name: string;
     key?: 'PK' | 'FK' | 'UK';
+    keys?: Array<'PK' | 'FK' | 'UK'>;
     comment?: string;
   }>;
 }
@@ -25,7 +30,7 @@ export interface EREdgeData {
   identifying: boolean;
 }
 
-export interface ERGraphData {
+export interface ERGraphData extends MermaidSourceData {
   diagramType: 'erDiagram';
 }
 
@@ -110,7 +115,7 @@ const ER_LINE_RE =
  */
 export function fromMermaidER(input: string): MermaidERGraph {
   validateInput(input, 'Mermaid ER');
-  const { lines } = prepareLines(input);
+  const { lines, source } = prepareLines(input);
 
   const header = lines[0]?.trim();
   if (!header || !header.startsWith('erDiagram')) {
@@ -120,6 +125,7 @@ export function fromMermaidER(input: string): MermaidERGraph {
   const nodeMap = new Map<string, ERNode>();
   const edges: EREdge[] = [];
   let edgeCounter = 0;
+  let direction: MermaidERGraph['direction'];
 
   function ensureNode(id: string): ERNode {
     if (!nodeMap.has(id)) {
@@ -141,12 +147,15 @@ export function fromMermaidER(input: string): MermaidERGraph {
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
+    const directionMatch = line.match(/^direction\s+(TB|TD|BT|LR|RL)$/);
+    if (directionMatch) { direction = MERMAID_TO_DIRECTION[directionMatch[1]]; continue; }
 
     // Entity attribute block: ENTITY {
-    const blockMatch = line.match(/^(\S+)\s*\{\s*$/);
+    const blockMatch = line.match(/^(\S+?)(?:\["?([^\]"]*)"?\])?\s*\{\s*$/);
     if (blockMatch) {
       currentEntity = blockMatch[1];
       ensureNode(currentEntity);
+      if (blockMatch[2] !== undefined) nodeMap.get(currentEntity)!.label = unescapeMermaidLabel(blockMatch[2]);
       inBlock = true;
       continue;
     }
@@ -160,7 +169,7 @@ export function fromMermaidER(input: string): MermaidERGraph {
 
       // Attribute: type name [PK|FK|UK] ["comment"]
       const attrMatch = line.match(
-        /^(\S+)\s+(\S+)(?:\s+(PK|FK|UK))?(?:\s+"([^"]*)")?$/,
+        /^(\S+)\s+(\S+)(?:\s+((?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*))?(?:\s+"([^"]*)")?$/,
       );
       if (attrMatch) {
         const node = nodeMap.get(currentEntity)!;
@@ -171,8 +180,9 @@ export function fromMermaidER(input: string): MermaidERGraph {
         node.data.attributes.push({
           type: attrMatch[1],
           name: attrMatch[2],
-          ...(attrMatch[3] && { key: attrMatch[3] as 'PK' | 'FK' | 'UK' }),
-          ...(attrMatch[4] && { comment: attrMatch[4] }),
+          ...(attrMatch[3] && { key: attrMatch[3].split(',')[0].trim() as 'PK' | 'FK' | 'UK' }),
+          ...(attrMatch[3]?.includes(',') && { keys: attrMatch[3].split(',').map((key) => key.trim() as 'PK' | 'FK' | 'UK') }),
+          ...(attrMatch[4] && { comment: unescapeMermaidLabel(attrMatch[4]) }),
         });
       }
       continue;
@@ -205,6 +215,8 @@ export function fromMermaidER(input: string): MermaidERGraph {
     }
 
     // Bare entity declaration
+    const aliasMatch = line.match(/^([^\s\[]+)\["?([^\]"]*)"?\]$/);
+    if (aliasMatch) { ensureNode(aliasMatch[1]).label = unescapeMermaidLabel(aliasMatch[2]); continue; }
     if (/^[A-Z_][\w]*$/i.test(line)) {
       ensureNode(line);
     }
@@ -216,7 +228,8 @@ export function fromMermaidER(input: string): MermaidERGraph {
     initialNodeId: null,
     nodes: Array.from(nodeMap.values()),
     edges,
-    data: { diagramType: 'erDiagram' },
+    data: { diagramType: 'erDiagram', ...(source && { source }) },
+    ...(direction && { direction }),
   };
 }
 
@@ -230,18 +243,22 @@ export function fromMermaidER(input: string): MermaidERGraph {
  * // "erDiagram\n    CUSTOMER ||--o{ ORDER : \"places\"\n    ..."
  */
 export function toMermaidER(graph: MermaidERGraph): string {
-  const lines: string[] = ['erDiagram'];
+  const lines: string[] = [...getMermaidPreamble(graph.data ?? {}), 'erDiagram'];
+  if (graph.direction) lines.push(`    direction ${DIRECTION_TO_MERMAID[graph.direction]}`);
 
   // Emit entities with attributes
   for (const node of graph.nodes) {
+    const declaration = node.label && node.label !== node.id ? `${node.id}["${escapeMermaidLabel(node.label)}"]` : node.id;
     if (node.data?.attributes && node.data.attributes.length > 0) {
-      lines.push(`    ${node.id} {`);
+      lines.push(`    ${declaration} {`);
       for (const attr of node.data.attributes) {
-        const keyStr = attr.key ? ` ${attr.key}` : '';
+        const keyStr = attr.keys?.length ? ` ${attr.keys.join(', ')}` : attr.key ? ` ${attr.key}` : '';
         const commentStr = attr.comment ? ` "${escapeMermaidLabel(attr.comment)}"` : '';
         lines.push(`        ${attr.type} ${attr.name}${keyStr}${commentStr}`);
       }
       lines.push(`    }`);
+    } else {
+      lines.push(`    ${declaration}`);
     }
   }
 

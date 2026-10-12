@@ -1,3 +1,5 @@
+import { createGraphDocumentConverter } from '../document';
+import { getStructuredDocumentProjectionGraph, getStructuredDocumentPatch } from '../preservation';
 import type { Graph } from '../../types';
 
 /**
@@ -40,6 +42,10 @@ export function fromEdgeList(
   edges: [string, string][],
   options?: { directed?: boolean; id?: string },
 ): Graph {
+  if (!Array.isArray(edges) || edges.some((edge) => !Array.isArray(edge) || edge.length !== 2 ||
+      edge.some((id) => typeof id !== 'string' || !id))) {
+    throw new Error('Edge list: expected pairs of non-empty node ids');
+  }
   const directed = options?.directed ?? true;
   const nodeIds = new Set<string>();
 
@@ -75,3 +81,12 @@ export function fromEdgeList(
     data: undefined as any,
   };
 }
+
+
+/** Exact native source preservation, with strict verified field edits. */
+export const edgeListDocumentConverter = createGraphDocumentConverter({
+  format: 'edge-list',
+  codec: { from: (source: Array<[string, string]>) => fromEdgeList(source), to: toEdgeList },
+  project: (source: Array<[string, string]>) => ({ graph: getStructuredDocumentProjectionGraph(fromEdgeList(source), source, 'edge-list') }),
+  patch: (context) => getStructuredDocumentPatch(context, 'edge-list'),
+});

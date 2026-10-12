@@ -1,0 +1,118 @@
+{
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "summary": {
+    "directed": true,
+    "multigraph": true,
+    "graph": {
+      "name": "Native fixture"
+    },
+    "nodes": [
+      {
+        "id": "Alpha & α",
+        "attributes": {
+          "id": "1",
+          "x": 0.1,
+          "y": 0.2,
+          "shape": "ellipse",
+          "ic": "Red"
+        }
+      },
+      {
+        "id": "",
+        "attributes": {
+          "id": "2",
+          "x": 0.5,
+          "y": 0.6,
+          "shape": "box"
+        }
+      },
+      {
+        "id": "isolated",
+        "attributes": {
+          "id": "3",
+          "x": 0.0,
+          "y": 0.0,
+          "shape": "ellipse"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "Alpha & α",
+        "target": "",
+        "key": 0,
+        "attributes": {
+          "weight": 2.5,
+          "l": "edge"
+        }
+      },
+      {
+        "source": "Alpha & α",
+        "target": "",
+        "key": 1,
+        "attributes": {
+          "weight": -3.0
+        }
+      },
+      {
+        "source": "Alpha & α",
+        "target": "Alpha & α",
+        "key": 0,
+        "attributes": {
+          "weight": 0.0
+        }
+      }
+    ]
+  },
+  "roundTrip": {
+    "directed": true,
+    "multigraph": true,
+    "graph": {
+      "name": "Native fixture"
+    },
+    "nodes": [
+      {
+        "id": "Alpha & α",
+        "x": 0.1,
+        "y": 0.2,
+        "shape": "ellipse",
+        "ic": "Red"
+      },
+      {
+        "id": "",
+        "x": 0.5,
+        "y": 0.6,
+        "shape": "box"
+      },
+      {
+        "id": "isolated",
+        "x": 0.0,
+        "y": 0.0,
+        "shape": "ellipse"
+      }
+    ],
+    "edges": [
+      {
+        "weight": 2.5,
+        "l": "edge",
+        "source": "Alpha & α",
+        "target": "",
+        "key": 0
+      },
+      {
+        "weight": -3.0,
+        "source": "Alpha & α",
+        "target": "",
+        "key": 1
+      },
+      {
+        "weight": 0.0,
+        "source": "Alpha & α",
+        "target": "Alpha & α",
+        "key": 0
+      }
+    ]
+  }
+}

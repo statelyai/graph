@@ -1,0 +1,20 @@
+{
+  "generated": "2026-10-12",
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "license": "Authored input and generated native output; NetworkX BSD-3-Clause.",
+  "documentation": "https://networkx.org/documentation/stable/_modules/networkx/readwrite/pajek.html",
+  "profile": "Uniform directed, unique labels, UTF-8, coordinates, parallel weighted arcs. This reader does not prove complete Pajek conformance or duplicate-label identity preservation.",
+  "command": ".venv-native/bin/python scripts/native/networkx_oracle.py < JSON request (operation=pajek)",
+  "files": [
+    {
+      "file": "uniform.net",
+      "sha256": "419aa778ed953c24be560cd556eb05b11ca8e5f3c93cf2c146e1fdd5d9abed2e"
+    },
+    {
+      "file": "uniform.native.json",
+      "sha256": "ad6376cbf77da0c2bd2d750a205371596ced01bbba54cd587e55081e3212af2c"
+    }
+  ]
+}

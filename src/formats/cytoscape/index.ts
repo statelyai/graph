@@ -1,173 +1,143 @@
+import type { FormatExportOptions } from '../preservation';
+import { createGraphDocumentConverter } from '../document';
+import { getStructuredDocumentProjectionGraph, getStructuredDocumentPatch } from '../preservation';
 import type { Graph, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
-
-// --- Cytoscape.js JSON types ---
+import { createMetadata, createNativeCarrier, getCarrierData, getClonedJSON, getMetadata,
+  getNativeCarrier, getRestoredRecord, getMergedNative, isJSONEqual, type FormatImportOptions } from '../preservation';
 
 export interface CytoscapeNode {
   data: { id: string; parent?: string; [key: string]: any };
   position?: { x: number; y: number };
+  [key: string]: any;
 }
-
 export interface CytoscapeEdge {
-  data: { id: string; source: string; target: string; [key: string]: any };
+  data: { id?: string; source: string; target: string; [key: string]: any };
+  [key: string]: any;
 }
-
 export interface CytoscapeJSON {
   data?: Record<string, any>;
-  elements: {
-    nodes: CytoscapeNode[];
-    edges: CytoscapeEdge[];
+  elements: { nodes: CytoscapeNode[]; edges: CytoscapeEdge[] };
+  [key: string]: any;
+}
+export interface CytoscapeFlatJSON {
+  data?: Record<string, any>;
+  elements: Array<CytoscapeNode | CytoscapeEdge>;
+  [key: string]: any;
+}
+/** Native cy.json() omits empty element groups. */
+export interface CytoscapeNativeJSON extends Omit<CytoscapeJSON, 'elements'> {
+  elements: { nodes?: CytoscapeNode[]; edges?: CytoscapeEdge[]; [key: string]: any };
+}
+export type CytoscapeInput = CytoscapeJSON | CytoscapeFlatJSON | CytoscapeNativeJSON;
+export interface CytoscapeImportOptions extends FormatImportOptions {}
+
+const NODE_FIELDS = ['initialNodeId', 'label', 'width', 'height', 'shape', 'color', 'style', 'ports'];
+const EDGE_FIELDS = ['label', 'mode', 'weight', 'points', 'routing', 'x', 'y', 'width', 'height', 'color', 'style', 'sourcePort', 'targetPort'];
+function getFields(value: Record<string, any>, fields: string[]): Record<string, any> {
+  return Object.fromEntries(fields.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]));
+}
+function getUserData(data: Record<string, any>, key: string, known: string[], native = false): any {
+  if (!native && Object.hasOwn(data, key)) return data[key];
+  const unknown = Object.fromEntries(Object.entries(data).filter(([name]) => !known.includes(name) && (name !== '__statelyai' || native || !['cytoscape.node', 'cytoscape.edge', 'cytoscape.graph'].some((format) => getMetadata(data[name], format)))));
+  return Object.keys(unknown).length > 0 ? unknown : undefined;
+}
+function getCytoscapeRoot(cyto: CytoscapeJSON, native = false): Omit<Graph, 'nodes' | 'edges'> {
+  return { id: cyto.data?.id ?? '', mode: cyto.data?.mode ?? 'directed',
+    initialNodeId: cyto.data?.initialNodeId ?? null,
+    data: getUserData(cyto.data ?? {}, 'graphData', ['id', 'mode', 'initialNodeId', 'direction', 'style'], native),
+    ...getFields(cyto.data ?? {}, ['direction', 'style']) };
+}
+function getCytoscapeNode(node: CytoscapeNode, native = false): Graph['nodes'][number] {
+  return { type: 'node', id: node.data.id, parentId: node.data.parent ?? null,
+    initialNodeId: node.data.initialNodeId ?? null, label: Object.hasOwn(node.data, 'label') ? node.data.label : '',
+    data: getUserData(node.data, 'nodeData', ['id', 'parent', 'x', 'y', ...NODE_FIELDS], native),
+    ...getFields(node.data, NODE_FIELDS),
+    ...(node.position?.x !== undefined ? { x: node.position.x } : getFields(node.data, ['x'])),
+    ...(node.position?.y !== undefined ? { y: node.position.y } : getFields(node.data, ['y'])),
   };
 }
+function getCytoscapeEdge(edge: CytoscapeEdge, index: number, native = false): Graph['edges'][number] {
+  return { type: 'edge', id: edge.data.id ?? `e${index}`, sourceId: edge.data.source, targetId: edge.data.target,
+    label: Object.hasOwn(edge.data, 'label') ? edge.data.label : '',
+    data: getUserData(edge.data, 'edgeData', ['id', 'source', 'target', ...EDGE_FIELDS], native),
+    ...getFields(edge.data, EDGE_FIELDS) };
+}
 
-// --- Conversion ---
+/** Export grouped Cytoscape elements, with versioned adapter metadata. */
+export interface CytoscapeExportOptions extends FormatExportOptions {}
 
-/**
- * Converts a graph to Cytoscape.js JSON format.
- *
- * @example
- * ```ts
- * import { createGraph } from '@statelyai/graph';
- * import { toCytoscapeJSON } from '@statelyai/graph/cytoscape';
- *
- * const graph = createGraph({
- *   nodes: [{ id: 'a' }, { id: 'b' }],
- *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
- * });
- *
- * const cyto = toCytoscapeJSON(graph);
- * // { elements: { nodes: [...], edges: [...] } }
- * ```
- */
-export function toCytoscapeJSON(graph: Graph): CytoscapeJSON {
-  const graphData: Record<string, any> = {};
-  if (graph.id) graphData.id = graph.id;
-  graphData.mode = graph.mode;
-  if (graph.initialNodeId)
-    graphData.initialNodeId = graph.initialNodeId;
-  if (graph.data !== undefined) graphData.graphData = graph.data;
-  if (graph.direction) graphData.direction = graph.direction;
-  if (graph.style !== undefined) graphData.style = graph.style;
+export function toCytoscapeJSON(graph: Graph, options: CytoscapeExportOptions = {}): CytoscapeJSON {
+  const carrier = options.nativeCarrier === false ? undefined : getNativeCarrier(graph.data, 'cytoscape');
+  if (carrier) return getMergedNative(carrier.native, toRawCytoscapeJSON(carrier.baseline),
+    toRawCytoscapeJSON({ ...graph, data: getCarrierData(graph.data, 'cytoscape') }));
+  return toRawCytoscapeJSON(graph);
+}
 
-  return {
-    ...(Object.keys(graphData).length > 0 && { data: graphData }),
+function toRawCytoscapeJSON(graph: Graph): CytoscapeJSON {
+  const { nodes, edges, ...root } = graph;
+  const used = new Set<string>();
+  for (const node of nodes) {
+    if (typeof node.id !== 'string' || !node.id || used.has(node.id)) throw new Error('Cytoscape: node IDs must be unique non-empty strings');
+    used.add(node.id);
+  }
+  function createEdgeId(preferred: string): string {
+    if (typeof preferred !== 'string' || !preferred) throw new Error('Cytoscape: edge IDs must be non-empty strings');
+    let id = preferred;
+    for (let suffix = 1; used.has(id); suffix++) id = `${preferred}__statelyai${suffix}`;
+    used.add(id); return id;
+  }
+  const cyto: CytoscapeJSON = {
+    data: { ...getFields(root, ['id', 'mode', 'initialNodeId', 'direction', 'style']), graphData: graph.data },
     elements: {
-      nodes: graph.nodes.map((n) => {
-        const data: CytoscapeNode['data'] = { id: n.id };
-        if (n.parentId) data.parent = n.parentId;
-        if (n.label) data.label = n.label;
-        if (n.initialNodeId) data.initialNodeId = n.initialNodeId;
-        if (n.data !== undefined) data.nodeData = n.data;
-        if (n.width !== undefined) data.width = n.width;
-        if (n.height !== undefined) data.height = n.height;
-        if (n.shape) data.shape = n.shape;
-        if (n.color) data.color = n.color;
-        if (n.style !== undefined) data.style = n.style;
-        if (n.ports !== undefined) data.ports = n.ports;
-
-        const node: CytoscapeNode = { data };
-        if (n.x !== undefined && n.y !== undefined) {
-          node.position = { x: n.x, y: n.y };
-        }
-        return node;
+      nodes: nodes.map((node) => {
+        const native: CytoscapeNode = { data: { id: node.id,
+          ...getFields(node, NODE_FIELDS), nodeData: node.data,
+          ...(node.parentId != null && { parent: node.parentId }),
+          ...(node.x !== undefined && node.y !== undefined ? {} : getFields(node, ['x', 'y'])),
+        }, ...(node.x !== undefined && node.y !== undefined && { position: { x: node.x, y: node.y } }) };
+        native.data.__statelyai = createMetadata('cytoscape.node', node, getCytoscapeNode(native));
+        return native;
       }),
-      edges: graph.edges.map((e) => {
-        const data: CytoscapeEdge['data'] = {
-          id: e.id,
-          source: e.sourceId,
-          target: e.targetId,
-        };
-        if (e.label) data.label = e.label;
-        if (e.mode) data.mode = e.mode;
-        if (e.data !== undefined) data.edgeData = e.data;
-        if (e.weight !== undefined) data.weight = e.weight;
-        if (e.points !== undefined) data.points = e.points;
-        if (e.routing !== undefined) data.routing = e.routing;
-        if (e.x !== undefined) data.x = e.x;
-        if (e.y !== undefined) data.y = e.y;
-        if (e.width !== undefined) data.width = e.width;
-        if (e.height !== undefined) data.height = e.height;
-        if (e.color) data.color = e.color;
-        if (e.style !== undefined) data.style = e.style;
-        if (e.sourcePort !== undefined) data.sourcePort = e.sourcePort;
-        if (e.targetPort !== undefined) data.targetPort = e.targetPort;
-        return { data } as CytoscapeEdge;
+      edges: edges.map((edge, index) => {
+        const native: CytoscapeEdge = { data: { id: createEdgeId(edge.id), source: edge.sourceId, target: edge.targetId,
+          ...getFields(edge, EDGE_FIELDS), edgeData: edge.data } };
+        native.data.__statelyai = createMetadata('cytoscape.edge', edge, getCytoscapeEdge(native, index));
+        return native;
       }),
     },
   };
+  cyto.data!.__statelyai = createMetadata('cytoscape.graph', root, getCytoscapeRoot(cyto));
+  return getClonedJSON(cyto);
 }
 
-/**
- * Parses a Cytoscape.js JSON object into a graph.
- *
- * @example
- * ```ts
- * import { fromCytoscapeJSON } from '@statelyai/graph/cytoscape';
- *
- * const graph = fromCytoscapeJSON({
- *   elements: {
- *     nodes: [{ data: { id: 'a' } }, { data: { id: 'b' } }],
- *     edges: [{ data: { id: 'e0', source: 'a', target: 'b' } }],
- *   },
- * });
- * ```
- */
-export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
-  if (!cyto || typeof cyto !== 'object') {
-    throw new Error('Cytoscape: expected an object');
+/** Import grouped or flat Cytoscape elements. `metadata: native` treats reserved blobs as user data. */
+export function fromCytoscapeJSON(input: CytoscapeInput, options: CytoscapeImportOptions = {}): Graph {
+  if (!input || typeof input !== 'object') throw new Error('Cytoscape: expected an object');
+  if (!input.elements || typeof input.elements !== 'object') throw new Error('Cytoscape: missing "elements" property');
+  let cyto: CytoscapeJSON;
+  if (Array.isArray(input.elements)) {
+    cyto = { ...input, elements: { nodes: [], edges: [] } };
+    for (const element of input.elements) {
+      if (element.group === 'edges' || ('source' in element.data && 'target' in element.data)) cyto.elements.edges.push(element as CytoscapeEdge);
+      else cyto.elements.nodes.push(element as CytoscapeNode);
+    }
+  } else {
+    if (Object.hasOwn(input.elements, 'nodes') && !Array.isArray(input.elements.nodes)) throw new Error('Cytoscape: "elements.nodes" must be an array');
+    if (Object.hasOwn(input.elements, 'edges') && !Array.isArray(input.elements.edges)) throw new Error('Cytoscape: "elements.edges" must be an array');
+    cyto = { ...input, elements: { ...input.elements, nodes: input.elements.nodes ?? [], edges: input.elements.edges ?? [] } };
   }
-  if (!cyto.elements || typeof cyto.elements !== 'object') {
-    throw new Error('Cytoscape: missing "elements" property');
-  }
-  if (!Array.isArray(cyto.elements.nodes)) {
-    throw new Error('Cytoscape: "elements.nodes" must be an array');
-  }
-  if (!Array.isArray(cyto.elements.edges)) {
-    throw new Error('Cytoscape: "elements.edges" must be an array');
-  }
-  return {
-    id: cyto.data?.id ?? '',
-    mode: cyto.data?.mode ?? 'directed',
-    initialNodeId: cyto.data?.initialNodeId ?? null,
-    data: cyto.data?.graphData,
-    ...(cyto.data?.direction && { direction: cyto.data.direction }),
-    ...(cyto.data?.style !== undefined && { style: cyto.data.style }),
-    nodes: cyto.elements.nodes.map((n) => ({
-      type: 'node' as const,
-      id: n.data.id,
-      parentId: n.data.parent ?? null,
-      initialNodeId: n.data.initialNodeId ?? null,
-      label: n.data.label ?? '',
-      data: n.data.nodeData,
-      ...(n.position && { x: n.position.x, y: n.position.y }),
-      ...(n.data.width !== undefined && { width: n.data.width }),
-      ...(n.data.height !== undefined && { height: n.data.height }),
-      ...(n.data.shape && { shape: n.data.shape }),
-      ...(n.data.color && { color: n.data.color }),
-      ...(n.data.style !== undefined && { style: n.data.style }),
-      ...(n.data.ports !== undefined && { ports: n.data.ports }),
-    })),
-    edges: cyto.elements.edges.map((e, i) => ({
-      type: 'edge' as const,
-      id: e.data.id ?? `e${i}`,
-      sourceId: e.data.source,
-      targetId: e.data.target,
-      label: e.data.label ?? '',
-      ...(e.data.mode && { mode: e.data.mode }),
-      data: e.data.edgeData,
-      ...(e.data.weight !== undefined && { weight: e.data.weight }),
-      ...(e.data.points !== undefined && { points: e.data.points }),
-      ...(e.data.routing !== undefined && { routing: e.data.routing }),
-      ...(e.data.x !== undefined && { x: e.data.x }),
-      ...(e.data.y !== undefined && { y: e.data.y }),
-      ...(e.data.width !== undefined && { width: e.data.width }),
-      ...(e.data.height !== undefined && { height: e.data.height }),
-      ...(e.data.color && { color: e.data.color }),
-      ...(e.data.style !== undefined && { style: e.data.style }),
-      ...(e.data.sourcePort !== undefined && { sourcePort: e.data.sourcePort }),
-      ...(e.data.targetPort !== undefined && { targetPort: e.data.targetPort }),
-    })),
+  if (!Array.isArray(cyto.elements.nodes)) throw new Error('Cytoscape: "elements.nodes" must be an array');
+  if (!Array.isArray(cyto.elements.edges)) throw new Error('Cytoscape: "elements.edges" must be an array');
+  const getWireMetadata = (value: any, format: string) => options.metadata === 'native' ? undefined : getMetadata(value, format);
+  const metadata = getWireMetadata(cyto.data?.__statelyai, 'cytoscape.graph');
+  const graph: Graph = {
+    ...getRestoredRecord(getCytoscapeRoot(cyto, options.metadata === 'native'), metadata),
+    nodes: cyto.elements.nodes.map((node) => getRestoredRecord(getCytoscapeNode(node, options.metadata === 'native'), getWireMetadata(node.data.__statelyai, 'cytoscape.node'))),
+    edges: cyto.elements.edges.map((edge, index) => getRestoredRecord(getCytoscapeEdge(edge, index, options.metadata === 'native'), getWireMetadata(edge.data.__statelyai, 'cytoscape.edge'))),
   };
+  if (!metadata || !isJSONEqual(cyto, toRawCytoscapeJSON(graph))) graph.data = createNativeCarrier(graph.data, 'cytoscape', cyto, graph);
+  return graph;
 }
 
 /**
@@ -189,3 +159,12 @@ export function fromCytoscapeJSON(cyto: CytoscapeJSON): Graph {
  */
 export const cytoscapeConverter: GraphFormatConverter<CytoscapeJSON> =
   createFormatConverter(toCytoscapeJSON, fromCytoscapeJSON);
+
+
+/** Exact native source preservation, with strict verified field edits. */
+export const cytoscapeDocumentConverter = createGraphDocumentConverter({
+  format: 'cytoscape',
+  codec: { from: (source: CytoscapeInput) => fromCytoscapeJSON(source, { metadata: 'native' }), to: (graph: Graph) => toCytoscapeJSON(graph, { nativeCarrier: false }) },
+  project: (source: CytoscapeInput) => ({ graph: getStructuredDocumentProjectionGraph(fromCytoscapeJSON(source, { metadata: 'native' }), source, 'cytoscape') }),
+  patch: (context) => getStructuredDocumentPatch(context, 'cytoscape'),
+});

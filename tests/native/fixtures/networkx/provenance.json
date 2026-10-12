@@ -1,0 +1,27 @@
+{
+  "generated": "2026-10-12",
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "license": "Authored inputs and generated native outputs; NetworkX BSD-3-Clause.",
+  "documentation": "https://networkx.org/documentation/stable/reference/readwrite/generated/networkx.readwrite.json_graph.node_link_graph.html",
+  "command": ".venv-native/bin/python scripts/native/networkx_oracle.py < JSON request (operation=node-link)",
+  "files": [
+    {
+      "file": "multidigraph.json",
+      "sha256": "0a61b9a7016722a4c8d1d68c0bc0e818956063e038aeac4863c5175b551259ba"
+    },
+    {
+      "file": "multidigraph.native.json",
+      "sha256": "df101e3b33acc1bc977b400a2797b258d7aa99968621c994c1b9c8cbd6454176"
+    },
+    {
+      "file": "simple-links.json",
+      "sha256": "2d7db213b3a349ce5be3076c665f90463444883b45541db29cf8bde767bf5550"
+    },
+    {
+      "file": "simple-links.native.json",
+      "sha256": "40a7099ae030694cc4514e0c1305f8db767d96fc8dbed8aa95899c8752337d9b"
+    }
+  ]
+}

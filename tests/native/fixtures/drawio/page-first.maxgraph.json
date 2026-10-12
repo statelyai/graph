@@ -1,0 +1,151 @@
+{
+  "oracle": "@maxgraph/core",
+  "version": "0.25.0",
+  "operation": "ModelXmlSerializer.import(mxGraphModel)",
+  "summary": [
+    {
+      "id": "0",
+      "parent": null,
+      "vertex": false,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": null,
+      "style": {},
+      "geometry": null
+    },
+    {
+      "id": "1",
+      "parent": "0",
+      "vertex": false,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": null,
+      "style": {},
+      "geometry": null
+    },
+    {
+      "id": "group",
+      "parent": "1",
+      "vertex": 1,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": "Group",
+      "style": {
+        "baseStyleNames": [
+          "group"
+        ]
+      },
+      "geometry": {
+        "x": 100,
+        "y": 80,
+        "width": 300,
+        "height": 180,
+        "relative": false,
+        "offset": null,
+        "points": null
+      }
+    },
+    {
+      "id": "a",
+      "parent": "group",
+      "vertex": 1,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": {
+        "element": "UserObject",
+        "attributes": {
+          "label": "<b>Alpha &amp; α</b>",
+          "vendor": "KEEP",
+          "count": "007"
+        }
+      },
+      "style": {
+        "rounded": 1,
+        "html": 1,
+        "fillColor": "#dae8fc"
+      },
+      "geometry": {
+        "x": 20,
+        "y": 30,
+        "width": 120,
+        "height": 60,
+        "relative": false,
+        "offset": null,
+        "points": null
+      }
+    },
+    {
+      "id": "edge",
+      "parent": "1",
+      "vertex": false,
+      "edge": 1,
+      "source": "a",
+      "target": "b",
+      "value": "label",
+      "style": {
+        "edgeStyle": "orthogonalEdgeStyle",
+        "endArrow": "none"
+      },
+      "geometry": {
+        "x": 0.5,
+        "y": -12,
+        "width": 0,
+        "height": 0,
+        "relative": 1,
+        "offset": {
+          "x": 3,
+          "y": 4
+        },
+        "points": [
+          {
+            "x": 250,
+            "y": 140
+          },
+          {
+            "x": 400,
+            "y": 140
+          }
+        ]
+      }
+    },
+    {
+      "id": "layer-extra",
+      "parent": "0",
+      "vertex": false,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": "Extra layer",
+      "style": {},
+      "geometry": null
+    },
+    {
+      "id": "b",
+      "parent": "layer-extra",
+      "vertex": 1,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": "",
+      "style": {
+        "baseStyleNames": [
+          "ellipse"
+        ],
+        "html": 0
+      },
+      "geometry": {
+        "x": 500,
+        "y": 80,
+        "width": 80,
+        "height": 80,
+        "relative": false,
+        "offset": null,
+        "points": null
+      }
+    }
+  ]
+}

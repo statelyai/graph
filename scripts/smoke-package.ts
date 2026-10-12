@@ -166,6 +166,147 @@ async function main(): Promise<void> {
         `edgeList[0]?.[0];`,
       ],
     },
+    './document': {
+      phase: 'core',
+      runtime: [
+        `const converter = $MOD.createGraphDocumentConverter({ format: 'smoke', codec: { from: () => m0.createGraph({ nodes: [{ id: 'a', label: 'A' }] }), to: () => 'regenerated' } });`,
+        `const source = '# retained comment\\nopaque source\\n';`,
+        `const document = converter.from(source);`,
+        `assert.equal(converter.to(JSON.parse(JSON.stringify(document))), source);`,
+        `document.graph.nodes[0].label = 'Edited';`,
+        `assert.equal($MOD.getGraphDocumentUpdate(document, converter).ok, false);`,
+        `assert.throws(() => converter.to(document), /unsupported-edit/);`,
+      ],
+      types: [
+        `const converter = $MOD.createGraphDocumentConverter({ format: 'visual-smoke', codec: { from: (_source: string) => m0.createVisualGraph({ nodes: [{ id: 'a', width: 3 }] }), to: (_graph: m0.VisualGraph) => 'visual' } });`,
+        `const document: $MOD.GraphDocument<string, m0.VisualGraph> = converter.from('visual');`,
+        `const width: number = document.graph!.nodes[0].width;`,
+        `const result = $MOD.getGraphDocumentUpdate(document, converter);`,
+        `if (result.ok) result.source.toUpperCase();`,
+        `width.toFixed();`,
+      ],
+    },
+    './adjacency-matrix': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `assert.equal($MOD.fromAdjacencyMatrix($MOD.toAdjacencyMatrix(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `const native = $MOD.toAdjacencyMatrix(graph);`,
+        `native.matrix[0]?.[0];`,
+      ],
+    },
+    './matrix-market': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `assert.equal($MOD.fromMatrixMarket($MOD.toMatrixMarket(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `const native = $MOD.toMatrixMarket(graph);`,
+        `native.toUpperCase();`,
+      ],
+    },
+    './graphviz-json': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `assert.equal($MOD.fromGraphvizJSON($MOD.toGraphvizJSON(graph, { regenerate: true })).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `const native = $MOD.toGraphvizJSON(graph, { regenerate: true });`,
+        `native.objects?.[0]?.name;`,
+      ],
+    },
+    './drawio': {
+      phase: 'optional',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `assert.equal($MOD.fromDrawio($MOD.toDrawio(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `const native = $MOD.toDrawio(graph);`,
+        `native.toUpperCase();`,
+      ],
+    },
+    './pajek': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `assert.equal($MOD.fromPajek($MOD.toPajek(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `const native = $MOD.toPajek(graph);`,
+        `native.toUpperCase();`,
+      ],
+    },
+    './plantuml': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `assert.equal($MOD.fromPlantUML($MOD.toPlantUML(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b', weight: 1 }] });`,
+        `const native = $MOD.toPlantUML(graph);`,
+        `native.toUpperCase();`,
+      ],
+    },
+    './csv': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromCSV($MOD.toCSV(graph)).edges.length, 1);`,
+        `assert.equal($MOD.fromTSV($MOD.toTSV(graph)).nodes.length, 2);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `const native = $MOD.toCSV(graph);`,
+        `native.nodes.toUpperCase();`,
+      ],
+    },
+    './graphlib': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromGraphlibJSON($MOD.toGraphlibJSON(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `const native = $MOD.toGraphlibJSON(graph);`,
+        `native.nodes[0]?.v;`,
+      ],
+    },
+    './graphology': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromGraphologyJSON($MOD.toGraphologyJSON(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `const native = $MOD.toGraphologyJSON(graph);`,
+        `native.nodes[0]?.key;`,
+      ],
+    },
+    './networkx': {
+      phase: 'core',
+      runtime: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a', label: 'A' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `assert.equal($MOD.fromNetworkXNodeLink($MOD.toNetworkXNodeLink(graph)).edges.length, 1);`,
+      ],
+      types: [
+        `const graph = m0.createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'e', sourceId: 'a', targetId: 'b' }] });`,
+        `const native = $MOD.toNetworkXNodeLink(graph);`,
+        `native.nodes[0]?.id;`,
+      ],
+    },
     './cytoscape': {
       phase: 'core',
       runtime: [
@@ -503,6 +644,45 @@ async function main(): Promise<void> {
       ],
     },
   };
+  const documentExports: Array<[string, string, string]> = [
+    ['./adjacency-list', 'adjacencyListDocumentConverter', '({a:["b"]})'],
+    ['./adjacency-matrix', 'adjacencyMatrixDocumentConverter', '({matrix:[[0,1],[0,0]],nodeIds:["a","b"],mode:"directed"})'],
+    ['./matrix-market', 'matrixMarketDocumentConverter', '"%%MatrixMarket matrix coordinate real general\\n2 2 1\\n1 2 1\\n"'],
+    ['./graphviz-json', 'graphvizJSONDocumentConverter', '({name:"g",directed:true,strict:false,_subgraph_cnt:0,objects:[{_gvid:0,name:"a"}],edges:[]})'],
+    ['./drawio', 'drawioDocumentConverter', '\'<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="a" value="A" vertex="1" parent="1"><mxGeometry x="0" y="0" width="40" height="30" as="geometry"/></mxCell></root></mxGraphModel>\''],
+    ['./pajek', 'pajekDocumentConverter', '\'*Vertices 1\\n1 "A"\\n*Arcs\\n\''],
+    ['./plantuml', 'plantumlDocumentConverter', '\'@startuml\\ncomponent "A" as a\\n@enduml\''],
+    ['./csv', 'csvDocumentConverter', '({nodes:"id\\r\\na\\r\\n",edges:"id,sourceId,targetId\\r\\n"})'],
+    ['./csv', 'tsvDocumentConverter', '({nodes:"id\\na\\n",edges:"id\\tsourceId\\ttargetId\\n"})'],
+    ['./graphlib', 'graphlibDocumentConverter', '({options:{directed:true,multigraph:false,compound:false},nodes:[{v:"a"}],edges:[]})'],
+    ['./graphology', 'graphologyDocumentConverter', '({options:{type:"directed",multi:false,allowSelfLoops:true},attributes:{},nodes:[{key:"a"}],edges:[]})'],
+    ['./networkx', 'networkxDocumentConverter', '({directed:true,multigraph:false,graph:{},nodes:[{id:"a"}],edges:[]})'],
+    ['./cytoscape', 'cytoscapeDocumentConverter', '({elements:{nodes:[{data:{id:"a"}}],edges:[]}})'],
+    ['./d2', 'd2DocumentConverter', '"# comment\\na: Before\\n"'],
+    ['./d3', 'd3DocumentConverter', '({nodes:[{id:"a"}],links:[]})'],
+    ['./dot', 'dotDocumentConverter', '"// comment\\ndigraph { a [label=\\\"Before\\\"]; }"'],
+    ['./edge-list', 'edgeListDocumentConverter', '([["a","b"]])'],
+    ['./elk', 'elkDocumentConverter', '({id:"root",children:[{id:"a"}],edges:[]})'],
+    ['./gexf', 'gexfDocumentConverter', '\'<gexf xmlns="http://gexf.net/1.3" version="1.3"><graph defaultedgetype="directed"><nodes><node id="a" label="Before"/></nodes><edges/></graph></gexf>\''],
+    ['./gml', 'gmlDocumentConverter', '\'graph [ node [ id 0 label "Before" ] ]\''],
+    ['./graphml', 'graphMLDocumentConverter', '\'<graphml xmlns="http://graphml.graphdrawing.org/xmlns"><graph edgedefault="directed"><node id="a"/></graph></graphml>\''],
+    ['./jgf', 'jgfDocumentConverter', '({graph:{id:"g",nodes:[{id:"a"}],edges:[]}})'],
+    ['./tgf', 'tgfDocumentConverter', '"a Before\\r\\n#\\r\\n"'],
+    ['./xyflow', 'xyflowDocumentConverter', '({nodes:[{id:"a",position:{x:0,y:0},data:{label:"Before"}}],edges:[]})'],
+    ...[
+      ['Flowchart', 'flowchart TD\\nA[Before]'], ['Sequence', 'sequenceDiagram\\nA->>B: Before'],
+      ['State', 'stateDiagram-v2\\nA --> B'], ['Class', 'classDiagram\\nclass A'],
+      ['ER', 'erDiagram\\nA'], ['Block', 'block-beta\\nA[Before]'],
+      ['Architecture', 'architecture-beta\\nservice a(server)[Before]'],
+      ['Requirement', 'requirementDiagram\\nrequirement a {\\ntext: Before\\n}'], ['Sankey', 'sankey-beta\\nA,B,1'],
+      ['GitGraph', 'gitGraph\\ncommit id: "a"'], ['C4', 'C4Context\\nPerson(a, "A")'], ['UseCase', 'usecase-beta\\nactor A("A")'],
+      ['Mindmap', 'mindmap\\n  root((Before))'], ['Ishikawa', 'ishikawa-beta\\n  Before'],
+    ].map(([name, source]) => ['./mermaid', `mermaid${name}DocumentConverter`, JSON.stringify(source).replace(/\\\\n/g, '\\n')] as [string, string, string]),
+  ];
+  for (const [key, symbol, source] of documentExports) {
+    exportChecks[key].runtime.push(`{ const nativeSource = ${source}; const nativeDocument = $MOD.${symbol}.from(nativeSource); assert.notEqual(nativeDocument.graph, null, ${JSON.stringify(`${key}:${symbol}`)}); assert.deepEqual($MOD.${symbol}.to(JSON.parse(JSON.stringify(nativeDocument))), nativeSource); }`);
+    exportChecks[key].types.push(`{ const nativeDocument = $MOD.${symbol}.from(${source}); const nativeSource = $MOD.${symbol}.to(nativeDocument); void nativeSource; }`);
+  }
   const missingChecks = publishedExportKeys.filter((key) => !(key in exportChecks));
   const staleChecks = Object.keys(exportChecks).filter(
     (key) => !publishedExportKeys.includes(key),
@@ -617,6 +797,7 @@ async function main(): Promise<void> {
         '--ignore-workspace',
         'dotparser',
         'fast-xml-parser',
+        'fflate',
         'zod',
         // Layout adapter optional peers
         'elkjs',

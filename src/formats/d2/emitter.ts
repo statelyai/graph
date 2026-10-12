@@ -1,4 +1,5 @@
 import type { GraphNode, GraphEdge } from '../../types';
+import { getEdgeMode } from '../../mode';
 import {
   type D2Arrow,
   type D2Graph,
@@ -8,6 +9,10 @@ import {
   type D2LabelBlock,
   escapeD2Key,
   escapeD2Label,
+  getD2ScalarGraph,
+  unquoteD2,
+  ARROW_TO_MODE,
+  RESERVED_KEYWORDS,
 } from './shared';
 
 const STRUCTURED_SHAPES = new Set(['sql_table', 'class']);
@@ -39,7 +44,17 @@ function splitId(id: string): string[] {
     } else buf += ch;
   }
   out.push(buf);
-  return out;
+  return out.map(unquoteD2);
+}
+
+function getSourceValueLines(key: string, value: any, ind: number): string[] {
+  const sourceKey = /^[A-Za-z0-9_-]+$/.test(key) ? key : escapeD2Key(key);
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return [`${indent(ind)}${sourceKey}: {`, ...Object.entries(value).flatMap(([name, child]) => getSourceValueLines(name, child, ind + 1)), `${indent(ind)}}`];
+  }
+  const scalar = Array.isArray(value) ? `[${value.map((entry) => entry === null ? 'null' : typeof entry === 'string' && /^(?:true|false|null|-?\d)/.test(entry) ? JSON.stringify(entry) : styleValueToD2(entry)).join('; ')}]`
+    : value === null ? 'null' : typeof value === 'string' && /^(?:true|false|null|-?\d)/.test(value) ? JSON.stringify(value) : styleValueToD2(value);
+  return [`${indent(ind)}${sourceKey}: ${scalar}`];
 }
 
 function indent(n: number): string {
@@ -69,6 +84,7 @@ function styleValueToD2(v: string | number | boolean): string {
 }
 
 interface EmitCtx {
+  graph: D2Graph;
   childrenOf: Map<string | null, GraphNode<D2NodeData, D2PortData>[]>;
   nodeById: Map<string, GraphNode<D2NodeData, D2PortData>>;
   /** Edges owned by a container (present in its `data.order`), keyed by owner id. */
@@ -77,6 +93,23 @@ interface EmitCtx {
   ownerOfEdge: Map<string, string>;
   /** Edge ids already emitted (so order-replay and fallback don't duplicate). */
   emittedEdges: Set<string>;
+}
+
+function getNodePath(ctx: EmitCtx, id: string): string[] {
+  const node = ctx.nodeById.get(id);
+  if (node?.data?.keyPath && node.data.sourceId === node.id) return node.data.keyPath;
+  const path = splitId(id);
+  // Graph-created hierarchies need not encode parent IDs into child IDs.
+  const ancestors: string[] = [];
+  const visited = new Set<string>([id]);
+  let parentId = node?.parentId;
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId);
+    if (id.startsWith(parentId + '.')) return path;
+    ancestors.unshift(parentId);
+    parentId = ctx.nodeById.get(parentId)?.parentId;
+  }
+  return [...ancestors.flatMap(splitId), ...path];
 }
 
 
@@ -96,7 +129,7 @@ function nodeAttrLines(
   if (d.icon) lines.push(`${indent(ind)}icon: ${d.icon}`);
   if (d.tooltip) lines.push(`${indent(ind)}tooltip: ${escapeD2Label(d.tooltip)}`);
   if (d.link) lines.push(`${indent(ind)}link: ${escapeD2Label(d.link)}`);
-  if (d.classes?.length) lines.push(`${indent(ind)}class: ${d.classes.join(' ')}`);
+  if (d.classes?.length) lines.push(`${indent(ind)}class: ${d.classes.length > 1 ? `[${d.classes.map(escapeD2Label).join('; ')}]` : escapeD2Label(d.classes[0])}`);
   if (node.width !== undefined) lines.push(`${indent(ind)}width: ${node.width}`);
   if (node.height !== undefined) lines.push(`${indent(ind)}height: ${node.height}`);
   if (node.x !== undefined) lines.push(`${indent(ind)}left: ${node.x}`);
@@ -116,6 +149,8 @@ function nodeAttrLines(
       lines.push(`${indent(ind)}${k}: ${styleValueToD2(v)}`);
     }
   }
+  if (d.source?.vars) lines.push(...getSourceValueLines('vars', d.source.vars, ind));
+  if (d.source?.classes) lines.push(...getClassLines(d.source.classes, ind));
   return lines;
 }
 
@@ -124,6 +159,7 @@ function portLines(node: GraphNode<D2NodeData, D2PortData>, ind: number): string
   for (const port of node.ports ?? []) {
     const pd = port.data ?? ({} as D2PortData);
     const vis = pd.visibility ?? '';
+    emitComments(pd.commentsBefore, ind, lines);
     const name = `${vis}${escapeD2Key(port.name)}`;
     let line = `${indent(ind)}${name}`;
     if (pd.typeName) line += `: ${escapeD2Label(pd.typeName)}`;
@@ -138,6 +174,8 @@ function portLines(node: GraphNode<D2NodeData, D2PortData>, ind: number): string
 function labelHeader(node: GraphNode<D2NodeData, D2PortData>): string {
   if (node.label == null || node.label === '') return '';
   const labelBlock = nodeData(node).labelBlock;
+  const data = nodeData(node);
+  if (data.labelSource && data.sourceLabel === node.label) return data.labelSource;
   if (labelBlock) {
     return emitLabelBlock(node.label, labelBlock);
   }
@@ -185,12 +223,17 @@ function emitScope(
 ): void {
   const children = ctx.childrenOf.get(containerId) ?? [];
   const ownedEdges = container ? (ctx.edgesByOwner.get(container.id) ?? []) : [];
-  const order = container ? nodeData(container).order : undefined;
+  const order = container ? nodeData(container).order : ctx.graph.data?.order;
 
   if (order) {
     const childById = new Map(children.map((c) => [c.id, c]));
     const edgeById = new Map(ownedEdges.map((e) => [e.id, e]));
     for (const refId of order) {
+      const imported = ctx.graph.data?.source?.importRecords?.find((record) => record.ref === refId && record.scopeId === containerId);
+      if (imported) {
+        lines.push(`${indent(ind)}${imported.spread ? '...' : ''}@${imported.path}`);
+        continue;
+      }
       const child = childById.get(refId);
       if (child) {
         emitItem(ctx, child, scopeSegs, ind, lines);
@@ -220,7 +263,7 @@ function emitItem(
   lines: string[],
 ): void {
   // Relative dotted key from the current scope.
-  const rel = splitId(node.id).slice(scopeSegs.length).map(escapeD2Key).join('.');
+  const rel = getNodePath(ctx, node.id).slice(scopeSegs.length).map(escapeD2Key).join('.');
 
   // Pure prefix: don't emit a block; recurse so descendants carry the prefix.
   if (isPurePrefix(ctx, node)) {
@@ -239,6 +282,7 @@ function emitItem(
 
   if (!needsBlock) {
     lines.push(`${indent(ind)}${rel}${label ? `: ${label}` : ''}`);
+    emitComments(nodeData(node).commentsAfter, ind, lines);
     return;
   }
 
@@ -247,18 +291,23 @@ function emitItem(
   lines.push(`${indent(ind)}${rel}: {`);
   if (label) lines.push(`${indent(ind + 1)}label: ${label}`);
   if (structured) {
-    lines.push(`${indent(ind + 1)}shape: ${node.shape}`);
+    lines.push(...attrLines);
     lines.push(...ports);
   } else {
     lines.push(...attrLines);
-    emitScope(ctx, node, node.id, splitId(node.id), ind + 1, lines);
+    emitScope(ctx, node, node.id, getNodePath(ctx, node.id), ind + 1, lines);
   }
+  emitComments(nodeData(node).trailingComments, ind + 1, lines);
   lines.push(`${indent(ind)}}`);
+  emitComments(nodeData(node).commentsAfter, ind, lines);
 }
 
-function endpointRef(nodeId: string, port: string | undefined, scopeSegs: string[]): string {
-  const segs = splitId(nodeId).slice(scopeSegs.length);
-  let ref = segs.map(escapeD2Key).join('.');
+function endpointRef(ctx: EmitCtx, nodeId: string, port: string | undefined, scopeSegs: string[]): string {
+  const path = getNodePath(ctx, nodeId);
+  let shared = 0;
+  while (shared < scopeSegs.length && path[shared] === scopeSegs[shared]) shared++;
+  const segs = path.slice(shared);
+  let ref = [...Array(scopeSegs.length - shared).fill('_'), ...segs.map(escapeD2Key)].join('.');
   if (port) ref += `.${escapeD2Key(port)}`;
   return ref;
 }
@@ -274,9 +323,10 @@ function emitEdge(
   const d = edgeData(edge);
   emitComments(d.commentsBefore, ind, lines);
 
-  const arrow: D2Arrow = d.arrow ?? modeToArrow(edge);
+  const mode = getEdgeMode(ctx.graph, edge);
+  const arrow: D2Arrow = d.arrow && ARROW_TO_MODE[d.arrow] === mode ? d.arrow : modeToArrow(ctx.graph, edge);
   const owner = scoped ? ctx.ownerOfEdge.get(edge.id) : undefined;
-  const scopeSegs = owner ? splitId(owner) : [];
+  const scopeSegs = owner ? getNodePath(ctx, owner) : [];
 
   // Honor authored reversed `<-`: swap endpoints back for display.
   let sId = edge.sourceId;
@@ -288,11 +338,11 @@ function emitEdge(
     [sPort, tPort] = [tPort, sPort];
   }
 
-  const left = endpointRef(sId, sPort, scopeSegs);
-  const right = endpointRef(tId, tPort, scopeSegs);
+  const left = endpointRef(ctx, sId, sPort, scopeSegs);
+  const right = endpointRef(ctx, tId, tPort, scopeSegs);
   let line = `${indent(ind)}${left} ${arrow} ${right}`;
   if (edge.label != null && edge.label !== '') {
-    const lbl = d.labelBlock
+    const lbl = d.labelSource && d.sourceLabel === edge.label ? d.labelSource : d.labelBlock
       ? emitLabelBlock(edge.label, d.labelBlock)
       : escapeD2Label(edge.label);
     line += `: ${lbl}`;
@@ -306,6 +356,7 @@ function emitEdge(
   } else {
     lines.push(line);
   }
+  emitComments(d.commentsAfter, ind, lines);
 }
 
 function edgeBlockLines(edge: GraphEdge<D2EdgeData>): string[] {
@@ -317,8 +368,13 @@ function edgeBlockLines(edge: GraphEdge<D2EdgeData>): string[] {
   }
   const d = edgeData(edge);
   const { sourceArrowhead, targetArrowhead } = d;
-  if (sourceArrowhead?.shape) out.push(`source-arrowhead.shape: ${sourceArrowhead.shape}`);
-  if (targetArrowhead?.shape) out.push(`target-arrowhead.shape: ${targetArrowhead.shape}`);
+  for (const [name, spec] of [['source-arrowhead', sourceArrowhead], ['target-arrowhead', targetArrowhead]] as const) {
+    if (!spec) continue;
+    if (spec.shape) out.push(`${name}.shape: ${escapeD2Label(spec.shape)}`);
+    if (spec.label !== undefined) out.push(`${name}.label: ${escapeD2Label(spec.label)}`);
+    for (const [key, value] of Object.entries(spec.style ?? {})) out.push(`${name}.style.${key}: ${styleValueToD2(value)}`);
+    for (const [key, value] of Object.entries(spec.attributes ?? {})) out.push(`${name}.${key}: ${styleValueToD2(value)}`);
+  }
   if (d.reserved) {
     for (const [k, v] of Object.entries(d.reserved)) {
       out.push(`${k}: ${styleValueToD2(v)}`);
@@ -327,8 +383,8 @@ function edgeBlockLines(edge: GraphEdge<D2EdgeData>): string[] {
   return out;
 }
 
-function modeToArrow(edge: GraphEdge<D2EdgeData>): D2Arrow {
-  switch (edge.mode) {
+function modeToArrow(graph: D2Graph, edge: GraphEdge<D2EdgeData>): D2Arrow {
+  switch (getEdgeMode(graph, edge)) {
     case 'undirected':
       return '--';
     case 'bidirectional':
@@ -336,6 +392,20 @@ function modeToArrow(edge: GraphEdge<D2EdgeData>): D2Arrow {
     default:
       return '->';
   }
+}
+
+function getClassLines(classes: Record<string, Record<string, any>>, ind: number): string[] {
+  const lines = [`${indent(ind)}classes: {`];
+  for (const [name, attributes] of Object.entries(classes)) {
+    lines.push(`${indent(ind + 1)}${escapeD2Key(name)}: {`);
+    for (const [key, value] of Object.entries(attributes)) {
+      if (RESERVED_KEYWORDS.has(key) || (value && typeof value === 'object')) lines.push(...getSourceValueLines(key, value, ind + 2));
+      else lines.push(`${indent(ind + 2)}style.${key}: ${styleValueToD2(value)}`);
+    }
+    lines.push(`${indent(ind + 1)}}`);
+  }
+  lines.push(`${indent(ind)}}`);
+  return lines;
 }
 
 /**
@@ -367,6 +437,7 @@ function buildEdgeOwnership(graph: D2Graph): {
 }
 
 export function toD2(graph: D2Graph): string {
+  getD2ScalarGraph(graph);
   const lines: string[] = [];
   const data = graph.data ?? { diagramType: 'd2' };
 
@@ -380,28 +451,16 @@ export function toD2(graph: D2Graph): string {
 
   // vars
   if (data.source?.vars && Object.keys(data.source.vars).length > 0) {
-    lines.push('vars: {');
-    for (const [k, v] of Object.entries(data.source.vars)) {
-      lines.push(`  ${escapeD2Key(k)}: ${styleValueToD2(v as any)}`);
-    }
-    lines.push('}');
+    lines.push(...getSourceValueLines('vars', data.source.vars, 0));
   }
 
   // classes
   if (data.source?.classes && Object.keys(data.source.classes).length > 0) {
-    lines.push('classes: {');
-    for (const [name, style] of Object.entries(data.source.classes)) {
-      lines.push(`  ${escapeD2Key(name)}: {`);
-      for (const [k, v] of Object.entries(style)) {
-        lines.push(`    style.${k}: ${styleValueToD2(v)}`);
-      }
-      lines.push('  }');
-    }
-    lines.push('}');
+    lines.push(...getClassLines(data.source.classes, 0));
   }
 
   // imports
-  if (data.source?.imports) {
+  if (data.source?.imports && !data.source.importRecords) {
     for (const imp of data.source.imports) lines.push(`@${imp}`);
   }
 
@@ -426,6 +485,7 @@ export function toD2(graph: D2Graph): string {
   }
   const { edgesByOwner, ownerOfEdge } = buildEdgeOwnership(graph);
   const ctx: EmitCtx = {
+    graph,
     childrenOf,
     nodeById,
     edgesByOwner,
@@ -451,4 +511,3 @@ export function toD2(graph: D2Graph): string {
 
   return lines.join('\n') + '\n';
 }
-

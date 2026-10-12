@@ -3,6 +3,8 @@ import { createFormatConverter } from '../converter';
 import {
   validateInput,
   prepareLines,
+  getMermaidPreamble,
+  type MermaidSourceData,
   escapeMermaidLabel,
   unescapeMermaidLabel,
   generateEdgeId,
@@ -28,7 +30,7 @@ export interface StateNodeData {
 
 export interface StateEdgeData {}
 
-export interface StateGraphData {
+export interface StateGraphData extends MermaidSourceData {
   diagramType: 'stateDiagram';
   classDefs?: Record<string, Record<string, string>>;
 }
@@ -72,7 +74,7 @@ function isParallelRegionNode(
  */
 export function fromMermaidState(input: string): MermaidStateGraph {
   validateInput(input, 'Mermaid state');
-  const { lines } = prepareLines(input);
+  const { lines, source } = prepareLines(input);
 
   const header = lines[0]?.trim();
   if (
@@ -343,7 +345,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
       if (!node.data.notes) node.data.notes = [];
       node.data.notes.push({
         position,
-        text,
+        text: unescapeMermaidLabel(text),
         format: inlineText && inlineText.length > 0 ? 'inline' : 'block',
       });
       continue;
@@ -476,6 +478,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
     edges,
     data: {
       diagramType: 'stateDiagram',
+      ...(source && { source }),
       ...(Object.keys(classDefs).length > 0 && { classDefs }),
     },
     direction: graphDirection,
@@ -492,7 +495,7 @@ export function fromMermaidState(input: string): MermaidStateGraph {
  * // "stateDiagram-v2\n    [*] --> Idle\n    ..."
  */
 export function toMermaidState(graph: MermaidStateGraph): string {
-  const lines: string[] = ['stateDiagram-v2'];
+  const lines: string[] = [...getMermaidPreamble(graph.data ?? {}), 'stateDiagram-v2'];
 
   // Top-level direction
   if (graph.direction) {
@@ -523,6 +526,37 @@ export function toMermaidState(graph: MermaidStateGraph): string {
     referencedByEdge.add(edge.targetId);
   }
   if (graph.initialNodeId) referencedByEdge.add(graph.initialNodeId);
+
+  const edgesByScope = new Map<string | null, StateEdge[]>();
+  function getAncestorScopes(nodeId: string): Array<string | null> {
+    const scopes: Array<string | null> = [];
+    const visited = new Set<string>();
+    let parentId = nodesById.get(nodeId)?.parentId ?? null;
+    while (parentId !== null) {
+      if (visited.has(parentId)) throw new Error('Mermaid state: cyclic hierarchy cannot be emitted');
+      visited.add(parentId);
+      scopes.push(parentId);
+      parentId = nodesById.get(parentId)?.parentId ?? null;
+    }
+    scopes.push(null);
+    return scopes;
+  }
+  for (const edge of graph.edges) {
+    const targets = new Set(getAncestorScopes(edge.targetId));
+    const scope = getAncestorScopes(edge.sourceId).find((ancestor) => targets.has(ancestor)) ?? null;
+    const entries = edgesByScope.get(scope) ?? [];
+    entries.push(edge); edgesByScope.set(scope, entries);
+  }
+  function writeEdges(parentId: string | null, indent: string) {
+    for (const edge of edgesByScope.get(parentId) ?? []) {
+      const sourceNode = nodesById.get(edge.sourceId);
+      const targetNode = nodesById.get(edge.targetId);
+      const sourceId = sourceNode?.data?.isStart ? '[*]' : edge.sourceId;
+      const targetId = targetNode?.data?.isEnd ? '[*]' : edge.targetId;
+      const label = edge.label ? ` : ${escapeMermaidLabel(edge.label)}` : '';
+      lines.push(`${indent}${sourceId} --> ${targetId}${label}`);
+    }
+  }
 
   function writeNodes(parentId: string | null, indent: string) {
     const children = childrenMap.get(parentId) ?? [];
@@ -597,6 +631,7 @@ export function toMermaidState(graph: MermaidStateGraph): string {
         }
       }
     }
+    if (parentId !== null) writeEdges(parentId, indent);
   }
 
   writeNodes(null, '    ');
@@ -610,22 +645,8 @@ export function toMermaidState(graph: MermaidStateGraph): string {
     lines.push(`    [*] --> ${graph.initialNodeId}`);
   }
 
-  // Emit transitions
-  for (const edge of graph.edges) {
-    let sourceId = edge.sourceId;
-    let targetId = edge.targetId;
-
-    // Map start/end pseudo-nodes back to [*]
-    const sourceNode = graph.nodes.find((n) => n.id === sourceId);
-    const targetNode = graph.nodes.find((n) => n.id === targetId);
-    if (sourceNode?.data?.isStart) sourceId = '[*]';
-    if (targetNode?.data?.isEnd) targetId = '[*]';
-
-    const label = edge.label
-      ? ` : ${escapeMermaidLabel(edge.label)}`
-      : '';
-    lines.push(`    ${sourceId} --> ${targetId}${label}`);
-  }
+  // Root transitions stay outside composite declarations.
+  writeEdges(null, '    ');
 
   // Emit classDefs
   const gd = graph.data;

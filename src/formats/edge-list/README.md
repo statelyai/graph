@@ -2,6 +2,16 @@
 
 Converter for the edge list format — a simple `[source, target][]` array of tuples.
 
+## Preservation
+
+<!-- preservation contract for edge-list derived from src/formats/support.ts and converter implementation -->
+
+Graph round-trip: **partial**. Native semantic round-trip: **full**.
+Source document preservation: **none**. These are separate guarantees;
+selected-field round-trip tests do not prove unrestricted losslessness.
+
+The minimal tuple representation preserves endpoint tuples and order, while omitting isolated nodes, edge IDs, labels, metadata and geometry. Import validates endpoint tuples; this format cannot provide a full Graph round-trip.
+
 ## Resources
 
 - [Edge list (Wikipedia)](https://en.wikipedia.org/wiki/Edge_list)
@@ -11,7 +21,7 @@ Converter for the edge list format — a simple `[source, target][]` array of tu
 <!-- exported symbols from src/formats/edge-list/index.ts -->
 
 ```ts
-import { toEdgeList, fromEdgeList, edgeListConverter } from '@statelyai/graph/edge-list';
+import { toEdgeList, fromEdgeList } from '@statelyai/graph/edge-list';
 import { createGraph } from '@statelyai/graph';
 
 // Export
@@ -64,6 +74,21 @@ Nodes are auto-created from edge endpoints. Node/edge `data` and `label` are not
 Pre-built `GraphFormatConverter<[string, string][]>`:
 
 ```ts
+import { edgeListConverter } from '@statelyai/graph/converter';
+
 const edges = edgeListConverter.to(graph);
 const graph = edgeListConverter.from(edges);
 ```
+
+
+## Native documents
+
+<!-- edgeListDocumentConverter derived from src/formats/edge-list/index.ts and src/formats/document/index.ts -->
+
+`edgeListDocumentConverter.from(source)` creates a plain JSON document with the
+original source and a separate Graph projection. `.to(document)` preserves exact
+source when unchanged, including after JSON serialization. Supported edits patch
+verified native fields; unsupported edits throw with diagnostics. `.getUpdate(document)`
+returns a diagnostic-bearing result. Native semantic projection remains partial.
+
+Original tuple order and duplicate entries stay intact. Graph edits reject because endpoint tuples cannot encode Graph labels, data, geometry or stable entity IDs.

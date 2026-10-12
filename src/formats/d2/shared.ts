@@ -87,9 +87,12 @@ export interface D2Source {
   /** `vars: { ... }` blocks, stored as nested key/value maps. */
   vars?: Record<string, any>;
   /** `classes: { name: { ...style } }` definitions. */
-  classes?: Record<string, Record<string, string | number | boolean>>;
+  classes?: Record<string, Record<string, any>>;
   /** `@path` import references in declaration order. */
   imports?: string[];
+  importRecords?: Array<{ path: string; spread: boolean; scopeId: string | null; ref: string }>;
+  /** Unsupported language constructs retained for inspection, not applied to topology. */
+  unknownStatements?: string[];
 }
 
 export interface D2GraphData {
@@ -99,9 +102,18 @@ export interface D2GraphData {
   leadingComments?: string[];
   /** Comments after the last statement. */
   trailingComments?: string[];
+  order?: string[];
 }
 
 export interface D2NodeData {
+  labelSource?: string;
+  sourceLabel?: string;
+  /** Authored key segments, guarded by sourceId so later ID edits take precedence. */
+  keyPath?: string[];
+  sourceId?: string;
+  source?: D2Source;
+  trailingComments?: string[];
+  commentsAfter?: string[];
   /** Whether the author declared this node via dot-path or a `{ }` block. */
   declarationForm?: 'dot' | 'block';
   /** Relative positioning keyword/target (`near: top-center`, `near: a.b`). */
@@ -131,9 +143,13 @@ export interface D2NodeData {
 export interface D2ArrowheadSpec {
   shape?: string;
   label?: string;
+  style?: Record<string, string | number | boolean>;
+  attributes?: Record<string, any>;
 }
 
 export interface D2EdgeData {
+  labelSource?: string;
+  sourceLabel?: string;
   /** Authored connector glyph, for faithful re-emit (incl. reversed `<-`). */
   arrow: D2Arrow;
   sourceArrowhead?: D2ArrowheadSpec;
@@ -141,10 +157,13 @@ export interface D2EdgeData {
   classes?: string[];
   labelBlock?: D2LabelBlock;
   commentsBefore?: string[];
+  commentsAfter?: string[];
   reserved?: Record<string, string | number | boolean>;
 }
 
 export interface D2PortData {
+  commentsBefore?: string[];
+  attributes?: Record<string, any>;
   /** SQL column type (`int`, `varchar`, ...) or class member type. */
   typeName?: string;
   /** SQL constraints (`primary_key`, `foreign_key`, `unique`). */
@@ -163,19 +182,40 @@ const SAFE_ID = /^[A-Za-z0-9_][A-Za-z0-9_ -]*$/;
 
 /** Quote a d2 key/id if it contains characters that need escaping. */
 export function escapeD2Key(id: string): string {
+  getD2ScalarString(id);
   if (id === '') return '""';
   // Quote reserved keywords so a node literally named e.g. `shape` round-trips
   // as a node id rather than being re-parsed as a reserved attribute.
   if (RESERVED_KEYWORDS.has(id)) return `"${id}"`;
   if (SAFE_ID.test(id) && !id.includes('  ')) return id;
-  return `"${id.replace(/"/g, '\\"')}"`;
+  return JSON.stringify(id);
 }
 
+/** D2 accepts NUL labels, but its UTF-8 compiler cannot preserve lone surrogates. */
+export function getD2ScalarString(value: string): string {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(++index);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) throw new Error('D2: wire labels/IDs require Unicode scalar strings');
+    } else if (code >= 0xdc00 && code <= 0xdfff) throw new Error('D2: wire labels/IDs require Unicode scalar strings');
+  }
+  return value;
+}
+export function getD2ScalarGraph(graph: D2Graph): D2Graph {
+  for (const node of graph.nodes) {
+    getD2ScalarString(node.id); if (node.label != null) getD2ScalarString(node.label);
+    for (const port of node.ports ?? []) { getD2ScalarString(port.name); if (port.label !== undefined) getD2ScalarString(port.label); if (typeof port.data?.typeName === 'string') getD2ScalarString(port.data.typeName); }
+  }
+  for (const edge of graph.edges) { getD2ScalarString(edge.sourceId); getD2ScalarString(edge.targetId); if (edge.label != null) getD2ScalarString(edge.label); }
+  return graph;
+}
 /** Quote a d2 label value if needed (contains `:`, `#`, leading/trailing space, etc.). */
 export function escapeD2Label(label: string): string {
+  getD2ScalarString(label);
   if (label === '') return '""';
   if (/[:;#{}|<>"\n]/.test(label) || label !== label.trim()) {
-    return `"${label.replace(/"/g, '\\"')}"`;
+    return JSON.stringify(label);
   }
   return label;
 }
@@ -184,7 +224,7 @@ export function escapeD2Label(label: string): string {
 export function unquoteD2(s: string): string {
   const t = s.trim();
   if (t.length >= 2 && t[0] === '"' && t[t.length - 1] === '"') {
-    return t.slice(1, -1).replace(/\\"/g, '"');
+    try { return JSON.parse(t); } catch { return t.slice(1, -1).replace(/\\(["\\])/g, '$1'); }
   }
   if (t.length >= 2 && t[0] === "'" && t[t.length - 1] === "'") {
     return t.slice(1, -1);

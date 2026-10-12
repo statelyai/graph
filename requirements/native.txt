@@ -1,0 +1,6 @@
+# Native test oracles only; never library runtime dependencies.
+# Versions verified against primary PyPI releases on 2026-10-12.
+networkx==3.7
+scipy==1.18.1
+numpy==2.5.4
+igraph==1.0.0

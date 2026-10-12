@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://gexf.net/1.3" xmlns:ns1="http://gexf.net/1.3">
+  <xs:import schemaLocation="viz.xsd"/>
+  <!-- Extends graph -->
+  <xs:complexType name="graph-content">
+    <xs:annotation>
+      <xs:documentation>Gext and data extension</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="ns1:attributes"/>
+      <xs:element ref="ns1:nodes"/>
+      <xs:element ref="ns1:edges"/>
+    </xs:sequence>
+    <xs:attribute name="timeformat" type="ns1:timeformat-type"/>
+    <xs:attribute name="start" type="ns1:time-type"/>
+    <xs:attribute name="end" type="ns1:time-type"/>
+    <xs:attribute name="timestamp" type="ns1:time-type"/>
+    <xs:attribute name="mode" type="ns1:mode-type-graph"/>
+    <xs:attribute name="timerepresentation" type="ns1:timerepresentation-type"/>
+    <xs:attribute name="timezone" type="xs:token"/>
+    <xs:attribute name="defaultedgetype" type="ns1:defaultedgetype-type"/>
+    <xs:attribute name="idtype" type="ns1:idtype-type"/>
+  </xs:complexType>
+  <xs:element name="attributes" type="ns1:attributes-content"/>
+  <xs:element name="nodes" type="ns1:nodes-content"/>
+  <xs:element name="edges" type="ns1:edges-content"/>
+  <!-- Extends attributes -->
+  <xs:complexType name="attributes-content">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="ns1:attribute"/>
+    </xs:sequence>
+    <xs:attribute name="mode" type="ns1:mode-type-attributes"/>
+    <xs:attribute name="class" use="required" type="ns1:class-type"/>
+  </xs:complexType>
+  <xs:element name="attribute" type="ns1:attribute-content"/>
+  <!-- Extends attribute values -->
+  <xs:attributeGroup name="attvalue-content">
+    <xs:attribute name="start" type="ns1:time-type"/>
+    <xs:attribute name="end" type="ns1:time-type"/>
+    <xs:attribute name="timestamp" type="ns1:time-type"/>
+    <xs:attribute name="for" use="required" type="ns1:id-type"/>
+    <xs:attribute name="value" use="required" type="xs:string"/>
+  </xs:attributeGroup>
+  <!-- Extends node -->
+  <xs:complexType name="node-content">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="ns1:spells"/>
+      <xs:choice>
+        <xs:element ref="ns1:color"/>
+        <xs:element ref="ns1:position"/>
+        <xs:element ref="ns1:size"/>
+        <xs:element name="shape">
+          <xs:complexType>
+            <xs:attributeGroup ref="node-shape-content"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+      <xs:element ref="ns1:attvalues"/>
+      <xs:choice>
+        <xs:element ref="ns1:nodes"/>
+        <xs:element ref="ns1:edges"/>
+      </xs:choice>
+      <xs:element ref="ns1:parents"/>
+    </xs:choice>
+    <xs:attribute name="start" type="ns1:time-type"/>
+    <xs:attribute name="end" type="ns1:time-type"/>
+    <xs:attribute name="intervals" type="xs:token"/>
+    <xs:attribute name="timestamp" type="ns1:time-type"/>
+    <xs:attribute name="timestamps" type="xs:token"/>
+    <xs:attribute name="id" use="required" type="ns1:id-type"/>
+    <xs:attribute name="label" type="xs:token"/>
+    <xs:attribute name="pid" type="ns1:id-type"/>
+  </xs:complexType>
+  <xs:element name="spells" type="ns1:spells-content"/>
+  <xs:element name="color">
+    <xs:complexType>
+      <xs:attributeGroup ref="color-content"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="position">
+    <xs:complexType>
+      <xs:attributeGroup ref="position-content"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="size">
+    <xs:complexType>
+      <xs:attributeGroup ref="size-content"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="attvalues" type="ns1:attvalues-content"/>
+  <xs:element name="parents" type="ns1:parents-content"/>
+  <!-- Extends edge -->
+  <xs:complexType name="edge-content">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="ns1:spells"/>
+      <xs:choice>
+        <xs:element ref="ns1:color"/>
+        <xs:element ref="ns1:thickness"/>
+        <xs:element name="shape">
+          <xs:complexType>
+            <xs:attributeGroup ref="edge-shape-content"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+      <xs:element ref="ns1:attvalues"/>
+    </xs:choice>
+    <xs:attribute name="start" type="ns1:time-type"/>
+    <xs:attribute name="end" type="ns1:time-type"/>
+    <xs:attribute name="intervals" type="xs:token"/>
+    <xs:attribute name="timestamp" type="ns1:time-type"/>
+    <xs:attribute name="timestamps" type="xs:token"/>
+    <xs:attribute name="id" type="ns1:id-type"/>
+    <xs:attribute name="type" type="ns1:edgetype-type"/>
+    <xs:attribute name="label" type="xs:token"/>
+    <xs:attribute name="source" use="required" type="ns1:id-type"/>
+    <xs:attribute name="target" use="required" type="ns1:id-type"/>
+    <xs:attribute name="weight" type="ns1:weight-type"/>
+    <xs:attribute name="kind" type="xs:token"/>
+  </xs:complexType>
+  <xs:element name="thickness">
+    <xs:complexType>
+      <xs:attributeGroup ref="thickness-content"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- Spells -->
+  <xs:complexType name="spells-content">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" ref="ns1:spell"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="spell">
+    <xs:complexType>
+      <xs:attributeGroup ref="ns1:spell-content"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- Spell -->
+  <xs:attributeGroup name="spell-content">
+    <xs:attribute name="start" type="ns1:time-type"/>
+    <xs:attribute name="end" type="ns1:time-type"/>
+    <xs:attribute name="timestamp" type="ns1:time-type"/>
+  </xs:attributeGroup>
+  <!-- Time type -->
+  <xs:simpleType name="time-type">
+    <xs:union memberTypes="xs:integer xs:double xs:date xs:dateTime"/>
+  </xs:simpleType>
+  <!-- Mode type (for graph) -->
+  <xs:simpleType name="mode-type-graph">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="static"/>
+      <xs:enumeration value="dynamic"/>
+      <xs:enumeration value="slice"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Mode type (for attributes) -->
+  <xs:simpleType name="mode-type-attributes">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="static"/>
+      <xs:enumeration value="dynamic"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Time format type -->
+  <xs:simpleType name="timeformat-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="integer"/>
+      <xs:enumeration value="double"/>
+      <xs:enumeration value="date"/>
+      <xs:enumeration value="dateTime"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="timerepresentation-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="interval"/>
+      <xs:enumeration value="timestamp"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

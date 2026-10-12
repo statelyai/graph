@@ -234,7 +234,7 @@ sequenceDiagram
       expect(graph.edges).toHaveLength(2);
       const bob = graph.nodes.find((n) => n.id === 'Bob')!;
       expect(bob.data.notes).toHaveLength(1);
-      expect(bob.data.notes![0]).toEqual({ position: 'right', text: 'Bob thinks' });
+      expect(bob.data.notes![0]).toEqual({ id: 'note_0', position: 'right', text: 'Bob thinks' });
     });
 
     it('parses Note left of actor', () => {
@@ -527,7 +527,8 @@ sequenceDiagram
         edges: [],
         data: { diagramType: 'sequence' },
       });
-      expect(output).toContain('database DB');
+      expect(output).toContain('participant DB@{ "type":"database" }');
+      expect(fromMermaidSequence(output).nodes[0].data.actorType).toBe('database');
     });
 
     it('serializes notes', () => {

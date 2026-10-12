@@ -1,0 +1,7 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": { "description": "legacy links spelling; key is an ordinary simple-edge attribute" },
+  "nodes": [{ "id": "left", "label": null }, { "id": "right", "label": "" }, { "id": "alone" }],
+  "links": [{ "source": "left", "target": "right", "key": "ordinary", "weight": 0, "custom": [false, null] }]
+}

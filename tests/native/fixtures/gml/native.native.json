@@ -1,0 +1,86 @@
+{
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "summary": {
+    "directed": true,
+    "multigraph": true,
+    "graph": {
+      "label": "Native α"
+    },
+    "nodes": [
+      {
+        "id": 0,
+        "attributes": {
+          "label": "A & \"quoted\"",
+          "vendor": "KEEP"
+        }
+      },
+      {
+        "id": 1,
+        "attributes": {
+          "label": ""
+        }
+      },
+      {
+        "id": 2,
+        "attributes": {}
+      }
+    ],
+    "edges": [
+      {
+        "source": 0,
+        "target": 1,
+        "key": 0,
+        "attributes": {
+          "weight": 2.5,
+          "label": "first"
+        }
+      },
+      {
+        "source": 0,
+        "target": 1,
+        "key": 1,
+        "attributes": {
+          "weight": -3
+        }
+      }
+    ]
+  },
+  "roundTrip": {
+    "directed": true,
+    "multigraph": true,
+    "graph": {
+      "label": "Native α"
+    },
+    "nodes": [
+      {
+        "label": "A & \"quoted\"",
+        "vendor": "KEEP",
+        "id": 0
+      },
+      {
+        "label": "",
+        "id": 1
+      },
+      {
+        "id": 2
+      }
+    ],
+    "edges": [
+      {
+        "weight": 2.5,
+        "label": "first",
+        "source": 0,
+        "target": 1,
+        "key": 0
+      },
+      {
+        "weight": -3,
+        "source": 0,
+        "target": 1,
+        "key": 1
+      }
+    ]
+  }
+}
