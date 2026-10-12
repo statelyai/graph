@@ -1,0 +1,69 @@
+{
+  "retrieved": "2026-10-12",
+  "repository": "https://github.com/jgraph/drawio-mcp",
+  "commit": "a4515e4dc986e22d369551ac213399d6fb653bde",
+  "schemaVersion": "1.0",
+  "license": "Apache-2.0; Copyright 2025 JGraph Ltd",
+  "sourceDocument": "https://github.com/jgraph/drawio-mcp/blob/a4515e4dc986e22d369551ac213399d6fb653bde/shared/xml-reference.md",
+  "profile": "Published uncompressed generated-file XSD; actual maxgraph0.25 mxGraph-compatible model import separately tests structure/attributes. No actual draw.io renderer or complete runtime semantic proof.",
+  "files": [
+    {
+      "file": "mxfile.xsd",
+      "url": "https://raw.githubusercontent.com/jgraph/drawio-mcp/a4515e4dc986e22d369551ac213399d6fb653bde/shared/mxfile.xsd",
+      "sha256": "905db85d4e8ebec0e91518cdd62982e0afb3f09ebdcaf9e6b1952957a606639a",
+      "modifications": [],
+      "resolverRewrites": []
+    },
+    {
+      "file": "LICENSE.txt",
+      "url": "https://raw.githubusercontent.com/jgraph/drawio-mcp/a4515e4dc986e22d369551ac213399d6fb653bde/LICENSE",
+      "sha256": "006e61a1b8c97620d75ceacc283de7a363d78da7da9a5b92203324c40feb7232",
+      "modifications": [],
+      "resolverRewrites": []
+    }
+  ],
+  "entry": "mxfile.xsd",
+  "fixtures": [
+    {
+      "file": "pages-uncompressed.drawio",
+      "sha256": "5a53987e0788209b71b70fd883008e239ebf451a678a0aafe95f9b211825e084",
+      "license": "Authored fixture",
+      "profile": "Multiple pages, layers, relative group geometry, UserObject/custom attributes/raw HTML, empty label, decorative arrow style, waypoints and relative edge label coordinates. Native codec proof pending."
+    },
+    {
+      "file": "page-first.mxgraph.xml",
+      "sha256": "42c38656a222630a1c35d852059101b28d99122d6e37c778df4ac62c789487cf",
+      "license": "Authored/generated fixture"
+    },
+    {
+      "file": "page-second.mxgraph.xml",
+      "sha256": "4bee07a4a4e75bc7344ec6cd421faada661bdf0b888577455b5a7a2438524593",
+      "license": "Authored/generated fixture"
+    },
+    {
+      "file": "pages-compressed.drawio",
+      "sha256": "f699141dee1adf539eb8b39c017eb19fc7f9aca22e5db61b6e24c9b2f7e95520",
+      "license": "Authored/generated fixture"
+    },
+    {
+      "file": "page-first.maxgraph.json",
+      "sha256": "400a131b76025b2f709b8e51a9c22addb44936919b8fa93ed89277fcc04a336d",
+      "license": "Authored native-model fixture output",
+      "oracle": "@maxgraph/core0.25.0 native mxGraph-compatible import"
+    },
+    {
+      "file": "page-second.maxgraph.json",
+      "sha256": "4480ef755dc723229192d2484b6277c193df3ab02834002b9f483578dcc3e5b6",
+      "license": "Authored native-model fixture output",
+      "oracle": "@maxgraph/core0.25.0 native mxGraph-compatible import"
+    }
+  ],
+  "compression": {
+    "generator": "Python3.14.8 standard-library zlib; UTF-8 encodeURIComponent-equivalent URI text then rawDEFLATE then base64",
+    "parameters": "urllib.parse.quote safe=~()*!'., zlib.compressobj(wbits=-15)",
+    "oracle": "Independent Node24 zlib.inflateRawSync restores exact URI-encoded XML; decoded pages pass actual maxgraph0.25 mxGraph-compatible model import."
+  },
+  "discrepancies": [
+    "Official schema1.0 describes compressed diagram text but diagramType requires an element-only mxGraphModel child. Compressedpages fixture is expected-invalid under this unchanged XSD; actual page inflation/model import are separate native-oracle checks."
+  ]
+}

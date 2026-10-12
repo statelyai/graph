@@ -1,8 +1,12 @@
 import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
+import { getEdgeMode } from '../../mode';
 import {
   validateInput,
   prepareLines,
+  getMermaidPreamble,
+  type MermaidSourceData,
+  getMermaidTokens,
   escapeMermaidLabel,
   unescapeMermaidLabel,
   generateEdgeId,
@@ -12,6 +16,7 @@ import {
 
 export interface BlockNodeData {
   span?: number;
+  columns?: number;
 }
 
 export interface BlockEdgeData {
@@ -29,7 +34,7 @@ export interface BlockEdgeData {
   arrowToken?: string;
 }
 
-export interface BlockGraphData {
+export interface BlockGraphData extends MermaidSourceData {
   diagramType: 'block';
   columns?: number;
 }
@@ -42,6 +47,8 @@ type BlockNode = GraphNode<BlockNodeData>;
 // Block shape patterns (subset of flowchart)
 const BLOCK_SHAPES: [string, string, string][] = [
   ['((', '))', 'circle'],
+  ['([', '])', 'stadium'],
+  ['[(', ')]', 'cylinder'],
   ['(', ')', 'rounded'],
   ['{{', '}}', 'hexagon'],
   ['{', '}', 'diamond'],
@@ -49,18 +56,21 @@ const BLOCK_SHAPES: [string, string, string][] = [
   ['[', ']', 'rectangle'],
 ];
 
-function parseBlockNode(text: string): { id: string; label: string; shape?: string } | null {
+function parseBlockNode(text: string): { id: string; label: string; shape?: string; span?: number } | null {
+  const spanMatch = text.match(/:(\d+)$/);
+  const span = spanMatch ? Number(spanMatch[1]) : undefined;
+  if (spanMatch) text = text.slice(0, spanMatch.index);
   for (const [opener, closer, shapeName] of BLOCK_SHAPES) {
     const idx = text.indexOf(opener);
     if (idx < 0) continue;
     const id = text.slice(0, idx).trim();
-    if (!id) continue;
+    if (!/^[\p{L}\p{N}_-]+$/u.test(id)) continue;
     if (!text.endsWith(closer)) continue;
     const label = text.slice(idx + opener.length, text.length - closer.length).trim();
-    return { id, label, shape: shapeName };
+    return { id, label: unescapeMermaidLabel(label.replace(/^"([\s\S]*)"$/, '$1')), shape: shapeName, ...(span !== undefined && { span }) };
   }
   if (/^[a-zA-Z_][\w]*$/.test(text.trim())) {
-    return { id: text.trim(), label: '', shape: undefined };
+    return { id: text.trim(), label: '', shape: undefined, ...(span !== undefined && { span }) };
   }
   return null;
 }
@@ -78,7 +88,9 @@ function parseBlockNode(text: string): { id: string; label: string; shape?: stri
  */
 export function fromMermaidBlock(input: string): MermaidBlockGraph {
   validateInput(input, 'Mermaid block');
-  const { lines } = prepareLines(input);
+  const prepared = prepareLines(input);
+  const { lines } = prepared;
+  let source = prepared.source;
 
   const header = lines[0]?.trim();
   if (!header || !header.startsWith('block-beta')) {
@@ -112,11 +124,27 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
+    const styleMatch = line.match(/^style\s+(\S+)\s+(.+)$/);
+    if (styleMatch) {
+      const style: Record<string, string> = Object.create(null);
+      for (const property of styleMatch[2].split(',')) {
+        const index = property.indexOf(':');
+        if (index >= 0) style[property.slice(0, index).trim()] = property.slice(index + 1).trim();
+      }
+      ensureNode(styleMatch[1]).style = style;
+      continue;
+    }
+    if (/^(?:columns\s+(?!\d)|classDef\s|class\s|space(?:\s|:|$))/.test(line)) {
+      ((source ??= {}).unknownStatements ??= []).push(line);
+      continue;
+    }
 
     // columns N
     const colsMatch = line.match(/^columns\s+(\d+)\s*$/);
     if (colsMatch) {
-      columns = parseInt(colsMatch[1], 10);
+      const parentId = parentStack[parentStack.length - 1];
+      if (parentId) nodeMap.get(parentId)!.data.columns = Number(colsMatch[1]);
+      else columns = Number(colsMatch[1]);
       continue;
     }
 
@@ -138,7 +166,7 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
     // Edge: A --> B, A --- B, A ==> B, A -.-> B, optionally with a pipe label:
     // A -->|label| B
     const edgeMatch = line.match(
-      /^(\S+)\s*(-->|---|==>|-\.->)\s*(?:\|([^|]*)\|\s*)?(\S+)\s*$/,
+      /^(\S+)\s*(<-->|-->|---|==>|-\.->)\s*(?:\|([^|]*)\|\s*)?(\S+)\s*$/,
     );
     if (edgeMatch) {
       const sourceId = edgeMatch[1];
@@ -154,6 +182,7 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
         sourceId,
         targetId,
         label: label ? unescapeMermaidLabel(label) : '',
+        mode: token === '---' ? 'undirected' : token === '<-->' ? 'bidirectional' : 'directed',
         data: {
           stroke:
             token === '==>' ? 'thick' : token === '-.->' ? 'dotted' : 'normal',
@@ -177,12 +206,13 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
 
     // Space-separated node declarations on one line
     // (block-beta allows `a b c` on one line to declare multiple nodes)
-    const parts = line.split(/\s+/);
+    const parts = getMermaidTokens(line, ' ', false);
     let consumed = false;
     for (const part of parts) {
       const parsed = parseBlockNode(part);
       if (parsed) {
         ensureNode(parsed.id, parsed.label, parsed.shape);
+        if (parsed.span !== undefined) nodeMap.get(parsed.id)!.data.span = parsed.span;
         consumed = true;
       }
     }
@@ -192,6 +222,9 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
     const nodeDecl = parseBlockNode(line);
     if (nodeDecl) {
       ensureNode(nodeDecl.id, nodeDecl.label, nodeDecl.shape);
+      if (nodeDecl.span !== undefined) nodeMap.get(nodeDecl.id)!.data.span = nodeDecl.span;
+    } else {
+      ((source ??= {}).unknownStatements ??= []).push(line);
     }
   }
 
@@ -203,6 +236,7 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
     edges,
     data: {
       diagramType: 'block',
+      ...(source && { source }),
       ...(columns !== undefined && { columns }),
     },
   };
@@ -218,7 +252,7 @@ export function fromMermaidBlock(input: string): MermaidBlockGraph {
  * // "block-beta\n    columns 2\n    a[\"Task A\"]\n    ..."
  */
 export function toMermaidBlock(graph: MermaidBlockGraph): string {
-  const lines: string[] = ['block-beta'];
+  const lines: string[] = [...getMermaidPreamble(graph.data ?? {}), 'block-beta'];
 
   if (graph.data?.columns) {
     lines.push(`    columns ${graph.data.columns}`);
@@ -237,32 +271,41 @@ export function toMermaidBlock(graph: MermaidBlockGraph): string {
     if (childrenMap.has(node.id)) isParent.add(node.id);
   }
 
-  function writeNodes(parentId: string | null, indent: string) {
-    const children = childrenMap.get(parentId) ?? [];
-    for (const child of children) {
-      if (isParent.has(child.id)) {
-        lines.push(`${indent}block:${child.id}`);
-        writeNodes(child.id, indent + '    ');
-        lines.push(`${indent}end`);
-      } else {
-        const label = child.label && child.label !== child.id
-          ? `["${escapeMermaidLabel(child.label)}"]`
-          : '';
-        const span = child.data?.span ? `:${child.data.span}` : '';
-        lines.push(`${indent}${child.id}${label}${span}`);
-      }
+  const stack: Array<{ node?: BlockNode; indent: string }> = (childrenMap.get(null) ?? []).slice().reverse().map((node) => ({ node, indent: '    ' }));
+  while (stack.length) {
+    const { node: child, indent } = stack.pop()!;
+    if (!child) { lines.push(`${indent}end`); continue; }
+    if (isParent.has(child.id)) {
+      lines.push(`${indent}block:${child.id}`);
+      if (child.data?.columns !== undefined) lines.push(`${indent}    columns ${child.data.columns}`);
+      stack.push({ indent });
+      for (const node of (childrenMap.get(child.id) ?? []).slice().reverse()) stack.push({ node, indent: indent + '    ' });
+    } else {
+      const shape = BLOCK_SHAPES.find((entry) => entry[2] === child.shape) ?? ['[', ']', 'rectangle'];
+      const label = child.label && (child.label !== child.id || child.shape)
+        ? `${shape[0]}"${escapeMermaidLabel(child.label)}"${shape[1]}` : '';
+      const span = child.data?.span ? `:${child.data.span}` : '';
+      lines.push(`${indent}${child.id}${label}${span}`);
     }
   }
 
-  writeNodes(null, '    ');
+  for (const node of graph.nodes) {
+    if (node.style) lines.push(`    style ${node.id} ${Object.entries(node.style).map(([key, value]) => `${key}:${value}`).join(',')}`);
+  }
 
   // Emit edges. Prefer the preserved original token so approximate mappings
   // round-trip exactly; otherwise derive from stroke/arrowType.
   for (const edge of graph.edges) {
     const d = edge.data;
     let arrow = d?.arrowToken;
+    const mode = edge.mode ?? (graph.mode !== 'directed' ? getEdgeMode(graph, edge) : d?.arrowToken === '---' || d?.arrowType === 'none' ? 'undirected'
+      : d?.arrowToken === '<-->' ? 'bidirectional' : getEdgeMode(graph, edge));
+    const tokenMode = arrow === '---' ? 'undirected' : arrow === '<-->' ? 'bidirectional' : 'directed';
+    if (arrow && tokenMode !== mode) arrow = undefined;
     if (!arrow) {
-      if (d?.stroke === 'thick') arrow = '==>';
+      if (mode === 'undirected') arrow = '---';
+      else if (mode === 'bidirectional') arrow = '<-->';
+      else if (d?.stroke === 'thick') arrow = '==>';
       else if (d?.stroke === 'dotted') arrow = '-.->';
       else arrow = d?.arrowType === 'none' ? '---' : '-->';
     }

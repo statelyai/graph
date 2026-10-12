@@ -1,11 +1,24 @@
-import { XMLBuilder, XMLParser } from 'fast-xml-parser';
+import { getStandardXML, getValidatedXMLValue } from '../xml-standard';
+import { createGraphDocumentConverter } from '../document';
+import { getXMLDocumentPatch, getXMLDocumentProjection } from '../xml-document';
+import { XMLBuilder, XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
 import { getEdgeMode } from '../../mode';
+import { createFormatData, getFormatMetadata, getNormalizedXML, getUserData } from '../xml-preservation';
 
 // --- GEXF (Graph Exchange XML Format, https://gexf.net/) ---
 
-export function toGEXF(graph: Graph): string {
+export interface GEXFExportOptions {
+  /** Published 1.3 XSD profile: core-namespace viz and an explicit root metadata carrier. */
+  standard?: boolean;
+}
+export interface GEXFImportOptions {
+  /** Interpret the standard export profile's discriminated root description carrier. */
+  standard?: boolean;
+}
+
+export function toGEXF(graph: Graph, options: GEXFExportOptions = {}): string {
   // Attribute declarations
   const nodeAttrs = [
     { '@_id': 'a_parentId', '@_title': 'parentId', '@_type': 'string' },
@@ -16,6 +29,8 @@ export function toGEXF(graph: Graph): string {
     { '@_id': 'a_height', '@_title': 'height', '@_type': 'double' },
     { '@_id': 'a_style', '@_title': 'style', '@_type': 'string' },
     { '@_id': 'a_ports', '@_title': 'ports', '@_type': 'string' },
+    { '@_id': 'a_private', '@_title': '_stately', '@_type': 'string' },
+    { '@_id': 'a_color', '@_title': '_statelyColor', '@_type': 'string' },
   ];
 
   const edgeAttrs = [
@@ -30,23 +45,38 @@ export function toGEXF(graph: Graph): string {
     { '@_id': 'a_edgeRouting', '@_title': 'routing', '@_type': 'string' },
     { '@_id': 'a_sourcePort', '@_title': 'sourcePort', '@_type': 'string' },
     { '@_id': 'a_targetPort', '@_title': 'targetPort', '@_type': 'string' },
+    { '@_id': 'a_edgePrivate', '@_title': '_stately', '@_type': 'string' },
+    { '@_id': 'a_edgeColor', '@_title': '_statelyColor', '@_type': 'string' },
   ];
 
+  const native = getFormatMetadata(graph.data, 'gexf');
+  const nativeAttrIds = new Map<string, string>();
+  for (const block of native?.attributes ?? []) {
+    const declarations = block['@_class'] === 'edge' ? edgeAttrs : nodeAttrs;
+    for (const declaration of getArray<any>(block.attribute)) {
+      let id = String(declaration['@_id']);
+      while (declarations.some((known) => known['@_id'] === id)) id = `native_${id}`;
+      nativeAttrIds.set(`${block['@_class']}:${declaration['@_id']}`, id);
+      declarations.push({ ...declaration, '@_id': id });
+    }
+  }
+  const getNativeValues = (data: unknown, kind: string): any[] => (getFormatMetadata(data, 'gexf')?.values ?? [])
+    .map((value: any) => ({ ...value, '@_for': nativeAttrIds.get(`${kind}:${value['@_for']}`) ?? value['@_for'] }));
   const nodes = graph.nodes.map((n) => {
     const attvalues: any[] = [];
-    if (n.parentId)
+    if (n.parentId != null)
       attvalues.push({ '@_for': 'a_parentId', '@_value': n.parentId });
-    if (n.initialNodeId)
+    if (n.initialNodeId != null)
       attvalues.push({
         '@_for': 'a_initialNodeId',
         '@_value': n.initialNodeId,
       });
-    if (n.data !== undefined)
+    if (getUserData(n.data, 'gexf') !== undefined)
       attvalues.push({
         '@_for': 'a_data',
-        '@_value': JSON.stringify(n.data),
+        '@_value': JSON.stringify(getUserData(n.data, 'gexf')),
       });
-    if (n.shape)
+    if (n.shape !== undefined)
       attvalues.push({ '@_for': 'a_shape', '@_value': n.shape });
     if (n.width !== undefined) {
       attvalues.push({ '@_for': 'a_width', '@_value': n.width });
@@ -67,23 +97,30 @@ export function toGEXF(graph: Graph): string {
       });
     }
 
+    const presence = { format: 'stately', version: 1, ...(n.label === null && { nullLabel: true }),
+      absentGeometry: ['x', 'y', 'width', 'height'].filter((key) => (n as any)[key] === undefined) };
+    attvalues.push({ '@_for': 'a_private', '@_value': JSON.stringify(presence) });
+    if (n.color !== undefined) attvalues.push({ '@_for': 'a_color', '@_value': JSON.stringify(n.color) });
+    attvalues.push(...getNativeValues(n.data, 'node'));
+    const extra = getFormatMetadata(n.data,'gexf')?.native ?? {};
     const node: any = {
+      ...Object.fromEntries(Object.entries(extra).filter(([key]) => key !== 'z' && key !== 'alpha')),
       '@_id': n.id,
-      // GEXF requires a label attribute; emit empty string so empty labels
-      // round-trip instead of being replaced by the node id.
-      '@_label': n.label ?? '',
+      // Omit null so an explicit native empty label remains authoritative.
+      ...(n.label !== null && { '@_label': n.label ?? '' }),
     };
-    if (n.parentId) node['@_pid'] = n.parentId;
+    if (n.parentId != null) node['@_pid'] = n.parentId;
     if (attvalues.length > 0) node.attvalues = { attvalue: attvalues };
 
     // Viz module
     if (n.color) {
-      const hex = n.color.replace('#', '');
-      if (hex.length === 6) {
+      const getHex = n.color.replace('#', '');
+      if (/^[0-9a-fA-F]{6}$/.test(getHex)) {
         node['viz:color'] = {
-          '@_r': parseInt(hex.slice(0, 2), 16),
-          '@_g': parseInt(hex.slice(2, 4), 16),
-          '@_b': parseInt(hex.slice(4, 6), 16),
+          '@_r': parseInt(getHex.slice(0, 2), 16),
+          '@_g': parseInt(getHex.slice(2, 4), 16),
+          '@_b': parseInt(getHex.slice(4, 6), 16),
+          ...(extra.alpha !== undefined && { '@_a': extra.alpha }),
         };
       }
     }
@@ -91,6 +128,7 @@ export function toGEXF(graph: Graph): string {
       node['viz:position'] = {
         '@_x': n.x ?? 0,
         '@_y': n.y ?? 0,
+        ...(extra.z !== undefined && { '@_z': extra.z }),
       };
     }
     if (n.width !== undefined || n.height !== undefined) {
@@ -100,29 +138,31 @@ export function toGEXF(graph: Graph): string {
     return node;
   });
 
-  const graphDirected = graph.mode !== 'undirected';
   const edges = graph.edges.map((e) => {
+    const extra = getFormatMetadata(e.data,'gexf')?.native ?? {};
     const edge: any = {
+      ...Object.fromEntries(Object.entries(extra).filter(([key]) => key !== 'z' && key !== 'alpha')),
       '@_id': e.id,
       '@_source': e.sourceId,
       '@_target': e.targetId,
     };
     // Per-edge directedness override. GEXF edges carry an optional `type`
     // attribute; emit it only when the edge differs from the graph default.
-    // Bidirectional has no GEXF representation and maps to directed.
-    const edgeDirected = getEdgeMode(graph, e) !== 'undirected';
-    if (edgeDirected !== graphDirected) {
-      edge['@_type'] = edgeDirected ? 'directed' : 'undirected';
-    }
-    if (e.label) edge['@_label'] = e.label;
-    if (e.data !== undefined) {
+    // GEXF mutual represents bidirectional edges natively.
+    const mode = getEdgeMode(graph, e);
+    if (e.mode !== undefined || mode !== graph.mode) edge['@_type'] = mode === 'bidirectional' ? 'mutual' : mode;
+    if (e.label != null) edge['@_label'] = e.label;
+    if (getUserData(e.data, 'gexf') !== undefined) {
       edge.attvalues = {
-        attvalue: [{ '@_for': 'a_edgeData', '@_value': JSON.stringify(e.data) }],
+        attvalue: [{ '@_for': 'a_edgeData', '@_value': JSON.stringify(getUserData(e.data, 'gexf')) }],
       };
     }
     const edgeAttvalues = edge.attvalues?.attvalue ?? [];
+    if (e.label === null) edgeAttvalues.push({ '@_for': 'a_edgePrivate', '@_value': JSON.stringify({ format: 'stately', version: 1, nullLabel: true }) });
+    if (e.color !== undefined) edgeAttvalues.push({ '@_for': 'a_edgeColor', '@_value': JSON.stringify(e.color) });
+    edgeAttvalues.push(...getNativeValues(e.data, 'edge'));
     if (e.weight !== undefined) {
-      edgeAttvalues.push({ '@_for': 'a_edgeWeight', '@_value': e.weight });
+      edge['@_weight'] = e.weight;
     }
     if (e.points !== undefined) {
       edgeAttvalues.push({
@@ -167,33 +207,48 @@ export function toGEXF(graph: Graph): string {
       edge.attvalues = { attvalue: edgeAttvalues };
     }
     if (e.color) {
-      const hex = e.color.replace('#', '');
-      if (hex.length === 6) {
+      const getHex = e.color.replace('#', '');
+      if (/^[0-9a-fA-F]{6}$/.test(getHex)) {
         edge['viz:color'] = {
-          '@_r': parseInt(hex.slice(0, 2), 16),
-          '@_g': parseInt(hex.slice(2, 4), 16),
-          '@_b': parseInt(hex.slice(4, 6), 16),
+          '@_r': parseInt(getHex.slice(0, 2), 16),
+          '@_g': parseInt(getHex.slice(2, 4), 16),
+          '@_b': parseInt(getHex.slice(4, 6), 16),
+          ...(extra.alpha !== undefined && { '@_a': extra.alpha }),
         };
       }
     }
     return edge;
   });
 
+  if (options.standard) for (const entity of [...nodes, ...edges]) {
+    for (const key of Object.keys(entity)) if (key.startsWith('viz:')) { entity[key.slice(4)] = entity[key]; delete entity[key]; }
+  }
+  const nativeMeta = native?.meta;
+  let meta = nativeMeta;
+  if (options.standard) {
+    const descriptions = getArray<any>(nativeMeta?.description);
+    if (descriptions.some((description) => getStandardRoot(description))) throw new Error('GEXF standard profile: reserved root description carrier collision');
+    const root = { id: graph.id, initialNodeId: graph.initialNodeId, data: getUserData(graph.data, 'gexf'),
+      ...(graph.direction !== undefined && {direction:graph.direction}), ...(graph.style !== undefined && {style:graph.style}) };
+    meta = { ...nativeMeta, description: [...descriptions, JSON.stringify({format:'@statelyai/graph/gexf-root',version:1,root})] };
+  }
   const obj: any = {
     '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
     gexf: {
       '@_xmlns': 'http://gexf.net/1.3',
-      '@_xmlns:viz': 'http://gexf.net/1.3/viz',
+      ...(!options.standard && {'@_xmlns:viz': 'http://gexf.net/1.3/viz'}),
       '@_version': '1.3',
+      ...(meta && { meta }),
       graph: {
-        '@_defaultedgetype': graph.mode === 'undirected' ? 'undirected' : 'directed',
-        ...(graph.id && { '@_id': graph.id }),
-        ...(graph.initialNodeId && { '@_initialNodeId': graph.initialNodeId }),
-        ...(graph.direction && { '@_direction': graph.direction }),
-        ...(graph.data !== undefined && {
-          '@_data': JSON.stringify(graph.data),
+        ...native?.graphAttributes,
+        '@_defaultedgetype': graph.mode === 'bidirectional' ? 'mutual' : graph.mode,
+        ...(!options.standard && graph.id && { '@_id': graph.id }),
+        ...(!options.standard && graph.initialNodeId != null && { '@_initialNodeId': graph.initialNodeId }),
+        ...(!options.standard && graph.direction && { '@_direction': graph.direction }),
+        ...(!options.standard && getUserData(graph.data, 'gexf') !== undefined && {
+          '@_data': JSON.stringify(getUserData(graph.data, 'gexf')),
         }),
-        ...(graph.style !== undefined && {
+        ...(!options.standard && graph.style !== undefined && {
           '@_style': JSON.stringify(graph.style),
         }),
         attributes: [
@@ -208,21 +263,29 @@ export function toGEXF(graph: Graph): string {
 
   const builder = new XMLBuilder({
     ignoreAttributes: false,
-    format: true,
+    // Formatting inserts whitespace into unknown mixed-content XML.
+    format: false,
     suppressEmptyNode: true,
   });
 
-  return builder.build(obj);
+  if (options.standard) getValidatedXMLValue(obj);
+  const output = builder.build(obj);
+  return options.standard ? getStandardXML(output) : output;
 }
 
-export function fromGEXF(xml: string): Graph {
+export function fromGEXF(xml: string, options: GEXFImportOptions = {}): Graph {
   if (typeof xml !== 'string') {
     throw new Error('GEXF: expected a string');
   }
+  const validation = XMLValidator.validate(xml);
+  if (validation !== true) throw new Error(`GEXF: invalid XML — ${validation.err.msg}`);
   const parser = new XMLParser({
     ignoreAttributes: false,
+    // Required by this peer to decode standard XML numeric character references.
+    htmlEntities: true,
     isArray: (name) =>
-      ['node', 'edge', 'attribute', 'attvalue', 'attributes'].includes(name),
+      ['node', 'edge', 'attribute', 'attvalue', 'attributes'].includes(name.split(':').pop()!),
+    parseTagValue: false,
     // Keep attribute text verbatim: labels like "  hi  " must not be trimmed.
     // Numeric fields are parsed explicitly.
     trimValues: false,
@@ -230,10 +293,12 @@ export function fromGEXF(xml: string): Graph {
 
   let parsed: any;
   try {
-    parsed = parser.parse(xml);
+    parsed = getNormalizedXML(parser.parse(xml), 'http://gexf.net/1.3');
   } catch (e: any) {
     throw new Error(`GEXF: invalid XML — ${e.message}`);
   }
+  if (!parsed?.gexf) parsed = getNormalizedXML(parser.parse(xml), 'http://gexf.net/1.2draft');
+  if (!parsed?.gexf) parsed = getNormalizedXML(parser.parse(xml), 'http://www.gexf.net/1.2draft');
   const gexf = parsed?.gexf;
   if (!gexf) {
     throw new Error('GEXF: missing <gexf> root element');
@@ -243,24 +308,45 @@ export function fromGEXF(xml: string): Graph {
     throw new Error('GEXF: missing <graph> element');
   }
 
-  const graphType: 'directed' | 'undirected' =
-    graphEl['@_defaultedgetype'] === 'undirected' ? 'undirected' : 'directed';
+  let nativeMeta = gexf.meta;
+  let root: any;
+  if (options.standard && nativeMeta) {
+    const descriptions = getArray<any>(nativeMeta.description);
+    const roots = descriptions.map(getStandardRoot).filter(Boolean);
+    if (roots.length > 1) throw new Error('GEXF standard profile: ambiguous root description carriers');
+    root = roots[0];
+    if (root) {
+      const rest = descriptions.filter((description) => !getStandardRoot(description));
+      nativeMeta = { ...nativeMeta };
+      if (rest.length) nativeMeta.description = rest.length === 1 ? rest[0] : rest;
+      else delete nativeMeta.description;
+      if (!Object.keys(nativeMeta).length) nativeMeta = undefined;
+    }
+  }
+  const graphType: Graph['mode'] = graphEl['@_defaultedgetype'] === 'mutual' ? 'bidirectional'
+    : graphEl['@_defaultedgetype'] === 'directed' ? 'directed' : 'undirected';
 
   // Build attribute ID → title map
-  const attrMap = new Map<string, string>();
-  for (const block of asArray(graphEl.attributes)) {
-    for (const attr of asArray(block?.attribute)) {
+  const nodeAttrMap = new Map<string, string>();
+  const edgeAttrMap = new Map<string, string>();
+  const nativeBlocks: any[] = [];
+  for (const block of getArray(graphEl.attributes)) {
+    for (const attr of getArray(block?.attribute)) {
       if (attr?.['@_id'] && attr?.['@_title']) {
-        attrMap.set(attr['@_id'], attr['@_title']);
+        (block['@_class'] === 'edge' ? edgeAttrMap : nodeAttrMap).set(String(attr['@_id']), String(attr['@_title']));
       }
     }
   }
 
+  for (const block of getArray<any>(graphEl.attributes)) {
+    const attribute = getArray<any>(block.attribute).filter((attr) => !getKnownAttributes(block['@_class'] === 'edge' ? 'edge' : 'node').has(String(attr['@_title'])));
+    if (attribute.length) nativeBlocks.push({ ...block, attribute });
+  }
   // Parse nodes
   const nodes: GraphNode[] = [];
-  function parseNodes(nodeEls: any, parentId: string | null) {
-    for (const n of asArray(nodeEls)) {
-      const attvals = getAttValues(n, attrMap);
+  function addNodes(nodeEls: any, parentId: string | null) {
+    for (const n of getArray(nodeEls)) {
+      const attvals = getAttValues(n, nodeAttrMap, getArray<any>(graphEl.attributes).filter((block) => block['@_class'] === 'node'));
       const id = String(n['@_id']);
 
       // pid attribute takes precedence, then attvalue, then structural parent
@@ -271,101 +357,113 @@ export function fromGEXF(xml: string): Graph {
         id,
         parentId: pid ?? attvals['parentId'] ?? parentId,
         initialNodeId: attvals['initialNodeId'] ?? null,
-        label: n['@_label'] ?? '',
+        label: getLabel(n['@_label'], attvals['_stately']),
         data:
           attvals['data'] !== undefined
-            ? tryParseJSON(attvals['data'])
+            ? getParsedJSON(attvals['data'])
             : undefined,
       };
-      if (attvals['shape']) (node as any).shape = attvals['shape'];
+      if (attvals['shape'] !== undefined) (node as any).shape = attvals['shape'];
       if (attvals['style'] !== undefined) {
-        node.style = tryParseJSON(attvals['style']);
+        node.style = getParsedJSON(attvals['style']);
       }
       if (attvals['ports'] !== undefined) {
-        node.ports = tryParseJSON(attvals['ports']);
+        node.ports = getParsedJSON(attvals['ports']);
       }
 
       // Viz properties
-      const pos = n['viz:position'];
+      const pos = (n['viz:position'] ?? n.position);
       if (pos) {
-        node.x = parseNumber(pos['@_x'] ?? 0, '<viz:position> x', 'node', id);
-        node.y = parseNumber(pos['@_y'] ?? 0, '<viz:position> y', 'node', id);
+        node.x = getNumber(pos['@_x'] ?? 0, '<viz:position> x', 'node', id);
+        node.y = getNumber(pos['@_y'] ?? 0, '<viz:position> y', 'node', id);
       }
-      const size = n['viz:size'];
+      const size = (n['viz:size'] ?? n.size);
       if (size) {
-        node.width = parseNumber(size['@_value'] ?? 0, '<viz:size>', 'node', id);
+        node.width = getNumber(size['@_value'] ?? 0, '<viz:size>', 'node', id);
         node.height = node.width;
       }
       if (attvals['width'] !== undefined) {
-        node.width = parseNumber(attvals['width'], 'width attribute', 'node', id);
+        node.width = getNumber(attvals['width'], 'width attribute', 'node', id);
       }
       if (attvals['height'] !== undefined) {
-        node.height = parseNumber(
+        node.height = getNumber(
           attvals['height'],
           'height attribute',
           'node',
           id,
         );
       }
-      const color = n['viz:color'];
+      const color = (n['viz:color'] ?? n.color);
       if (color) {
         const r = Number(color['@_r'] ?? 0);
         const g = Number(color['@_g'] ?? 0);
         const b = Number(color['@_b'] ?? 0);
-        node.color = `#${hex(r)}${hex(g)}${hex(b)}`;
+        node.color = color['@_hex'] ?? `#${getHex(r)}${getHex(g)}${getHex(b)}`;
       }
 
+      const privateData = getPrivateData(attvals['_stately']);
+      for (const key of privateData?.absentGeometry ?? []) {
+        // Only suppress the values fabricated by our own exporter, never edits.
+        const fallback = key === 'height' ? node.width : key === 'width' ? node.height : 0;
+        if ((node as any)[key] === fallback) delete (node as any)[key];
+      }
+      if (attvals['_statelyColor'] !== undefined) {
+        const original = getParsedJSON(attvals['_statelyColor']);
+        if (!color || getColor(original) === node.color?.toLowerCase()) node.color = original;
+      }
+      if ((n['viz:shape'] ?? n.shape)?.['@_value'] !== undefined && !attvals['shape']) node.shape = (n['viz:shape'] ?? n.shape)['@_value'];
+      node.data = createFormatData(node.data, 'gexf', getNativeMetadata(n, nodeAttrMap,'node'));
       nodes.push(node);
 
       // Handle nested hierarchy (GEXF 1.2+ style)
       const nested = n.nodes?.node ?? n.node;
       if (nested) {
-        parseNodes(nested, id);
+        addNodes(nested, id);
       }
     }
   }
 
   const nodeEls = graphEl.nodes?.node ?? graphEl.node;
-  parseNodes(nodeEls, null);
+  addNodes(nodeEls, null);
 
   // Parse edges
   const edgeEls = graphEl.edges?.edge ?? graphEl.edge;
-  const edges: GraphEdge[] = asArray(edgeEls).map((e: any, i: number) => {
-    const attvals = getAttValues(e, attrMap);
+  const edges: GraphEdge[] = getArray(edgeEls).map((e: any, i: number) => {
+    const attvals = getAttValues(e, edgeAttrMap, getArray<any>(graphEl.attributes).filter((block) => block['@_class'] === 'edge'));
     const id = String(e['@_id'] ?? `e${i}`);
     const edge: GraphEdge = {
       type: 'edge',
       id,
       sourceId: String(e['@_source']),
       targetId: String(e['@_target']),
-      label: e['@_label'] ?? '',
+      label: getLabel(e['@_label'], attvals['_stately']),
       data:
         attvals['data'] !== undefined
-          ? tryParseJSON(attvals['data'])
+          ? getParsedJSON(attvals['data'])
           : undefined,
-      ...(attvals['weight'] !== undefined && {
-        weight: parseNumber(attvals['weight'], 'weight attribute', 'edge', id),
+      ...((e['@_weight'] !== undefined || attvals['weight'] !== undefined) && {
+        weight: getNumber(e['@_weight'] ?? attvals['weight'], 'weight attribute', 'edge', id),
       }),
       ...(attvals['points'] !== undefined && {
-        points: tryParseJSON(attvals['points']),
+        points: getParsedJSON(attvals['points']),
       }),
       ...(attvals['routing'] !== undefined && {
         routing: attvals['routing'] as GraphEdge['routing'],
       }),
       ...(attvals['x'] !== undefined && {
-        x: parseNumber(attvals['x'], 'x attribute', 'edge', id),
+        x: getNumber(attvals['x'], 'x attribute', 'edge', id),
       }),
       ...(attvals['y'] !== undefined && {
-        y: parseNumber(attvals['y'], 'y attribute', 'edge', id),
+        y: getNumber(attvals['y'], 'y attribute', 'edge', id),
       }),
       ...(attvals['width'] !== undefined && {
-        width: parseNumber(attvals['width'], 'width attribute', 'edge', id),
+        width: getNumber(attvals['width'], 'width attribute', 'edge', id),
       }),
       ...(attvals['height'] !== undefined && {
-        height: parseNumber(attvals['height'], 'height attribute', 'edge', id),
+        height: getNumber(attvals['height'], 'height attribute', 'edge', id),
       }),
       ...(attvals['style'] !== undefined && {
-        style: tryParseJSON(attvals['style']),
+        style: getParsedJSON(attvals['style']),
       }),
       ...(attvals['sourcePort'] !== undefined && {
         sourcePort: attvals['sourcePort'],
@@ -374,41 +472,43 @@ export function fromGEXF(xml: string): Graph {
         targetPort: attvals['targetPort'],
       }),
     };
-    const color = e['viz:color'];
+    const color = (e['viz:color'] ?? e.color);
     if (color) {
       const r = Number(color['@_r'] ?? 0);
       const g = Number(color['@_g'] ?? 0);
       const b = Number(color['@_b'] ?? 0);
-      edge.color = `#${hex(r)}${hex(g)}${hex(b)}`;
+      edge.color = color['@_hex'] ?? `#${getHex(r)}${getHex(g)}${getHex(b)}`;
     }
     // Per-edge directedness override from the GEXF `type` attribute.
     const typeAttr = e['@_type'];
     if (typeAttr !== undefined) {
-      edge.mode = String(typeAttr) === 'undirected' ? 'undirected' : 'directed';
+      edge.mode = typeAttr === 'mutual' ? 'bidirectional' : typeAttr === 'undirected' ? 'undirected' : 'directed';
     }
+    if (attvals['_statelyColor'] !== undefined) {
+      const original = getParsedJSON(attvals['_statelyColor']);
+      if (!color || getColor(original) === edge.color?.toLowerCase()) edge.color = original;
+    }
+    edge.data = createFormatData(edge.data, 'gexf', getNativeMetadata(e, edgeAttrMap,'edge'));
     return edge;
   });
 
   return {
-    id: String(graphEl['@_id'] ?? ''),
+    id: String(graphEl['@_id'] ?? root?.id ?? ''),
     mode: graphType,
-    initialNodeId: graphEl['@_initialNodeId'] ?? null,
+    initialNodeId: graphEl['@_initialNodeId'] ?? root?.initialNodeId ?? null,
     nodes,
     edges,
-    data:
-      graphEl['@_data'] !== undefined
-        ? tryParseJSON(String(graphEl['@_data']))
-        : (undefined as any),
-    ...(graphEl['@_direction'] && { direction: graphEl['@_direction'] }),
-    ...(graphEl['@_style'] !== undefined && {
-      style: tryParseJSON(String(graphEl['@_style'])),
+    data: createFormatData(graphEl['@_data'] !== undefined ? getParsedJSON(String(graphEl['@_data'])) : root?.data, 'gexf', { ...(nativeMeta && { meta: nativeMeta }), ...(nativeBlocks.length && { attributes: nativeBlocks }), ...(Object.keys(graphEl).some((key) => ['@_mode','@_timeformat','@_start','@_end','@_timestamp','@_timezone','@_timerepresentation','@_idtype'].includes(key)) && {graphAttributes:Object.fromEntries(Object.entries(graphEl).filter(([key]) => ['@_mode','@_timeformat','@_start','@_end','@_timestamp','@_timezone','@_timerepresentation','@_idtype'].includes(key)))}) }),
+    ...((graphEl['@_direction'] ?? root?.direction) !== undefined && { direction: graphEl['@_direction'] ?? root?.direction }),
+    ...((graphEl['@_style'] !== undefined || root?.style !== undefined) && {
+      style: graphEl['@_style'] !== undefined ? getParsedJSON(String(graphEl['@_style'])) : root.style,
     }),
   };
 }
 
 // --- Helpers ---
 
-function asArray<T>(val: T | T[] | undefined): T[] {
+function getArray<T>(val: T | T[] | undefined): T[] {
   if (val === undefined) return [];
   return Array.isArray(val) ? val : [val];
 }
@@ -416,19 +516,23 @@ function asArray<T>(val: T | T[] | undefined): T[] {
 function getAttValues(
   el: any,
   attrMap: Map<string, string>,
+  blocks: any[] = [],
 ): Record<string, string> {
-  const result: Record<string, string> = {};
+  const result: Record<string, string> = Object.create(null);
+  for (const block of blocks) for (const attr of getArray<any>(block.attribute)) {
+    if (attr.default !== undefined) result[String(attr['@_title'])] = String(typeof attr.default === 'object' ? attr.default['#text'] ?? '' : attr.default);
+  }
   const attvalues = el?.attvalues?.attvalue;
-  for (const av of asArray(attvalues)) {
+  for (const av of getArray(attvalues)) {
     if (av?.['@_for'] != null) {
-      const title = attrMap.get(av['@_for']) ?? av['@_for'];
+      const title = attrMap.get(String(av['@_for'])) ?? av['@_for'];
       result[title] = String(av['@_value'] ?? '');
     }
   }
   return result;
 }
 
-function tryParseJSON(str: string): any {
+function getParsedJSON(str: string): any {
   try {
     return JSON.parse(str);
   } catch {
@@ -436,7 +540,7 @@ function tryParseJSON(str: string): any {
   }
 }
 
-function parseNumber(
+function getNumber(
   value: any,
   field: string,
   kind: 'node' | 'edge',
@@ -451,10 +555,56 @@ function parseNumber(
   return parsed;
 }
 
-function hex(n: number): string {
+function getHex(n: number): string {
   return n.toString(16).padStart(2, '0');
 }
 
 /** Bidirectional converter for GEXF (Graph Exchange XML Format). */
 export const gexfConverter: GraphFormatConverter<string> =
   createFormatConverter(toGEXF, fromGEXF);
+
+function getKnownAttributes(kind: 'node' | 'edge'): Set<string> {
+  return new Set(kind === 'node' ? ['parentId','initialNodeId','data','shape','width','height','style','ports','_stately','_statelyColor'] : ['data','weight','x','y','width','height','style','points','routing','sourcePort','targetPort','_stately','_statelyColor']);
+}
+
+function getNativeMetadata(el: any, declarations: Map<string, string>, kind: 'node' | 'edge'): Record<string, any> {
+  const values = getArray<any>(el.attvalues?.attvalue).filter((value) => !getKnownAttributes(kind).has(declarations.get(String(value['@_for'])) ?? String(value['@_for'])));
+  const extra: Record<string, any> = {};
+  for (const [key, value] of Object.entries(el)) {
+    if (['@_start', '@_end', '@_timestamp', '@_timestamps', '@_intervals', '@_kind', 'spells', 'parents', 'viz:thickness', 'viz:shape'].includes(key)) extra[key] = value;
+  }
+  const position = el['viz:position'] ?? el.position, color = el['viz:color'] ?? el.color;
+  if (position?.['@_z'] !== undefined) extra.z = position['@_z'];
+  if (color?.['@_a'] !== undefined) extra.alpha = color['@_a'];
+  if (el.shape !== undefined) extra['viz:shape'] = el.shape;
+  if (el.thickness !== undefined) extra['viz:thickness'] = el.thickness;
+  return { ...(values.length && { values }), ...(Object.keys(extra).length && { native: extra }) };
+}
+
+function getPrivateData(value: string | undefined): any {
+  const parsed = value === undefined ? undefined : getParsedJSON(value);
+  return parsed?.format === 'stately' && parsed.version === 1 ? parsed : undefined;
+}
+
+function getLabel(value: string | undefined, metadata: string | undefined): string | null {
+  return (value === undefined && getPrivateData(metadata)?.nullLabel) ? null : value ?? '';
+}
+
+function getColor(value: unknown): string | undefined {
+  return typeof value === 'string' && /^#?[0-9a-fA-F]{6}$/.test(value) ? `#${value.replace('#','').toLowerCase()}` : undefined;
+}
+
+/** Exact native source with a partial Graph projection and verified literal-label patches. */
+export const gexfDocumentConverter = createGraphDocumentConverter({
+  format: 'gexf',
+  codec: { from: fromGEXF, to: toGEXF },
+  project: (source) => getXMLDocumentProjection(source, 'gexf', fromGEXF),
+  patch: (context) => getXMLDocumentPatch(context, 'gexf'),
+});
+
+function getStandardRoot(value: unknown): any {
+  const text = typeof value === 'string' ? value : value && typeof value === 'object' ? (value as any)['#text'] : undefined;
+  if (typeof text !== 'string') return undefined;
+  const parsed = getParsedJSON(text);
+  return parsed?.format === '@statelyai/graph/gexf-root' && parsed.version === 1 && parsed.root && typeof parsed.root === 'object' && !Array.isArray(parsed.root) && typeof parsed.root.id === 'string' ? parsed.root : undefined;
+}

@@ -187,3 +187,59 @@ graph [
     });
   });
 });
+
+describe('GML native fidelity', () => {
+  it('decodes standard string entities and exports entity-escaped text', () => {
+    const graph = fromGML('graph [ node [ id 0 label "A &amp; &quot;B&quot; &#228;" ] ]');
+    expect(graph.nodes[0].label).toBe('A & "B" ä');
+    expect(toGML(graph)).toContain('label "A &amp; &quot;B&quot; &#228;"');
+  });
+
+  it.each(['graph [ node [ id 0 ]', 'graph [ node [ id 0 label "unfinished', 'graph [ node [ id 0 ] ] ]'])('rejects malformed document %s', (source) => {
+    expect(() => fromGML(source)).toThrow('GML:');
+  });
+
+  it('retains ordered repeated foreign attributes', () => {
+    const source = 'graph [ comment "network" node [ id 0 custom [ item "first" item "second" ] ] ]';
+    const output = toGML(fromGML(source));
+    expect(output).toContain('comment "network"');
+    expect(output.indexOf('item "first"')).toBeLessThan(output.indexOf('item "second"'));
+    expect(fromGML(output).nodes[0].data).toEqual(fromGML(source).nodes[0].data);
+  });
+});
+
+describe('GML standard interoperability options', () => {
+  it('emits integer references and restores original Graph IDs and node ordering', () => {
+    const graph: Graph = {id:'network',mode:'directed',data:undefined,nodes:[{type:'node',id:'child',parentId:'parent',label:null,data:undefined},{type:'node',id:'parent',parentId:null,label:null,data:undefined}],edges:[{type:'edge',id:'connection',sourceId:'parent',targetId:'child',label:null,data:undefined}]};
+    const output = toGML(graph,{standard:true});
+    expect(output).toContain('id 0');
+    expect(output).toContain('source 1');
+    expect(output).toContain('target 0');
+    const restored = fromGML(output,{standard:true});
+    expect(restored.id).toBe('network');
+    expect(restored.nodes.map((node) => node.id)).toEqual(['child','parent']);
+    expect(restored.edges[0]).toMatchObject({id:'connection',sourceId:'parent',targetId:'child',label:null});
+  });
+
+  it('preserves JSON and labels containing backslashes while accepting legacy imports', () => {
+    const graph: Graph = {id:'g',mode:'directed',data:{path:'C:\\new\\folder'},nodes:[{type:'node',id:'a',parentId:null,label:'C:\\new',data:'literal \\n'}],edges:[]};
+    const restored = fromGML(toGML(graph));
+    expect(restored.data).toEqual(graph.data);
+    expect(restored.nodes[0].label).toBe(graph.nodes[0].label);
+    expect(restored.nodes[0].data).toBe(graph.nodes[0].data);
+    expect(fromGML('graph [ node [ id "a" label "C:\\\\new" ] ]').nodes[0].label).toBe('C:\\new');
+    expect(fromGML('graph [ node [ id 0 label "C:\\\\new" ] ]',{standard:true}).nodes[0].label).toBe('C:\\\\new');
+  });
+});
+
+describe('GML foreign graphics', () => {
+  it('retains unknown graphics beside mapped geometry', () => {
+    const source = 'graph [ node [ id 0 graphics [ x 10 y 20 fill "red" type "ellipse" ] ] ]';
+    const graph = fromGML(source);
+    const output = toGML(graph);
+    expect(output).toContain('fill "red"');
+    expect(output).toContain('type "ellipse"');
+    expect(fromGML(output).nodes[0]).toMatchObject({x:10,y:20});
+    expect(fromGML(output).nodes[0].data).toEqual(graph.nodes[0].data);
+  });
+});

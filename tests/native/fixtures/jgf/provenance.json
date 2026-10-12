@@ -1,0 +1,24 @@
+{
+  "retrieved": "2026-10-12",
+  "repository": "https://github.com/jsongraph/json-graph-specification",
+  "commit": "758ab3d0275dc2fa96ddfec9a0d0ca2c5f440b99",
+  "files": [
+    {
+      "file": "json-graph-schema_v1.json",
+      "url": "https://raw.githubusercontent.com/jsongraph/json-graph-specification/758ab3d0275dc2fa96ddfec9a0d0ca2c5f440b99/json-graph-schema_v1.json",
+      "sha256": "28dda9987e5c4335dc96020906a68d14e88c27a0df8b18509dad51b708abcb7d"
+    },
+    {
+      "file": "json-graph-schema_v2.json",
+      "url": "https://raw.githubusercontent.com/jsongraph/json-graph-specification/758ab3d0275dc2fa96ddfec9a0d0ca2c5f440b99/json-graph-schema_v2.json",
+      "sha256": "9d3cd9dd6e78e3186cdb886a0f30f2f40407cface074ab2e877bfd2b2a59f258"
+    },
+    {
+      "file": "LICENSE",
+      "url": "https://raw.githubusercontent.com/jsongraph/json-graph-specification/758ab3d0275dc2fa96ddfec9a0d0ca2c5f440b99/LICENSE",
+      "sha256": "d0a726d891d49cda0458f53e05c95ebbb46a12afbb18a0b975dad7989e1decca"
+    }
+  ],
+  "changes": "Unmodified upstream bytes.",
+  "licenseFile": "LICENSE"
+}

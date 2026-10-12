@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" xmlns:ns1="http://gexf.net/1.3">
+  <xs:import namespace="http://gexf.net/1.3" schemaLocation="gexf.xsd"/>
+  <!-- Extends node -->
+  <!-- Extend edge -->
+  <!-- Color -->
+  <xs:attributeGroup name="color-content">
+    <xs:attribute name="r" type="color-channel"/>
+    <xs:attribute name="g" type="color-channel"/>
+    <xs:attribute name="b" type="color-channel"/>
+    <xs:attribute name="hex" type="xs:token"/>
+    <xs:attribute name="a" type="alpha-channel"/>
+  </xs:attributeGroup>
+  <!-- Position -->
+  <xs:attributeGroup name="position-content">
+    <xs:attribute name="x" use="required" type="xs:float"/>
+    <xs:attribute name="y" use="required" type="xs:float"/>
+    <xs:attribute name="z" type="xs:float"/>
+  </xs:attributeGroup>
+  <!-- Size -->
+  <xs:attributeGroup name="size-content">
+    <xs:attribute name="value" use="required" type="size-type"/>
+  </xs:attributeGroup>
+  <!-- Thickness -->
+  <xs:attributeGroup name="thickness-content">
+    <xs:attribute name="value" use="required" type="thickness-type"/>
+  </xs:attributeGroup>
+  <!-- Node shape -->
+  <xs:attributeGroup name="node-shape-content">
+    <xs:attribute name="value" use="required" type="node-shape-type"/>
+    <xs:attribute name="uri" type="xs:anyURI"/>
+  </xs:attributeGroup>
+  <!-- Edge shape -->
+  <xs:attributeGroup name="edge-shape-content">
+    <xs:attribute name="value" use="required" type="edge-shape-type"/>
+  </xs:attributeGroup>
+  <!-- Color -->
+  <xs:simpleType name="color-channel">
+    <xs:restriction base="xs:nonNegativeInteger">
+      <xs:maxInclusive value="255"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Alpha Channel -->
+  <xs:simpleType name="alpha-channel">
+    <xs:restriction base="xs:float">
+      <xs:minInclusive value="0.0"/>
+      <xs:maxInclusive value="1.0"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Size -->
+  <xs:simpleType name="size-type">
+    <xs:restriction base="xs:float">
+      <xs:minInclusive value="0.0"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Thickness -->
+  <xs:simpleType name="thickness-type">
+    <xs:restriction base="xs:float">
+      <xs:minInclusive value="0.0"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Node shape -->
+  <xs:simpleType name="node-shape-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="disc"/>
+      <xs:enumeration value="square"/>
+      <xs:enumeration value="triangle"/>
+      <xs:enumeration value="diamond"/>
+      <xs:enumeration value="image"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Edge shape -->
+  <xs:simpleType name="edge-shape-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="solid"/>
+      <xs:enumeration value="dotted"/>
+      <xs:enumeration value="dashed"/>
+      <xs:enumeration value="double"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

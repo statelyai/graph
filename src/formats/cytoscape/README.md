@@ -7,6 +7,24 @@ Converter for [Cytoscape.js](https://js.cytoscape.org/) JSON format — the stan
 The converter uses plain JSON and does not require the `cytoscape` runtime.
 Install `cytoscape` only when passing the converted data to Cytoscape.js.
 
+## Preservation
+
+<!-- preservation contract for cytoscape derived from src/formats/support.ts and converter implementation -->
+
+Graph round-trip: **partial**. Native semantic round-trip: **partial**.
+Source document preservation: **none**. These are separate guarantees;
+selected-field round-trip tests do not prove unrestricted losslessness.
+
+Imports grouped elements, including omitted empty groups from `cy.json()`, and flat element arrays. Grouped output retains native element properties, viewport and user data through a JSON snapshot. Null labels, empty strings and independent coordinates use versioned metadata. Edge IDs that collide with node IDs are qualified for Cytoscape’s global element namespace, with Graph IDs retained in metadata. Flat input is normalized to grouped output; declaration order across node and edge groups is not preserved.
+
+
+<!-- native metadata policy derived from src/formats/preservation.ts -->
+
+Native snapshots use a private JSON convention on Graph data. Serialize `cy.json()` before document import to remove JavaScript-only undefined fields. Import options
+`{ metadata: 'native' }` disable adapter marker interpretation. A foreign value
+that deliberately matches the marker schema remains ambiguous in automatic mode.
+Comments, lexical formatting and source locations are not preserved.
+
 ## Resources
 
 - [Cytoscape.js documentation](https://js.cytoscape.org/)
@@ -63,7 +81,7 @@ const imported = fromCytoscapeJSON({
 
 <!-- Cytoscape fidelity notes derived from src/formats/cytoscape/index.ts -->
 
-Preserves graph `mode`, `initialNodeId`, `data`, `direction`, `style`; node `parentId` (as `parent`), position (`x`/`y`), `shape`, `color`, `width`, `height`, `style`, `label`, `ports`; and edge `weight`, visual/style fields, `sourcePort`, `targetPort`, and `data`.
+Maps selected graph `mode`, `initialNodeId`, `data`, `direction`, `style`; node `parentId` (as `parent`), position (`x`/`y`), `shape`, `color`, `width`, `height`, `style`, `label`, `ports`; and edge `weight`, visual/style fields, `sourcePort`, `targetPort`, and `data`.
 
 ### `cytoscapeConverter`
 
@@ -81,3 +99,21 @@ const graph = cytoscapeConverter.from(cyto);
 | `CytoscapeJSON` | Top-level `{ data?, elements: { nodes, edges } }` |
 | `CytoscapeNode` | `{ data: { id, parent?, ... }, position? }` |
 | `CytoscapeEdge` | `{ data: { id, source, target, ... } }` |
+
+
+## Native documents
+
+<!-- cytoscapeDocumentConverter derived from src/formats/cytoscape/index.ts and src/formats/document/index.ts -->
+
+`cytoscapeDocumentConverter.from(source)` creates a plain JSON document with the
+original source and a separate Graph projection. `.to(document)` preserves exact
+source when unchanged, including after JSON serialization. Supported edits patch
+verified native fields; unsupported edits throw with diagnostics. `.getUpdate(document)`
+returns a diagnostic-bearing result. Native semantic projection remains partial.
+
+Grouped and flat source shapes, including interleaved elements, stay intact. Labels, mapped styles/weights/geometry and user data patch native fields. Structural edits and user data colliding with native entity keys reject.
+
+Bare exports interpret recognized import carriers by default. Use
+`{ nativeCarrier: false }` when Graph data is user-authored and could match the
+private carrier schema. Document projection pins importer state to its external
+source before unwrapping it, preserving foreign lookalikes.

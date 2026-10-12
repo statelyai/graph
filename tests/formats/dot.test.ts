@@ -20,7 +20,7 @@ describe('toDOT', () => {
     const dot = toDOT(g);
     expect(dot).toContain('digraph test');
     expect(dot).toContain('a [label="Node A"]');
-    expect(dot).toContain('a -> b [label="goes to"]');
+    expect(fromDOT(dot).edges[0]).toMatchObject({id:'e1',sourceId:'a',targetId:'b',label:'goes to'});
   });
 
   it('exports undirected graph', () => {

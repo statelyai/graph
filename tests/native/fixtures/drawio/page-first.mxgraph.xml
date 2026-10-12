@@ -1,0 +1,23 @@
+<mxGraphModel dx="0" dy="0" grid="1"><root>
+      <mxCell id="0" />
+      <mxCell id="1" parent="0" />
+      <mxCell id="layer-extra" value="Extra layer" parent="0" />
+      <mxCell id="group" value="Group" style="group;" vertex="1" parent="1">
+        <mxGeometry x="100" y="80" width="300" height="180" as="geometry" />
+      </mxCell>
+      <UserObject id="a" label="&lt;b&gt;Alpha &amp;amp; α&lt;/b&gt;" vendor="KEEP" count="007">
+        <mxCell style="rounded=1;html=1;fillColor=#dae8fc;" vertex="1" parent="group">
+          <mxGeometry x="20" y="30" width="120" height="60" as="geometry" />
+        </mxCell>
+      </UserObject>
+      <mxCell id="b" value="" style="ellipse;html=0;" vertex="1" parent="layer-extra">
+        <mxGeometry x="500" y="80" width="80" height="80" as="geometry" />
+      </mxCell>
+      <mxCell id="edge" value="label" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" edge="1" source="a" target="b" parent="1">
+        <mxGeometry x="0.5" y="-12" relative="1" as="geometry">
+          <mxPoint x="3" y="4" as="offset" />
+          <Array as="points"><mxPoint x="250" y="140" /><mxPoint x="400" y="140" /></Array>
+        </mxGeometry>
+      </mxCell>
+    </root></mxGraphModel>
+  

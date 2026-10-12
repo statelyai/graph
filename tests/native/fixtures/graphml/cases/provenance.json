@@ -1,0 +1,17 @@
+{
+  "created": "2026-10-12",
+  "author": "@statelyai/graph native regression fixtures",
+  "license": "Repository MIT license; authored examples, not upstream schema copies.",
+  "specification": "https://graphml.graphdrawing.org/specification.html",
+  "files": [
+    {
+      "file": "scopes-ports.graphml",
+      "sha256": "7c917dca46b78b4cd65e5d32707281565e6c228c14a26587c3fbaed6591bdcc6"
+    },
+    {
+      "file": "nested-keyrefs.graphml",
+      "sha256": "b139a2a8f7d66f024f673f3470aeb522b6512f76f8193f5152916173f1f2c486"
+    }
+  ],
+  "notes": "nested-keyrefs.graphml intentionally demonstrates the official GraphML descendant identity-constraint ambiguity in libxml2; all other authored fixtures validate against their pinned profile."
+}

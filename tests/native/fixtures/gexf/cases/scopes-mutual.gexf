@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<g:gexf xmlns:g="http://gexf.net/1.3" version="1.3">
+  <g:meta><g:creator>Native fixture</g:creator><g:description>USER DESCRIPTION</g:description></g:meta>
+  <g:graph defaultedgetype="undirected">
+    <g:attributes class="node"><g:attribute id="shared" title="score" type="integer"><g:default>7</g:default></g:attribute></g:attributes>
+    <g:attributes class="edge"><g:attribute id="shared" title="tag" type="string"/></g:attributes>
+    <g:nodes><g:node id="a" label="A &#x3B1;"><g:attvalues><g:attvalue for="shared" value="9"/></g:attvalues><g:color r="1" g="2" b="3" a="0.5"/><g:position x="2" y="3" z="4"/></g:node><g:node id="b" label=""/><g:node id="isolated"/></g:nodes>
+    <g:edges><g:edge id="mutual" source="a" target="b" type="mutual" weight="2.5"><g:attvalues><g:attvalue for="shared" value="tagged"/></g:attvalues></g:edge></g:edges>
+  </g:graph>
+</g:gexf>

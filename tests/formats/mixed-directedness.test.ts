@@ -54,8 +54,8 @@ describe.each([
     // Undirected override survives.
     expect(getEdgeMode(out, e2)).toBe('undirected');
     expect(e2.mode).toBe('undirected');
-    // Bidirectional has no native representation → collapses to directed.
-    expect(getEdgeMode(out, e3)).toBe('directed');
+    // GEXF mutual and GraphML private mode metadata preserve bidirectional.
+    expect(getEdgeMode(out, e3)).toBe('bidirectional');
   });
 
   it('round-trips an undirected graph with a directed override', () => {

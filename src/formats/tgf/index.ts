@@ -1,3 +1,5 @@
+import { createGraphDocumentConverter } from '../document';
+import { getStructuredDocumentProjectionGraph, getStructuredDocumentPatch } from '../preservation';
 import type { Graph, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
 
@@ -22,14 +24,19 @@ import { createFormatConverter } from '../converter';
  */
 export function toTGF(graph: Graph): string {
   const lines: string[] = [];
+  const ids = new Set(graph.nodes.map((node) => node.id));
 
   for (const node of graph.nodes) {
+    if (!node.id || /\s/.test(node.id) || node.id === '#') throw new Error('TGF: node ids must be whitespace-free tokens other than #');
+    if (node.label != null && /[\r\n]/.test(node.label)) throw new Error('TGF: labels cannot contain newlines');
     lines.push(node.label ? `${node.id} ${node.label}` : node.id);
   }
 
   lines.push('#');
 
   for (const edge of graph.edges) {
+    if (!ids.has(edge.sourceId) || !ids.has(edge.targetId)) throw new Error('TGF: edge endpoint references a missing node');
+    if (edge.label != null && /[\r\n]/.test(edge.label)) throw new Error('TGF: labels cannot contain newlines');
     const parts = [edge.sourceId, edge.targetId];
     if (edge.label) parts.push(edge.label);
     lines.push(parts.join(' '));
@@ -53,18 +60,21 @@ export function fromTGF(tgf: string): Graph {
   if (typeof tgf !== 'string') {
     throw new Error('TGF: expected a string');
   }
-  const lines = tgf.split('\n');
-  const sepIdx = lines.indexOf('#');
+  const lines = tgf.split(/\r\n|\n|\r/);
+  const sepIdx = lines.findIndex((line) => line.trim() === '#');
   const nodeLines = sepIdx >= 0 ? lines.slice(0, sepIdx) : lines;
   const edgeLines = sepIdx >= 0 ? lines.slice(sepIdx + 1) : [];
 
   const nodes: Graph['nodes'] = [];
+  const ids = new Set<string>();
   for (const line of nodeLines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const spaceIdx = trimmed.indexOf(' ');
-    const id = spaceIdx >= 0 ? trimmed.slice(0, spaceIdx) : trimmed;
-    const label = spaceIdx >= 0 ? trimmed.slice(spaceIdx + 1) : '';
+    if (!line.trim()) continue;
+    const match = line.trimStart().match(/^(\S+)(?:[ \t]+(.*))?$/);
+    if (!match) throw new Error('TGF: malformed node declaration');
+    const id = match[1];
+    const label = match[2] ?? '';
+    if (ids.has(id)) throw new Error(`TGF: duplicate node id "${id}"`);
+    ids.add(id);
     nodes.push({
       type: 'node',
       id,
@@ -77,12 +87,12 @@ export function fromTGF(tgf: string): Graph {
 
   const edges: Graph['edges'] = [];
   for (const line of edgeLines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const parts = trimmed.split(' ');
-    const sourceId = parts[0];
-    const targetId = parts[1];
-    const label = parts.slice(2).join(' ');
+    if (!line.trim()) continue;
+    const match = line.trimStart().match(/^(\S+)[ \t]+(\S+)(?:[ \t]+(.*))?$/);
+    if (!match) throw new Error('TGF: malformed edge declaration');
+    const [, sourceId, targetId] = match;
+    const label = match[3] ?? '';
+    if (!ids.has(sourceId) || !ids.has(targetId)) throw new Error('TGF: edge endpoint references a missing node');
     edges.push({
       type: 'edge',
       id: `e${edges.length}`,
@@ -122,3 +132,12 @@ export function fromTGF(tgf: string): Graph {
  */
 export const tgfConverter: GraphFormatConverter<string> =
   createFormatConverter(toTGF, fromTGF);
+
+
+/** Exact native source preservation, with strict verified field edits. */
+export const tgfDocumentConverter = createGraphDocumentConverter({
+  format: 'tgf',
+  codec: { from: (source: string) => fromTGF(source), to: toTGF },
+  project: (source: string) => ({ graph: getStructuredDocumentProjectionGraph(fromTGF(source), source, 'tgf') }),
+  patch: (context) => getStructuredDocumentPatch(context, 'tgf'),
+});

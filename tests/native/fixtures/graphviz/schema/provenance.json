@@ -1,0 +1,27 @@
+{
+  "retrieved": "2026-10-12",
+  "repository": "https://gitlab.com/graphviz/graphviz",
+  "source": "doc/infosrc/graphviz_json_schema.json",
+  "documentation": "https://graphviz.org/docs/outputs/json/",
+  "license": "EPL-2.0",
+  "entry": "graphviz_json_schema.json",
+  "files": [
+    {
+      "file": "graphviz_json_schema.json",
+      "sha256": "0a9656975cea8c14f2b6d7ae172c89f981dc98283abebab84b8ebd8fe48b316d",
+      "url": "https://gitlab.com/api/v4/projects/graphviz%2Fgraphviz/repository/blobs/a28b72e11bf5ab44781452063148e3323a23d602/raw",
+      "blob": "a28b72e11bf5ab44781452063148e3323a23d602",
+      "modifications": []
+    },
+    {
+      "file": "LICENSE.txt",
+      "sha256": "0becf16567beb77fa252b7664631dd177c8f9a1889e48995b45379c7130e5303",
+      "url": "https://gitlab.com/api/v4/projects/graphviz%2Fgraphviz/repository/blobs/e23ece2c852415800ac224b74ede6c5849f6f88d/raw",
+      "blob": "e23ece2c852415800ac224b74ede6c5849f6f88d",
+      "modifications": []
+    }
+  ],
+  "limits": [
+    "The upstream schema places additionalProperties inside properties, so unknown attributes are not constrained by a top-level additionalProperties rule. Runtime adapter separately validates known label/weight/geometry types and indexed references."
+  ]
+}

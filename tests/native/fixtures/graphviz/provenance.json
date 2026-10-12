@@ -1,0 +1,36 @@
+{
+  "generated": "2026-10-12",
+  "enginePackage": "@hpcc-js/wasm-graphviz",
+  "packageVersion": "1.22.0",
+  "engineVersion": "15.0.0",
+  "command": "engine.layout(source, 'json', 'dot')",
+  "license": "Own DOT fixtures; Graphviz output derived from those inputs. Graphviz 15 EPL-2.0; WASM wrapper Apache-2.0.",
+  "documentation": "https://graphviz.org/docs/outputs/json/",
+  "files": [
+    {
+      "file": "strict-ports.dot",
+      "sha256": "d39cbc028e60dc86bffc1eb6bd9c878907106757f845b8d093c0d374647b268f"
+    },
+    {
+      "file": "strict-ports.json",
+      "sha256": "3a4985bebfd3cd80488868bf69033012f3d160a280d8ac4c944104063a134ad6"
+    },
+    {
+      "file": "clusters-ranks.dot",
+      "sha256": "fe0d0b0e96fd99ba3cddae62af7936291a0206dbd7723fb8cfd5b08c05b7cf20"
+    },
+    {
+      "file": "clusters-ranks.json",
+      "sha256": "b8b35f14f42ac5d845398f86643af6539a9d2d60e72ae0599e2018bd810b66b4"
+    },
+    {
+      "file": "parallel-undirected.dot",
+      "sha256": "87d95ac5e09d3d31df533e79353c33a196a23f8d03927783b025ef5b99f4752f"
+    },
+    {
+      "file": "parallel-undirected.json",
+      "sha256": "21dbca163dbe9793bb98921fbc0f2b7d067b6caa7d5ab755e812844721c0cc58"
+    }
+  ],
+  "serialization": "Generated JSON capture formatting normalizes trailing horizontal whitespace only; parsed native JSON values remain unchanged."
+}

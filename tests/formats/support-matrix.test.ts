@@ -11,10 +11,11 @@ import { fromGML, toGML } from '../../src/formats/gml';
 import { fromGraphML, toGraphML } from '../../src/formats/graphml';
 import { fromJGF, toJGF } from '../../src/formats/jgf';
 import { fromXYFlow, toXYFlow } from '../../src/formats/xyflow';
+import type { FormatSupportEntry } from '../../src/format-support';
 import type { Graph, VisualGraph } from '../../src/types';
 import { expectFixtureRoundTrip } from './fixture-roundtrip';
 
-const ROUND_TRIP_KEYS = {
+const SELECTED_FIXTURE_KEYS = {
   graphKeys: ['initialNodeId', 'data', 'direction', 'style'] as Array<keyof Graph>,
   nodeKeys: [
     'parentId',
@@ -31,6 +32,7 @@ const ROUND_TRIP_KEYS = {
     'ports',
   ] as Array<keyof Graph['nodes'][number]>,
   edgeKeys: [
+    'mode',
     'label',
     'weight',
     'data',
@@ -47,7 +49,7 @@ const ROUND_TRIP_KEYS = {
   ] as Array<keyof Graph['edges'][number]>,
 };
 
-const FULL_ROUND_TRIP_CHECKS = {
+const SELECTED_FIXTURE_CHECKS = {
   cytoscape: (graph: Graph) => fromCytoscapeJSON(toCytoscapeJSON(graph)),
   d3: (graph: Graph) => fromD3Graph(toD3Graph(graph)),
   elk: (graph: Graph) => fromELK(toELK(graph as VisualGraph)),
@@ -65,7 +67,25 @@ describe('format support matrix', () => {
     expect(ids).toEqual(
       expect.arrayContaining([
         'adjacency-list',
+        'adjacency-matrix',
+        'matrix-market',
+        'graphviz-json',
+        'drawio',
+        'pajek',
+        'plantuml',
+        'mermaid/architecture',
+        'mermaid/requirement',
+        'mermaid/sankey',
+        'mermaid/gitgraph',
+        'mermaid/c4',
+        'mermaid/usecase',
+        'csv',
+        'tsv',
+        'graphology',
+        'graphlib',
+        'networkx',
         'cytoscape',
+        'd2',
         'd3',
         'dot',
         'edge-list',
@@ -88,12 +108,12 @@ describe('format support matrix', () => {
     );
   });
 
-  it('marks d2 as a full-fidelity syntax format with ports and no weight', () => {
+  it('describes d2 mappings without claiming complete syntax preservation', () => {
     const d2 = getFormatSupportEntry('d2');
     expect(d2).toBeDefined();
     expect(d2?.features.ports).toBe('full');
     expect(d2?.features.hierarchy).toBe('full');
-    expect(d2?.features.roundTrip).toBe('full');
+    expect(d2?.features.roundTrip).toBe('partial');
     expect(d2?.features.weight).toBe('none');
   });
 
@@ -110,7 +130,7 @@ describe('format support matrix', () => {
     const state = getFormatSupportEntry('mermaid/state');
 
     expect(state).toBeDefined();
-    // Isolated plain states and plain node labels are dropped on emit.
+    // Diagram-specific mappings do not establish complete preservation.
     expect(state?.features.roundTrip).toBe('partial');
     expect(state?.notes.join('\n')).toContain('data');
     expect(state?.notes.join('\n')).toContain('Isolated');
@@ -136,7 +156,7 @@ describe('format support matrix', () => {
     // both dialects (nested <graph>, native <port>, sourceport/targetport).
     expect(graphml?.features.hierarchy).toBe('full');
     expect(graphml?.features.ports).toBe('full');
-    expect(graphml?.features.roundTrip).toBe('full');
+    expect(graphml?.features.roundTrip).toBe('partial');
     expect(graphml?.notes.join('\n')).toContain('both dialects');
     expect(graphml?.notes.join('\n')).toContain('nested `<graph>`');
     expect(graphml?.notes.join('\n')).toContain('`<port>`');
@@ -144,33 +164,46 @@ describe('format support matrix', () => {
     expect(graphml?.notes.join('\n')).toContain('first `<graph>`');
   });
 
-  it('marks lossless metadata adapters as full round-trip', () => {
-    for (const id of ['cytoscape', 'd3', 'elk', 'gexf', 'gml', 'jgf', 'xyflow']) {
-      expect(getFormatSupportEntry(id)?.features.roundTrip).toBe('full');
+  it('separates Graph, native semantic and source document preservation', () => {
+    for (const entry of FORMAT_SUPPORT_MATRIX) {
+      expect(entry.preservation, entry.id).toEqual({
+        graph: 'partial',
+        native: entry.id === 'edge-list' ? 'full' : 'partial',
+        document: entry.id === 'd2' || entry.id.startsWith('mermaid/') ? 'partial' : 'none',
+      });
+      expect(entry.features.roundTrip, entry.id).toBe(entry.preservation?.graph);
     }
   });
 
-  // Diagram-syntax formats (mermaid, d2) round-trip their own syntax fully but
-  // are not generic data containers — they don't preserve arbitrary foreign
-  // graph data (e.g. edge weights, untyped node data), so they're excluded from
-  // the generic fully-featured fixture conformance check.
-  const SYNTAX_FORMAT = (id: string) =>
-    id.startsWith('mermaid/') || id === 'd2';
-
-  it('has fixture conformance checks for generic full round-trip adapters', () => {
-    const genericFullRoundTripIds = FORMAT_SUPPORT_MATRIX.filter(
-      (entry) => entry.features.roundTrip === 'full' && !SYNTAX_FORMAT(entry.id),
-    ).map((entry) => entry.id);
-
-    expect(Object.keys(FULL_ROUND_TRIP_CHECKS).sort()).toEqual(
-      genericFullRoundTripIds.sort(),
-    );
+  it('retains compatibility with entries that only provide legacy features', () => {
+    const entry: FormatSupportEntry = {
+      id: 'custom',
+      importPath: 'custom/format',
+      features: FORMAT_SUPPORT_MATRIX[0].features,
+      notes: [],
+    };
+    expect(entry.preservation).toBeUndefined();
   });
 
-  it.each(Object.entries(FULL_ROUND_TRIP_CHECKS))(
-    '%s full round-trip claim preserves the fully featured fixture',
+  it('gives each built-in format a unique identity and an explicit preservation contract', () => {
+    expect(new Set(FORMAT_SUPPORT_MATRIX.map((entry) => entry.id)).size).toBe(
+      FORMAT_SUPPORT_MATRIX.length,
+    );
+    expect(FORMAT_SUPPORT_MATRIX.every((entry) => entry.preservation !== undefined)).toBe(true);
+  });
+
+  // These checks project selected fields and sort entities. They characterize
+  // known mappings, not complete Graph, native format or source conformance.
+  it('keeps selected fixture characterizations for structured adapters', () => {
+    expect(Object.keys(SELECTED_FIXTURE_CHECKS).sort()).toEqual([
+      'cytoscape', 'd3', 'elk', 'gexf', 'gml', 'graphml', 'jgf', 'xyflow',
+    ]);
+  });
+
+  it.each(Object.entries(SELECTED_FIXTURE_CHECKS))(
+    '%s preserves the selected fixture fields (entity order excluded)',
     (_id, roundTrip) => {
-      expectFixtureRoundTrip(roundTrip, ROUND_TRIP_KEYS);
+      expectFixtureRoundTrip(roundTrip, SELECTED_FIXTURE_KEYS);
     },
   );
 });

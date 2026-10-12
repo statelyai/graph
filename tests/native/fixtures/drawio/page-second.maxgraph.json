@@ -1,0 +1,48 @@
+{
+  "oracle": "@maxgraph/core",
+  "version": "0.25.0",
+  "operation": "ModelXmlSerializer.import(mxGraphModel)",
+  "summary": [
+    {
+      "id": "0",
+      "parent": null,
+      "vertex": false,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": null,
+      "style": {},
+      "geometry": null
+    },
+    {
+      "id": "1",
+      "parent": "0",
+      "vertex": false,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": null,
+      "style": {},
+      "geometry": null
+    },
+    {
+      "id": "a",
+      "parent": "1",
+      "vertex": 1,
+      "edge": false,
+      "source": null,
+      "target": null,
+      "value": "Same ID on another page",
+      "style": {},
+      "geometry": {
+        "x": 1,
+        "y": 2,
+        "width": 80,
+        "height": 40,
+        "relative": false,
+        "offset": null,
+        "points": null
+      }
+    }
+  ]
+}

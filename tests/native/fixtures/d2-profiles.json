@@ -1,0 +1,12 @@
+{
+  "oracle": "@terrastruct/d2@0.1.33",
+  "retrieved": "2026-10-12",
+  "documentation": ["https://d2lang.com/tour/text", "https://d2lang.com/tour/sql-tables", "https://d2lang.com/tour/connections", "https://d2lang.com/tour/containers", "https://d2lang.com/tour/vars"],
+  "fixtures": [
+    {"name":"escaped labels and literal dotted keys","source":"\"a.b\": \"東京 \\\"quoted\\\" path\\\\\"\nc: Target\n\"a.b\" -> c: Edge\nIsolated: Alone\n"},
+    {"name":"SQL ports","source":"db: {\n  shape: sql_table\n  id: int { constraint: primary_key }\n  name: string\n}\nservice: API\nservice -> db.id: Queries\n"},
+    {"name":"mixed arrows and full arrowheads","source":"a: Alpha\nb: Beta\na <-> b: Two way {\n  source-arrowhead.shape: diamond\n  target-arrowhead.shape: triangle\n}\na -- b: Undirected\na -> b: Directed\n"},
+    {"name":"scoped identity and ancestor references","source":"outer: {\n  a: Alpha\n  nested: {\n    c: Gamma\n    c -> _.a: Scoped\n  }\n}\n"},
+    {"name":"recursive vars and classes","source":"vars: {\n  theme: { color: blue }\n}\nclasses: {\n  styled: { style.fill: ${theme.color} }\n}\na: {\n  label: Styled\n  class: styled\n}\n"}
+  ]
+}

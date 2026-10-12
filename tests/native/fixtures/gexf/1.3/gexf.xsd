@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://gexf.net/1.3" xmlns:ns1="http://gexf.net/1.3">
+  <xs:include schemaLocation="dynamics.xsd"/>
+  <xs:import schemaLocation="viz.xsd"/>
+  <xs:element name="gexf" type="ns1:gexf-content"/>
+  <!-- Gexf -->
+  <xs:complexType name="gexf-content">
+    <xs:sequence>
+      <xs:element minOccurs="0" ref="ns1:meta"/>
+      <xs:element ref="ns1:graph"/>
+    </xs:sequence>
+    <xs:attribute name="version" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="1.3"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="variant" type="xs:string"/>
+  </xs:complexType>
+  <xs:element name="meta" type="ns1:meta-content"/>
+  <xs:element name="graph" type="ns1:graph-content"/>
+  <!-- Meta -->
+  <xs:complexType name="meta-content">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="ns1:creator"/>
+      <xs:element ref="ns1:keywords"/>
+      <xs:element ref="ns1:description"/>
+    </xs:choice>
+    <xs:attribute name="lastmodifieddate" type="xs:date"/>
+  </xs:complexType>
+  <xs:element name="creator" type="xs:string"/>
+  <xs:element name="keywords" type="xs:string"/>
+  <xs:element name="description" type="xs:string"/>
+  <!-- Graph -->
+  <!-- Nodes -->
+  <xs:complexType name="nodes-content">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="ns1:node"/>
+    </xs:sequence>
+    <xs:attribute name="count" type="xs:nonNegativeInteger"/>
+  </xs:complexType>
+  <xs:element name="node" type="ns1:node-content"/>
+  <!-- Edges -->
+  <xs:complexType name="edges-content">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="ns1:edge"/>
+    </xs:sequence>
+    <xs:attribute name="count" type="xs:nonNegativeInteger"/>
+  </xs:complexType>
+  <xs:element name="edge" type="ns1:edge-content"/>
+  <!-- Node -->
+  <!-- Edge -->
+  <!-- Extends nodes -->
+  <!-- Extends nodes -->
+  <!-- Parents -->
+  <xs:complexType name="parents-content">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="ns1:parent"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="parent">
+    <xs:complexType>
+      <xs:attributeGroup ref="ns1:parent-content"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- Parent -->
+  <xs:attributeGroup name="parent-content">
+    <xs:attribute name="for" use="required" type="ns1:id-type"/>
+  </xs:attributeGroup>
+  <!-- Attributes -->
+  <!-- Attribute -->
+  <xs:complexType name="attribute-content">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="ns1:default"/>
+      <xs:element ref="ns1:options"/>
+    </xs:choice>
+    <xs:attribute name="id" use="required" type="ns1:id-type"/>
+    <xs:attribute name="title" use="required" type="xs:string"/>
+    <xs:attribute name="type" use="required" type="ns1:attrtype-type"/>
+  </xs:complexType>
+  <xs:element name="default" type="xs:string"/>
+  <xs:element name="options" type="xs:string"/>
+  <!-- Attribute values (for nodes and edges) -->
+  <xs:complexType name="attvalues-content">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" ref="ns1:attvalue"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="attvalue">
+    <xs:complexType>
+      <xs:attributeGroup ref="ns1:attvalue-content"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- Attribute value -->
+  <!-- Attribute types -->
+  <xs:simpleType name="attrtype-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="integer"/>
+      <xs:enumeration value="long"/>
+      <xs:enumeration value="double"/>
+      <xs:enumeration value="float"/>
+      <xs:enumeration value="boolean"/>
+      <xs:enumeration value="bigdecimal"/>
+      <xs:enumeration value="biginteger"/>
+      <xs:enumeration value="byte"/>
+      <xs:enumeration value="char"/>
+      <xs:enumeration value="short"/>
+      <xs:enumeration value="liststring"/>
+      <xs:enumeration value="listboolean"/>
+      <xs:enumeration value="listinteger"/>
+      <xs:enumeration value="listlong"/>
+      <xs:enumeration value="listfloat"/>
+      <xs:enumeration value="listdouble"/>
+      <xs:enumeration value="listbyte"/>
+      <xs:enumeration value="listshort"/>
+      <xs:enumeration value="listbigdecimal"/>
+      <xs:enumeration value="listbiginteger"/>
+      <xs:enumeration value="listchar"/>
+      <xs:enumeration value="string"/>
+      <xs:enumeration value="anyURI"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Attribute class (for attributes) -->
+  <xs:simpleType name="class-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="node"/>
+      <xs:enumeration value="edge"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Default edge type -->
+  <xs:simpleType name="defaultedgetype-type">
+    <xs:annotation>
+      <xs:documentation>Datatypes</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="directed"/>
+      <xs:enumeration value="undirected"/>
+      <xs:enumeration value="mutual"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Edge type -->
+  <xs:simpleType name="edgetype-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="directed"/>
+      <xs:enumeration value="undirected"/>
+      <xs:enumeration value="mutual"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Id type -->
+  <xs:simpleType name="id-type">
+    <xs:union memberTypes="xs:string xs:integer xs:long"/>
+  </xs:simpleType>
+  <!-- Id type (for graph) -->
+  <xs:simpleType name="idtype-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="integer"/>
+      <xs:enumeration value="string"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Edge weigth -->
+  <xs:simpleType name="weight-type">
+    <xs:restriction base="xs:double"/>
+  </xs:simpleType>
+</xs:schema>

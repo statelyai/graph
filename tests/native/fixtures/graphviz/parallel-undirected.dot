@@ -1,0 +1,1 @@
+graph G { a -- b[label="first"]; a -- b[label="second"]; isolated; }

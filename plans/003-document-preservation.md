@@ -1,0 +1,27 @@
+# 003: Add serializable native document preservation
+
+Planned at `de5ebf8`, 2026-10-12. Priority P1; effort L; risk HIGH. Depends on 002. User authorizes common-sense architecture decisions; after giving the optional preference question ample time, reviewer adopts the recommended additive GraphDocument boundary, communicated in commentary. User can still steer this choice.
+
+## Objective
+
+Preserve original native source/comments/unknown fields/extensions/multiple graphs/hyperedges without changing the simple Graph model. Native semantics and opaque preservation are separate capabilities. Edited Graphs must never silently replay stale source.
+
+## Adopted boundary and proposed detailed contract
+
+Add a subpath document module, plain JSON `GraphDocument` envelope with version, format, graph projection(s), original native value/source and baseline, diagnostics/projection losses, and adapter extension state. Generic prefixed parse/create/to/get APIs accept explicit codecs rather than loading every optional peer at root. Unchanged documents reproduce exact source; edits use format-specific updates with unknown state retention, otherwise explicit unsupported-edit diagnostic and strict rejection. JSON serialization/deserialization must not lose preservation state. Never claim unsupported hyperedge semantics become binary Graph edges losslessly.
+
+Prefer `@statelyai/graph/document` exporting `createGraphDocumentConverter` and plain types. Existing native subpaths expose optional `*DocumentConverter` objects (same `.from(source)` / `.to(document)` pattern) registered explicitly; no global registry and no eager optional-peer import from root. Factory accepts a format ID, existing codec, and optional native patch/project hooks. Document stores version/format/source, Graph projection and JSON baseline, diagnostics, and preservation state. A source that cannot project to binary Graph must be retained with an explicit unavailable/partial projection diagnostic; never fabricated binary semantic equivalence. Edited source/native fields are authoritative over metadata snapshots.
+
+Required invariants: `.to(.from(source))` returns exact original text/native JSON when unchanged, also after JSON serialization of the document. Graph edits are never ignored. Supported label/data/style/geometry changes patch native source while retaining comments/unknown fields; unsupported structural edits throw a diagnostic-bearing ordinary Error by default. An explicit lossy regeneration option may exist only with a returned diagnostic result, never silently via `.to`. Generated Graph-to-native documents need native carriers/sidecars for Graph-only fields; bare minimal formats remain partial. Document provenance/version and native value consistency must be validated, with no functions/classes/symbols/cycles in stored content. Capture snapshots independently so later mutation cannot alter baselines.
+
+Detailed API defaults: `GraphDocument<TSource, N, E, G, P>` stores a constant kind/version, format ID, cloned source, `graph: Graph<N,E,G,P> | null`, JSON baseline and diagnostic list. A projection failure may preserve the source with graph null and `projection-unavailable`; strict import explicitly throws. Default strict `.to(document)` refuses changed Graph when no safe patch exists. Provide `getGraphDocumentUpdate` returning a discriminated plain result with source/diagnostics rather than an implicit lossy string. Imported source edits and graph edits affecting the same field require conflict detection; independent unknown-source changes should survive. No source replay after a Graph edit and no graph snapshot restore after a native field edit. Semantic projections remain explicitly partial even when exact source preservation succeeds.
+
+Ownership for core executor: new `src/formats/document/**` (package subpath ./document), document tests/docs/ADR, package.json/lock/tsdown/smoke updates and test contract exclusions if root exports added. Keep dependency installs serial. Native hooks belong to their converter executors and must be reviewed/registered explicitly; do not edit their implementation files concurrently. Implement core first and ask reviewer to coordinate hooks. JSON formats can patch known entity records by stable ID while retaining unknown fields. Text/XML hooks must target verified lexical spans, preserve comments/namespaces/declarations, and reject ambiguity/unimplemented structure changes. Regex replacing all matching labels indiscriminately is not acceptable.
+
+## Steps / scope
+
+Write exact API/compatibility ADR under docs/adr, tests covering JSON persistence, no-op source equality, editing supported fields with preserved comments/extensions, unsupported structural edits and strict mode, metadata provenance and native precedence. Executor owns new document module/tests/docs and additive package/build exports; coordinate converter ownership. Integrate every existing codec through explicit registrations. Retain current APIs/default behavior except confirmed bug fixes. Namespaces must avoid arbitrary user-data collisions.
+
+## Verification / done
+
+`pnpm verify` exit 0; package smoke imports work; document no-op equality and post-edit reparse semantics tested, preserve unknown native content, diagnostics precise. Public exports represented/excluded in tests/contracts. README/Changeset updated. No complete semantic claims without independent fixtures/oracles. If user chooses a different model boundary, pause dependent implementation and report the reconciliation needed.

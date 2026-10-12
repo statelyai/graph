@@ -1,0 +1,167 @@
+{
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "summary": {
+    "directed": true,
+    "multigraph": true,
+    "graph": {
+      "name": "Native graph",
+      "id": "ordinary attribute",
+      "metadata": {
+        "vendor": [
+          1,
+          null,
+          "α"
+        ]
+      }
+    },
+    "nodes": [
+      {
+        "id": 1,
+        "attributes": {
+          "label": "numeric one",
+          "color": "#ff00ff",
+          "vendor": {
+            "keep": true
+          }
+        }
+      },
+      {
+        "id": "1",
+        "attributes": {
+          "label": "string one"
+        }
+      },
+      {
+        "id": false,
+        "attributes": {
+          "label": ""
+        }
+      },
+      {
+        "id": "isolated",
+        "attributes": {
+          "metadata": [
+            null,
+            42
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": 1,
+        "target": "1",
+        "key": "shared",
+        "attributes": {
+          "weight": 2.5,
+          "label": "numeric→string",
+          "vendor": {
+            "x": [
+              1,
+              2
+            ]
+          }
+        }
+      },
+      {
+        "source": 1,
+        "target": "1",
+        "key": 2,
+        "attributes": {
+          "weight": 3
+        }
+      },
+      {
+        "source": "1",
+        "target": false,
+        "key": "shared",
+        "attributes": {
+          "label": "repeated key, different pair"
+        }
+      },
+      {
+        "source": false,
+        "target": false,
+        "key": "loop",
+        "attributes": {
+          "weight": -1
+        }
+      }
+    ]
+  },
+  "roundTrip": {
+    "directed": true,
+    "multigraph": true,
+    "graph": {
+      "name": "Native graph",
+      "id": "ordinary attribute",
+      "metadata": {
+        "vendor": [
+          1,
+          null,
+          "α"
+        ]
+      }
+    },
+    "nodes": [
+      {
+        "label": "numeric one",
+        "color": "#ff00ff",
+        "vendor": {
+          "keep": true
+        },
+        "id": 1
+      },
+      {
+        "label": "string one",
+        "id": "1"
+      },
+      {
+        "label": "",
+        "id": false
+      },
+      {
+        "metadata": [
+          null,
+          42
+        ],
+        "id": "isolated"
+      }
+    ],
+    "edges": [
+      {
+        "weight": 2.5,
+        "label": "numeric→string",
+        "vendor": {
+          "x": [
+            1,
+            2
+          ]
+        },
+        "source": 1,
+        "target": "1",
+        "key": "shared"
+      },
+      {
+        "weight": 3,
+        "source": 1,
+        "target": "1",
+        "key": 2
+      },
+      {
+        "label": "repeated key, different pair",
+        "source": "1",
+        "target": false,
+        "key": "shared"
+      },
+      {
+        "weight": -1,
+        "source": false,
+        "target": false,
+        "key": "loop"
+      }
+    ]
+  }
+}

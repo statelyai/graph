@@ -1,0 +1,19 @@
+{
+  "generated": "2026-10-12",
+  "oracle": "networkx",
+  "version": "3.7",
+  "python": "3.14.8",
+  "license": "Authored inputs and generated native outputs; NetworkX BSD-3-Clause.",
+  "documentation": "https://networkx.org/documentation/stable/reference/readwrite/generated/networkx.readwrite.gml.parse_gml.html",
+  "command": ".venv-native/bin/python scripts/native/networkx_oracle.py < JSON request (operation=gml)",
+  "files": [
+    {
+      "file": "native.gml",
+      "sha256": "0d6cb1ef088fcee21e769e03e53ce801f9ca3c8217daaf2e3501521480c2f3ff"
+    },
+    {
+      "file": "native.native.json",
+      "sha256": "2af412469d888c4cfa0c3ae1d246ad3e9b0dd4b5d8d1905b9a395dd48bad468c"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "retrieved": "2026-10-12",
+  "entry": "graphml.xsd",
+  "license": "CC BY 3.0; ../LICENSE.txt; attribution GraphML Working Group and https://graphml.graphdrawing.org/",
+  "files": [
+    {
+      "file": "graphml.xsd",
+      "url": "http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd",
+      "retrievedFrom": "http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd",
+      "sha256": "c5d04fb93d579712aa375f3ace67fe9243d6aaa9b039576516722af2d9c5af52",
+      "resolverRewrites": [
+        {
+          "from": "http://graphml.graphdrawing.org/xmlns/1.0/graphml-structure.xsd",
+          "to": "graphml-structure.xsd"
+        }
+      ]
+    },
+    {
+      "file": "graphml-structure.xsd",
+      "url": "http://graphml.graphdrawing.org/xmlns/1.0/graphml-structure.xsd",
+      "retrievedFrom": "http://graphml.graphdrawing.org/xmlns/1.0/graphml-structure.xsd",
+      "sha256": "7809123855d2ef634dea2b678055b6230607efb9addde55a06c4afd67075a04b",
+      "resolverRewrites": [
+        {
+          "from": "http://graphml.graphdrawing.org/xmlns/1.0/xlink.xsd",
+          "to": "xlink.xsd"
+        }
+      ]
+    },
+    {
+      "file": "xlink.xsd",
+      "url": "http://graphml.graphdrawing.org/xmlns/1.0/xlink.xsd",
+      "retrievedFrom": "http://graphml.graphdrawing.org/xmlns/1.0/xlink.xsd",
+      "sha256": "4f76a2f3c026979b733f92d3f85c815723848b72731a72ef40a1709959b698ed",
+      "resolverRewrites": []
+    }
+  ],
+  "changes": "Schema bytes are unmodified. Test resolver replaces only schemaLocation URLs in memory with vendored filenames; semantic schema components unchanged.",
+  "retrievalNote": "Official GraphML host currently has a mismatched HTTPS certificate; schema was retrieved from its published HTTP endpoint. Original SHA256 pinned."
+}

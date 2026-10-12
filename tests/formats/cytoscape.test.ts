@@ -62,9 +62,17 @@ describe('Cytoscape.js JSON', () => {
     expect(() => fromCytoscapeJSON({} as any)).toThrow('Cytoscape: missing "elements" property');
   });
 
-  it('throws on missing nodes/edges arrays', () => {
-    expect(() => fromCytoscapeJSON({ elements: { edges: [] } } as any)).toThrow('Cytoscape: "elements.nodes" must be an array');
-    expect(() => fromCytoscapeJSON({ elements: { nodes: [] } } as any)).toThrow('Cytoscape: "elements.edges" must be an array');
+  it('throws on malformed present nodes/edges groups', () => {
+    expect(() => fromCytoscapeJSON({ elements: { nodes: null, edges: [] } } as any)).toThrow('Cytoscape: "elements.nodes" must be an array');
+    expect(() => fromCytoscapeJSON({ elements: { nodes: [], edges: {} } } as any)).toThrow('Cytoscape: "elements.edges" must be an array');
+  });
+
+  it('accepts native omitted empty groups while retaining the grouped output shape', () => {
+    for (const elements of [{ nodes: [] }, { edges: [] }, {}]) {
+      const graph = fromCytoscapeJSON({ elements });
+      expect(graph.nodes).toEqual([]); expect(graph.edges).toEqual([]);
+      expect(toCytoscapeJSON(graph).elements).toEqual({ nodes: [], edges: [] });
+    }
   });
 
   it('handles empty elements', () => {

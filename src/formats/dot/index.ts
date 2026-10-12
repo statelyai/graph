@@ -1,6 +1,9 @@
+import { createGraphDocumentConverter } from '../document';
+import { getDOTDocumentPatch, getDOTDocumentProjection, getValidatedDOTString } from './document';
 import parse from 'dotparser';
 import type { Graph, GraphNode, GraphEdge, GraphFormatConverter } from '../../types';
 import { createFormatConverter } from '../converter';
+import { createFormatData, getFormatMetadata, getUserData } from '../xml-preservation';
 
 /**
  * Round-trip preservation of DOT constructs that this library does not model
@@ -23,10 +26,17 @@ import { createFormatConverter } from '../converter';
  * `fromDOT(toDOT(fromDOT(x)))` is stable for the covered constructs.
  */
 interface DotEntityPreserve {
+  inheritedAttrs?: Record<string, string>;
+  borderColor?: string;
+  style?: string;
+  subgraph?: boolean;
+  memberships?: string[];
   /** DOT attributes with no native field, verbatim. */
   attrs?: Record<string, string>;
   /** True when `label` came from an HTML-like `<...>` value; re-emit with `<>`. */
   labelHtml?: boolean;
+  /** Missing native node label inherits Graphviz's default \N; distinct from Graph ''. */
+  implicitLabel?: boolean;
   /** Compass point on the source endpoint of an edge (e.g. `n`, `se`). */
   sourceCompass?: string;
   /** Compass point on the target endpoint of an edge. */
@@ -41,6 +51,8 @@ interface DotRankGroup {
 }
 
 interface DotGraphPreserve {
+  strict?: boolean;
+  subgraphs?: Array<{ id: string; parentId: string | null; attrs: Record<string, string>; nodes: string[] }>;
   /** Leftover `graph [...]` attributes (excludes `rankdir`, mapped to direction). */
   attrs?: Record<string, string>;
   /** `node [...]` default attributes in effect at graph scope. */
@@ -52,9 +64,9 @@ interface DotGraphPreserve {
 }
 
 /** Node attribute names mapped to native fields — excluded from the `dot` bag. */
-const MODELED_NODE_ATTRS = new Set(['label', 'shape', 'fillcolor', 'color', 'style']);
+const MODELED_NODE_ATTRS = new Set(['label', 'shape', 'fillcolor', 'color', 'style', '_stately']);
 /** Edge attribute names mapped to native fields — excluded from the `dot` bag. */
-const MODELED_EDGE_ATTRS = new Set(['label', 'color']);
+const MODELED_EDGE_ATTRS = new Set(['label', 'color', '_stately']);
 
 /** DOT compass points, in the port syntax `node:port:compass`. */
 const COMPASS_POINTS = new Set([
@@ -64,6 +76,8 @@ const COMPASS_POINTS = new Set([
 function getDotPreserve(
   data: unknown,
 ): DotEntityPreserve | undefined {
+  const metadata = getFormatMetadata(data, 'dot');
+  if (metadata) return metadata.native;
   if (data && typeof data === 'object' && 'dot' in data) {
     return (data as { dot?: DotEntityPreserve }).dot;
   }
@@ -71,7 +85,7 @@ function getDotPreserve(
 }
 
 /** Partition an attr map into modeled vs. leftover (preserved) attributes. */
-function leftoverAttrs(
+function getLeftoverAttrs(
   attrs: Record<string, string>,
   modeled: Set<string>,
 ): Record<string, string> | undefined {
@@ -95,7 +109,8 @@ const DOT_KEYWORDS = new Set([
 ]);
 
 /** Escape a DOT identifier */
-function escapeId(id: string): string {
+function getEscapedId(id: string): string {
+  getValidatedDOTString(id);
   if (
     /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id) &&
     !DOT_KEYWORDS.has(id.toLowerCase())
@@ -106,8 +121,8 @@ function escapeId(id: string): string {
 }
 
 /** Escape a DOT label string */
-function escapeLabel(label: string): string {
-  return label
+function getEscapedLabel(label: string): string {
+  return getValidatedDOTString(label)
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     // A raw newline inside a quoted string is invalid DOT; \n is the DOT
@@ -116,17 +131,17 @@ function escapeLabel(label: string): string {
 }
 
 /**
- * Invert {@link escapeLabel}. dotparser unescapes `\"` itself but passes
+ * Invert {@link getEscapedLabel}. dotparser unescapes `\"` itself but passes
  * `\\` and `\n` through verbatim.
  */
-function unescapeLabel(label: string): string {
+function getUnescapedLabel(label: string): string {
   return label.replace(/\\(\\|n)/g, (_, ch) => (ch === 'n' ? '\n' : '\\'));
 }
 
-function formatEndpoint(id: string, port?: string, compass?: string): string {
-  let out = escapeId(id);
-  if (port) out += `:${escapeId(port)}`;
-  if (compass) out += `:${escapeId(compass)}`;
+function getFormattedEndpoint(id: string, port?: string, compass?: string): string {
+  let out = getEscapedId(id);
+  if (port) out += `:${getEscapedId(port)}`;
+  if (compass) out += `:${getEscapedId(compass)}`;
   return out;
 }
 
@@ -134,9 +149,10 @@ function formatEndpoint(id: string, port?: string, compass?: string): string {
  * Format a `key=value` attribute. HTML-like labels are emitted with `<...>`
  * delimiters (verbatim, no escaping); everything else is a quoted string.
  */
-function formatAttr(key: string, value: string, html = false): string {
-  if (html) return `${key}=<${value}>`;
-  return `${key}="${escapeLabel(value)}"`;
+function getFormattedAttr(key: string, value: string, html = false): string {
+  getValidatedDOTString(key);
+  if (html) return `${key}=<${getValidatedDOTString(value)}>`;
+  return `${key}="${getEscapedLabel(value)}"`;
 }
 
 const DIRECTION_TO_RANKDIR: Record<string, string> = {
@@ -183,79 +199,120 @@ const SHAPE_TO_DOT: Record<string, string> = {
  * ```
  */
 export function toDOT(graph: Graph): string {
+  const gp = getDotPreserve(graph.data) as DotGraphPreserve | undefined;
   const isDirected = graph.mode !== 'undirected';
   const keyword = isDirected ? 'digraph' : 'graph';
   const edgeOp = isDirected ? '->' : '--';
-
-  const lines: string[] = [];
-  lines.push(`${keyword} ${escapeId(graph.id)} {`);
-
-  if (graph.direction) {
-    const rankdir = DIRECTION_TO_RANKDIR[graph.direction] ?? 'TB';
-    lines.push(`  rankdir=${rankdir};`);
+  const lines = [`${gp?.strict ? 'strict ' : ''}${keyword} ${getEscapedId(graph.id)} {`];
+  const graphExtension = {
+    format: 'stately', version: 1, mode: graph.mode,
+    ...(graph.initialNodeId != null && { initialNodeId: graph.initialNodeId }),
+    ...(getDotUserData(graph.data) !== undefined && { data: getDotUserData(graph.data) }),
+    ...(graph.style !== undefined && { style: graph.style }),
+  };
+  if (Object.keys(graphExtension).length > 3 || graph.mode === 'bidirectional') {
+    lines.push(`  ${getFormattedAttr('_stately', JSON.stringify(graphExtension))};`);
   }
-
-  // Preserved graph-level state: bgcolor/fontname/… graph attrs and node/edge
-  // default attribute bags (see DotGraphPreserve).
-  const gp = (graph.data as { dot?: DotGraphPreserve } | undefined)?.dot;
-  if (gp?.attrs) {
-    for (const [k, v] of Object.entries(gp.attrs)) {
-      lines.push(`  ${formatAttr(k, v)};`);
-    }
-  }
-  if (gp?.nodeDefaults && Object.keys(gp.nodeDefaults).length > 0) {
-    const parts = Object.entries(gp.nodeDefaults).map(([k, v]) => formatAttr(k, v));
-    lines.push(`  node [${parts.join(', ')}];`);
-  }
-  if (gp?.edgeDefaults && Object.keys(gp.edgeDefaults).length > 0) {
-    const parts = Object.entries(gp.edgeDefaults).map(([k, v]) => formatAttr(k, v));
-    lines.push(`  edge [${parts.join(', ')}];`);
-  }
-
+  if (graph.direction) lines.push(`  rankdir=${DIRECTION_TO_RANKDIR[graph.direction]};`);
+  for (const [key, value] of Object.entries(gp?.attrs ?? {})) lines.push(`  ${getFormattedAttr(getEscapedId(key), value)};`);
+  if (gp?.nodeDefaults) lines.push(`  node [${Object.entries(gp.nodeDefaults).map(([key,value]) => getFormattedAttr(getEscapedId(key),value)).join(', ')}];`);
+  if (gp?.edgeDefaults) lines.push(`  edge [${Object.entries(gp.edgeDefaults).map(([key,value]) => getFormattedAttr(getEscapedId(key),value)).join(', ')}];`);
+  const nodeIndex = new Map(graph.nodes.map((node) => [node.id,node]));
+  const subgraphIndex = new Map(gp?.subgraphs?.map((subgraph) => [subgraph.id,subgraph]) ?? []);
+  const parentIds = new Set(graph.nodes.flatMap((node) => node.parentId == null ? [] : [node.parentId]));
+  const containers = new Set(graph.nodes.filter((node) => getDotPreserve(node.data)?.subgraph || parentIds.has(node.id)).map((node) => node.id));
+  const children = new Map<string | null, GraphNode[]>();
   for (const node of graph.nodes) {
-    const p = getDotPreserve(node.data);
-    const attrs: string[] = [];
-    if (node.label) attrs.push(formatAttr('label', node.label, p?.labelHtml));
-    if (node.shape) {
-      const dotShape = SHAPE_TO_DOT[node.shape] ?? node.shape;
-      attrs.push(`shape=${dotShape}`);
-    }
-    if (node.color) attrs.push(`fillcolor="${escapeLabel(node.color)}" style=filled`);
-    if (p?.attrs) {
-      for (const [k, v] of Object.entries(p.attrs)) attrs.push(formatAttr(k, v));
-    }
-    if (attrs.length > 0) {
-      lines.push(`  ${escapeId(node.id)} [${attrs.join(', ')}];`);
-    } else {
-      lines.push(`  ${escapeId(node.id)};`);
-    }
+    const parent = node.parentId != null && containers.has(node.parentId) ? node.parentId : null;
+    const group = children.get(parent) ?? [];
+    group.push(node); children.set(parent, group);
   }
-
+  const tasks: Array<{ node?: GraphNode; close?: boolean; indent: string }> = [...(children.get(null) ?? [])].reverse().map((node) => ({ node, indent: '  ' }));
+  const visited = new Set<string>();
+  while (tasks.length) {
+    const task = tasks.pop()!;
+    if (task.close) { lines.push(`${task.indent}}`); continue; }
+    const node = task.node!;
+    if (visited.has(node.id)) continue;
+    visited.add(node.id);
+    const p = getDotPreserve(node.data);
+    if (containers.has(node.id)) {
+      lines.push(`${task.indent}subgraph ${getEscapedId(node.id)} {`);
+      if (node.label != null) lines.push(`${task.indent}  ${getFormattedAttr('label', node.label)};`);
+      const extension = getEntityExtension(node);
+      if (!p?.subgraph) extension.compound = true;
+      if (node.shape !== undefined) extension.shape = node.shape;
+      if (node.color !== undefined) extension.color = node.color;
+      if (Object.keys(extension).length > 2) lines.push(`${task.indent}  ${getFormattedAttr('_stately',JSON.stringify(extension))};`);
+      const native = subgraphIndex.get(node.id);
+      for (const [key,value] of Object.entries(native?.attrs ?? {})) if (key !== 'label' && key !== '_stately') lines.push(`${task.indent}  ${getFormattedAttr(getEscapedId(key),value)};`);
+      tasks.push({ close: true, indent: task.indent });
+      for (const child of [...(children.get(node.id) ?? [])].reverse()) tasks.push({ node: child, indent: task.indent + '  ' });
+      continue;
+    }
+    const attrs: string[] = [];
+    if (node.label != null && !(node.label === '' && getFormatMetadata(node.data, 'dot')?.native?.implicitLabel)) attrs.push(getFormattedAttr('label',node.label,p?.labelHtml));
+    if (node.shape) attrs.push(`shape=${getEscapedId(SHAPE_TO_DOT[node.shape] ?? node.shape)}`);
+    if (node.color !== undefined) attrs.push(getFormattedAttr('fillcolor',node.color));
+    if (p?.borderColor !== undefined) attrs.push(getFormattedAttr('color', p.borderColor));
+    if (p?.style !== undefined) attrs.push(getFormattedAttr('style',p.style));
+    else if (node.color !== undefined) attrs.push('style=filled');
+    for (const [key,value] of Object.entries({ ...p?.inheritedAttrs, ...p?.attrs })) attrs.push(getFormattedAttr(getEscapedId(key),value));
+    const extension = getEntityExtension(node);
+    if (Object.keys(extension).length > 2) attrs.push(getFormattedAttr('_stately',JSON.stringify(extension)));
+    lines.push(`${task.indent}${getEscapedId(node.id)}${attrs.length ? ` [${attrs.join(', ')}]` : ''};`);
+  }
   for (const edge of graph.edges) {
     const p = getDotPreserve(edge.data);
     const attrs: string[] = [];
-    if (edge.label) attrs.push(formatAttr('label', edge.label, p?.labelHtml));
-    if (edge.color) attrs.push(`color="${escapeLabel(edge.color)}"`);
-    if (p?.attrs) {
-      for (const [k, v] of Object.entries(p.attrs)) attrs.push(formatAttr(k, v));
-    }
-    const attrStr = attrs.length > 0 ? ` [${attrs.join(', ')}]` : '';
-    lines.push(
-      `  ${formatEndpoint(edge.sourceId, edge.sourcePort, p?.sourceCompass)} ${edgeOp} ${formatEndpoint(edge.targetId, edge.targetPort, p?.targetCompass)}${attrStr};`,
-    );
+    if (edge.label != null) attrs.push(getFormattedAttr('label',edge.label,p?.labelHtml));
+    if (edge.color !== undefined) attrs.push(getFormattedAttr('color',edge.color));
+    for (const [key,value] of Object.entries({ ...p?.inheritedAttrs, ...p?.attrs })) attrs.push(getFormattedAttr(getEscapedId(key),value));
+    const extension = getEntityExtension(edge);
+    if (Object.keys(extension).length > 2) attrs.push(getFormattedAttr('_stately',JSON.stringify(extension)));
+    if (edge.mode === 'bidirectional' || (edge.mode === undefined && graph.mode === 'bidirectional')) attrs.push('dir=both');
+    else if (edge.mode === 'undirected' && isDirected) attrs.push('dir=none');
+    lines.push(`  ${getFormattedEndpoint(edge.sourceId,edge.sourcePort,p?.sourceCompass)} ${edgeOp} ${getFormattedEndpoint(edge.targetId,edge.targetPort,p?.targetCompass)}${attrs.length ? ` [${attrs.join(', ')}]` : ''};`);
   }
-
-  // Preserved `rank=same` (and other rank) groups, emitted as anonymous
-  // subgraphs so Graphviz re-applies the constraint.
-  if (gp?.ranks) {
-    for (const group of gp.ranks) {
-      const members = group.nodes.map((id) => `${escapeId(id)};`).join(' ');
-      lines.push(`  { rank=${escapeId(group.rank)}; ${members} }`);
-    }
+  // Additional memberships are DOT subgraph references, not extra Graph nodes.
+  for (const subgraph of gp?.subgraphs ?? []) {
+    const extra = subgraph.nodes.filter((id) => nodeIndex.get(id)?.parentId !== subgraph.id);
+    if (extra.length) lines.push(`  subgraph ${getEscapedId(subgraph.id)} { ${extra.map((id) => `${getEscapedId(id)};`).join(' ')} }`);
   }
-
+  for (const rank of gp?.ranks ?? []) lines.push(`  { rank=${getEscapedId(rank.rank)}; ${rank.nodes.map((id) => `${getEscapedId(id)};`).join(' ')} }`);
   lines.push('}');
   return lines.join('\n');
+}
+
+function getDotUserData(data: unknown): any {
+  if (getFormatMetadata(data,'dot')) return getUserData(data,'dot');
+  if (data && typeof data === 'object' && Object.keys(data).length === 1 && 'dot' in data && (data as any).dot && typeof (data as any).dot === 'object' && ['attrs','inheritedAttrs','labelHtml','sourceCompass','targetCompass','borderColor','style','subgraph','nodeDefaults','edgeDefaults','ranks','subgraphs','strict'].some((key) => key in (data as any).dot)) return undefined;
+  return data;
+}
+
+function getEntityExtension(entity: GraphNode | GraphEdge): Record<string, any> {
+  const extension: Record<string, any> = { format: 'stately', version: 1 };
+  if (entity.type === 'edge') extension.id = entity.id;
+  if (entity.label === null) extension.nullLabel = true;
+  for (const key of ['initialNodeId','ports','x','y','width','height','style','weight','points','routing','mode']) {
+    if ((entity as any)[key] !== undefined && (key !== 'initialNodeId' || (entity as any)[key] !== null)) extension[key] = (entity as any)[key];
+  }
+  const data = getDotUserData(entity.data);
+  if (data !== undefined) extension.data = data;
+  return extension;
+}
+
+function getPrivateData(value: string | undefined): any {
+  if (value === undefined) return undefined;
+  try {
+    const result = JSON.parse(getUnescapedLabel(value));
+    return result?.format === 'stately' && result.version === 1 ? result : undefined;
+  } catch { return undefined; }
+}
+
+function getPreservedData(data: unknown, native: DotEntityPreserve | DotGraphPreserve): any {
+  if (Object.keys(native).length === 0) return data;
+  return data === undefined && !('implicitLabel' in native) ? { dot: native } : createFormatData(data,'dot',{ native });
 }
 
 // --- fromDOT ---
@@ -310,7 +367,7 @@ type DotAttrEq =
   | number
   | { type: 'id'; value: string; html?: boolean };
 
-function attrValueString(eq: DotAttrEq): string {
+function getAttrValueString(eq: DotAttrEq): string {
   if (eq !== null && typeof eq === 'object') return eq.value;
   return String(eq);
 }
@@ -319,16 +376,16 @@ function isHtmlAttr(eq: DotAttrEq): boolean {
   return eq !== null && typeof eq === 'object' && eq.html === true;
 }
 
-function attrsToMap(attrList: { id: string; eq: DotAttrEq }[]): AttrMap {
+function getAttrsMap(attrList: { id: string; eq: DotAttrEq }[]): AttrMap {
   const map: AttrMap = {};
   for (const a of attrList) {
-    map[a.id] = attrValueString(a.eq);
+    map[a.id] = getAttrValueString(a.eq);
   }
   return map;
 }
 
 /** Names of attributes in the list whose value is an HTML-like `<...>` value. */
-function htmlAttrNames(attrList: { id: string; eq: DotAttrEq }[]): Set<string> {
+function getHtmlAttrNames(attrList: { id: string; eq: DotAttrEq }[]): Set<string> {
   const names = new Set<string>();
   for (const a of attrList) {
     if (isHtmlAttr(a.eq)) names.add(a.id);
@@ -336,7 +393,7 @@ function htmlAttrNames(attrList: { id: string; eq: DotAttrEq }[]): Set<string> {
   return names;
 }
 
-function nodeFromAttrs(
+function getNodeFromAttrs(
   id: string,
   attrs: AttrMap,
   defaults: AttrMap,
@@ -348,30 +405,38 @@ function nodeFromAttrs(
   const rawLabel = merged['label'] ?? '';
   // HTML-like labels are preserved verbatim (no unescaping); plain labels use
   // the DOT string escapes.
-  const label = labelIsHtml ? rawLabel : unescapeLabel(rawLabel);
+  const label = labelIsHtml ? rawLabel : getUnescapedLabel(rawLabel);
   const rawShape = merged['shape'];
   const shape = rawShape ? (DOT_TO_SHAPE[rawShape] ?? rawShape) : undefined;
   const color = merged['fillcolor'] ?? merged['color'] ?? undefined;
 
   // Preserve leftover node-explicit attributes (defaults are preserved once at
   // graph scope, so they are not folded into the per-node bag).
-  const rest = leftoverAttrs(attrs, MODELED_NODE_ATTRS);
+  const rest = getLeftoverAttrs(attrs, MODELED_NODE_ATTRS);
   const preserve: DotEntityPreserve = {
     ...(rest && { attrs: rest }),
+    ...(getLeftoverAttrs(defaults, MODELED_NODE_ATTRS) && { inheritedAttrs: getLeftoverAttrs(defaults, MODELED_NODE_ATTRS) }),
+    ...(merged['color'] !== undefined && { borderColor: merged['color'] }),
+    ...((merged['style'] !== undefined || color !== undefined) && { style: merged['style'] ?? '' }),
     ...(labelIsHtml && { labelHtml: true }),
+    ...(merged['label'] === undefined && !getPrivateData(attrs['_stately']) && { implicitLabel: true }),
   };
-  const data =
-    Object.keys(preserve).length > 0 ? ({ dot: preserve } as any) : undefined;
+  const privateData = getPrivateData(attrs['_stately']);
+  const data = getPreservedData(privateData?.data, preserve);
 
+  const portNames = labelIsHtml ? [...label.matchAll(/\bPORT\s*=\s*["']([^"']+)["']/gi)].map((match) => match[1])
+    : ['record','Mrecord'].includes(rawShape ?? '') ? [...label.matchAll(/<([^<>]+)>/g)].map((match) => match[1]) : [];
   return {
     type: 'node',
     id,
     parentId,
-    initialNodeId: null,
-    label,
+    initialNodeId: privateData?.initialNodeId ?? null,
+    label: merged['label'] === undefined && privateData?.nullLabel ? null : label,
     data,
+    ...(portNames.length && { ports:[...new Set(portNames)].map((name) => ({name,direction:'inout' as const,data:null})) }),
+    ...Object.fromEntries(['ports','x','y','width','height','style'].filter((key) => privateData?.[key] !== undefined).map((key) => [key,privateData[key]])),
     ...(shape && { shape }),
-    ...(color && { color }),
+    ...(color !== undefined && { color }),
   };
 }
 
@@ -408,7 +473,7 @@ export function fromDOT(dot: string): Graph {
 
   let ast: ReturnType<typeof parse>;
   try {
-    ast = parse(dot);
+    ast = parse(getNormalizedNodeLists(dot));
   } catch (e: any) {
     throw new Error(`DOT: parse error — ${e.message}`);
   }
@@ -423,6 +488,11 @@ export function fromDOT(dot: string): Graph {
   const nodeMap = new Map<string, GraphNode>();
   const edges: GraphEdge[] = [];
   let edgeIdx = 0;
+  const strict = (root as typeof root & { strict?: boolean }).strict === true;
+  const strictEdges = new Map<string, { edge: GraphEdge; attrs: AttrMap }>();
+  const nodeStates = new Map<string, { attrs: AttrMap; defaults: AttrMap; html: Set<string> }>();
+  const subgraphs: NonNullable<DotGraphPreserve['subgraphs']> = [];
+  let privateGraph: any;
   let direction: Graph['direction'] | undefined;
 
   // Accumulated graph-level DOT state with no native field, for round-tripping.
@@ -431,20 +501,21 @@ export function fromDOT(dot: string): Graph {
   let rootEdgeDefaults: Record<string, string> | undefined;
   const rankGroups: DotRankGroup[] = [];
 
-  function ensureNode(
+  function addImplicitNode(
     id: string,
     parentId: string | null,
     defaults: AttrMap,
   ): void {
     if (!nodeMap.has(id)) {
-      nodeMap.set(id, nodeFromAttrs(id, {}, defaults, parentId));
+      nodeStates.set(id,{ attrs: {}, defaults: { ...defaults }, html: new Set() });
+      nodeMap.set(id, getNodeFromAttrs(id, {}, defaults, parentId));
     }
   }
 
   function getNodeIdsFromSubgraph(children: any[]): string[] {
     const ids = new Set<string>();
 
-    function collect(statements: any[]): void {
+    function addNodeIds(statements: any[]): void {
       for (const stmt of statements) {
         switch (stmt.type) {
           case 'node_stmt': {
@@ -456,54 +527,64 @@ export function fromDOT(dot: string): Graph {
               if (item.type === 'node_id') {
                 ids.add(item.id);
               } else if (item.type === 'subgraph') {
-                collect(item.children);
+                addNodeIds(item.children);
               }
             }
             break;
           }
           case 'subgraph': {
-            collect(stmt.children);
+            addNodeIds(stmt.children);
             break;
           }
         }
       }
     }
 
-    collect(children);
+    addNodeIds(children);
     return [...ids];
   }
 
-  function walkChildren(
+  function addStatements(
     children: typeof root.children,
     parentId: string | null,
     nodeDefaults: AttrMap,
     edgeDefaults: AttrMap,
+    inheritedNodeHtml = new Set<string>(),
+    inheritedEdgeHtml = new Set<string>(),
   ): void {
     let nd = { ...nodeDefaults };
     let ed = { ...edgeDefaults };
+    const nodeHtml = new Set(inheritedNodeHtml);
+    const edgeDefaultHtml = new Set(inheritedEdgeHtml);
 
     for (const stmt of children) {
       switch (stmt.type) {
         case 'attr_stmt': {
           if (stmt.target === 'node') {
-            const map = attrsToMap(stmt.attr_list);
+            const map = getAttrsMap(stmt.attr_list);
             nd = { ...nd, ...map };
+            for (const key of Object.keys(map)) nodeHtml.delete(key);
+            for (const key of getHtmlAttrNames(stmt.attr_list)) nodeHtml.add(key);
             // Preserve `node [...]` defaults declared at graph scope.
             if (parentId === null) {
               rootNodeDefaults = { ...(rootNodeDefaults ?? {}), ...map };
             }
           } else if (stmt.target === 'edge') {
-            const map = attrsToMap(stmt.attr_list);
+            const map = getAttrsMap(stmt.attr_list);
             ed = { ...ed, ...map };
+            for (const key of Object.keys(map)) edgeDefaultHtml.delete(key);
+            for (const key of getHtmlAttrNames(stmt.attr_list)) edgeDefaultHtml.add(key);
             // Preserve `edge [...]` defaults declared at graph scope.
             if (parentId === null) {
               rootEdgeDefaults = { ...(rootEdgeDefaults ?? {}), ...map };
             }
           } else if (stmt.target === 'graph') {
-            const graphAttrs = attrsToMap(stmt.attr_list);
+            const graphAttrs = getAttrsMap(stmt.attr_list);
             for (const [k, v] of Object.entries(graphAttrs)) {
               if (k === 'rankdir') {
                 direction = RANKDIR_TO_DIRECTION[v.toUpperCase()] ?? undefined;
+              } else if (k === '_stately' && parentId === null) {
+                privateGraph = getPrivateData(v);
               } else if (parentId === null) {
                 // Preserve other graph attributes (bgcolor, fontname, …).
                 graphPreserveAttrs[k] = v;
@@ -515,20 +596,27 @@ export function fromDOT(dot: string): Graph {
 
         case 'node_stmt': {
           const id = stmt.node_id.id;
-          const attrs = attrsToMap(stmt.attr_list);
-          const html = htmlAttrNames(stmt.attr_list);
-          const node = nodeFromAttrs(id, attrs, nd, parentId, html);
+          const attrs = getAttrsMap(stmt.attr_list);
+          const previous = nodeStates.get(id);
+          const html = new Set(previous?.html ?? nodeHtml);
+          if ('label' in attrs) html.delete('label');
+          for (const name of getHtmlAttrNames(stmt.attr_list)) html.add(name);
+          const combined = { ...previous?.attrs, ...attrs };
+          const defaults = previous?.defaults ?? nd;
+          nodeStates.set(id, { attrs: combined, defaults: { ...defaults }, html });
+          const original = nodeMap.get(id);
+          const node = getNodeFromAttrs(id, combined, defaults, original?.parentId ?? parentId, html);
           nodeMap.set(id, node);
           break;
         }
 
         case 'edge_stmt': {
-          const edgeAttrs = attrsToMap(stmt.attr_list);
-          const edgeHtml = htmlAttrNames(stmt.attr_list);
+          const edgeAttrs = getAttrsMap(stmt.attr_list);
+          const edgeHtml = getHtmlAttrNames(stmt.attr_list);
           const mergedEdgeAttrs = { ...ed, ...edgeAttrs };
           // Leftover edge-explicit attrs (defaults preserved once at graph scope).
-          const edgeRest = leftoverAttrs(edgeAttrs, MODELED_EDGE_ATTRS);
-          const labelIsHtml = edgeHtml.has('label');
+          const edgeRest = getLeftoverAttrs(edgeAttrs, MODELED_EDGE_ATTRS);
+          const labelIsHtml = edgeHtml.has('label') || (!('label' in edgeAttrs) && edgeDefaultHtml.has('label'));
 
           // Walk edge_list: each consecutive pair forms edges between endpoint sets.
           // DOT allows node IDs or subgraphs as endpoints; subgraphs expand to all
@@ -536,7 +624,12 @@ export function fromDOT(dot: string): Graph {
           const endpointGroups: EndpointRef[][] = [];
           for (const item of stmt.edge_list) {
             if (item.type === 'node_id') {
-              ensureNode(item.id, parentId, nd);
+              const existed = nodeMap.has(item.id);
+              addImplicitNode(item.id, parentId, nd);
+              if (!existed && nodeHtml.has('label')) {
+                const state = nodeStates.get(item.id)!; state.html = new Set(nodeHtml);
+                nodeMap.set(item.id,getNodeFromAttrs(item.id,{},nd,parentId,nodeHtml));
+              }
               endpointGroups.push([
                 {
                   id: item.id,
@@ -545,10 +638,10 @@ export function fromDOT(dot: string): Graph {
                 },
               ]);
             } else if (item.type === 'subgraph') {
-              walkChildren(item.children, parentId, nd, ed);
+              addStatements(item.children, parentId, nd, ed,nodeHtml,edgeDefaultHtml);
               const subNodeIds = getNodeIdsFromSubgraph(item.children);
               for (const subNodeId of subNodeIds) {
-                ensureNode(subNodeId, parentId, nd);
+                addImplicitNode(subNodeId, parentId, nd);
               }
               if (subNodeIds.length > 0) {
                 endpointGroups.push(subNodeIds.map((id) => ({ id })));
@@ -564,6 +657,7 @@ export function fromDOT(dot: string): Graph {
                 const rawLabel = mergedEdgeAttrs['label'] ?? '';
                 const preserve: DotEntityPreserve = {
                   ...(edgeRest && { attrs: edgeRest }),
+                  ...(getLeftoverAttrs(ed, MODELED_EDGE_ATTRS) && { inheritedAttrs: getLeftoverAttrs(ed, MODELED_EDGE_ATTRS) }),
                   ...(labelIsHtml && { labelHtml: true }),
                   ...(source.compass && { sourceCompass: source.compass }),
                   ...(target.compass && { targetCompass: target.compass }),
@@ -573,7 +667,7 @@ export function fromDOT(dot: string): Graph {
                   id: `e${edgeIdx++}`,
                   sourceId: source.id,
                   targetId: target.id,
-                  label: labelIsHtml ? rawLabel : unescapeLabel(rawLabel),
+                  label: labelIsHtml ? rawLabel : getUnescapedLabel(rawLabel),
                   data:
                     Object.keys(preserve).length > 0
                       ? ({ dot: preserve } as any)
@@ -584,7 +678,34 @@ export function fromDOT(dot: string): Graph {
                     color: mergedEdgeAttrs['color'],
                   }),
                 };
-                edges.push(edge);
+                const privateData = getPrivateData(edgeAttrs['_stately']);
+                if (privateData) {
+                  if (typeof privateData.id === 'string') edge.id = privateData.id;
+                  if (mergedEdgeAttrs['label'] === undefined && privateData.nullLabel) edge.label = null;
+                  for (const key of ['x','y','width','height','style','weight','points','routing','mode']) if (privateData[key] !== undefined) (edge as any)[key] = privateData[key];
+                  edge.data = getPreservedData(privateData.data, preserve);
+                }
+                const pair = isDirected ? [source.id,target.id] : [source.id,target.id].sort();
+                const strictKey = JSON.stringify(pair);
+                const previous = strictEdges.get(strictKey);
+                if (strict && previous) {
+                  if ('label' in edgeAttrs) previous.edge.label = edge.label;
+                  if ('color' in edgeAttrs) previous.edge.color = edge.color;
+                  const oldPreserve = { ...getDotPreserve(previous.edge.data) };
+                  if (source.port !== undefined || source.compass !== undefined) {
+                    previous.edge.sourcePort = source.port;
+                    delete oldPreserve.sourceCompass;
+                  }
+                  if (target.port !== undefined || target.compass !== undefined) {
+                    previous.edge.targetPort = target.port;
+                    delete oldPreserve.targetCompass;
+                  }
+                  previous.edge.data = getPreservedData(getDotUserData(previous.edge.data), { ...oldPreserve, ...preserve, attrs: { ...oldPreserve.attrs, ...edgeRest } });
+                  previous.attrs = { ...previous.attrs, ...edgeAttrs };
+                } else {
+                  edges.push(edge);
+                  if (strict) strictEdges.set(strictKey,{ edge, attrs: edgeAttrs });
+                }
               }
             }
           }
@@ -594,12 +715,15 @@ export function fromDOT(dot: string): Graph {
         case 'subgraph': {
           // Extract subgraph-level graph attributes (label, rank, …).
           let subLabel = '';
+          let subHasLabel = false;
           let rank: string | undefined;
+          let subPrivate: any;
           for (const child of stmt.children) {
             if (child.type === 'attr_stmt' && child.target === 'graph') {
-              const ga = attrsToMap(child.attr_list);
-              if (ga['label']) subLabel = unescapeLabel(ga['label']);
+              const ga = getAttrsMap(child.attr_list);
+              if ('label' in ga) { subLabel = getUnescapedLabel(ga['label']); subHasLabel = true; }
               if (ga['rank']) rank = ga['rank'];
+              if (ga['_stately']) subPrivate = getPrivateData(ga['_stately']);
             }
           }
 
@@ -611,7 +735,8 @@ export function fromDOT(dot: string): Graph {
           if (rank) {
             const members = getNodeIdsFromSubgraph(stmt.children);
             rankGroups.push({ rank, nodes: members });
-            for (const m of members) ensureNode(m, parentId, nd);
+            addStatements(stmt.children.filter((child) => !(child.type === 'attr_stmt' && child.target === 'graph')), parentId, nd, ed,nodeHtml,edgeDefaultHtml);
+            for (const m of members) addImplicitNode(m, parentId, nd);
             break;
           }
 
@@ -624,21 +749,54 @@ export function fromDOT(dot: string): Graph {
             label: subLabel,
             data: undefined as any,
           };
-          nodeMap.set(subId, subNode);
+          subNode.data = subPrivate?.compound ? subPrivate.data : getPreservedData(subPrivate?.data,{subgraph:true});
+          if (!subHasLabel && subPrivate?.nullLabel) subNode.label = null;
+          for (const key of ['initialNodeId','ports','x','y','width','height','style','shape','color']) if (subPrivate?.[key] !== undefined) (subNode as any)[key] = subPrivate[key];
+          if (!nodeMap.has(subId)) nodeMap.set(subId, subNode);
+          const attrs: Record<string,string> = {};
+          for (const child of stmt.children) if (child.type === 'attr_stmt' && child.target === 'graph') Object.assign(attrs,getAttrsMap(child.attr_list));
+          delete attrs['_stately'];
+          const existing = subgraphs.find((subgraph) => subgraph.id === subId);
+          if (existing) { Object.assign(existing.attrs,attrs); existing.nodes = [...new Set([...existing.nodes,...getNodeIdsFromSubgraph(stmt.children)])]; }
+          else if (!subPrivate?.compound) subgraphs.push({ id: subId, parentId, attrs, nodes: getNodeIdsFromSubgraph(stmt.children) });
 
-          walkChildren(stmt.children, subId, nd, ed);
+          addStatements(stmt.children, subId, nd, ed,nodeHtml,edgeDefaultHtml);
           break;
         }
       }
     }
   }
 
-  walkChildren(root.children, null, {}, {});
+  addStatements(root.children, null, {}, {});
 
+  for (const edge of edges) {
+    for (const end of ['source','target'] as const) {
+      const portKey = end === 'source' ? 'sourcePort' : 'targetPort';
+      const id = end === 'source' ? edge.sourceId : edge.targetId;
+      const port = edge[portKey];
+      if (port && COMPASS_POINTS.has(port) && !nodeMap.get(id)?.ports?.some((declared) => declared.name === port)) {
+        const native = {...getDotPreserve(edge.data),[end === 'source' ? 'sourceCompass' : 'targetCompass']:port};
+        delete edge[portKey];
+        edge.data = getPreservedData(getDotUserData(edge.data),native);
+      }
+    }
+  }
+  // Defaults introduced later must not retroactively style existing objects.
+  for (const [id,state] of nodeStates) {
+    const missing: Record<string,string> = {};
+    for (const key of Object.keys(rootNodeDefaults ?? {})) if (!(key in state.defaults) && !(key in state.attrs)) missing[key] = '';
+    if (Object.keys(missing).length) {
+      const node = nodeMap.get(id)!;
+      const native = getDotPreserve(node.data) ?? {};
+      node.data = getPreservedData(getDotUserData(node.data),{ ...native,inheritedAttrs:{ ...missing,...native.inheritedAttrs } });
+    }
+  }
   // Assemble preserved graph-level DOT state (see DotGraphPreserve). Only
   // populated when there is something to preserve, so plain graphs keep
   // `data: undefined`.
   const graphPreserve: DotGraphPreserve = {
+    ...(strict && { strict: true }),
+    ...(subgraphs.length && { subgraphs }),
     ...(Object.keys(graphPreserveAttrs).length > 0 && {
       attrs: graphPreserveAttrs,
     }),
@@ -653,11 +811,12 @@ export function fromDOT(dot: string): Graph {
 
   return {
     id: root.id ?? '',
-    mode: isDirected ? 'directed' : 'undirected',
-    initialNodeId: null,
+    mode: privateGraph?.mode === 'bidirectional' && isDirected ? 'bidirectional' : (isDirected ? 'directed' : 'undirected'),
+    initialNodeId: privateGraph?.initialNodeId ?? null,
     nodes: [...nodeMap.values()],
     edges,
-    data: graphData,
+    data: privateGraph?.data !== undefined ? getPreservedData(privateGraph.data,graphPreserve) : graphData,
+    ...(privateGraph?.style !== undefined && { style: privateGraph.style }),
     ...(direction && { direction }),
   };
 }
@@ -686,3 +845,96 @@ export function fromDOT(dot: string): Graph {
  */
 export const dotConverter: GraphFormatConverter<string> =
   createFormatConverter(toDOT, fromDOT);
+
+/** Adapt the current node-list grammar to dotparser's older endpoint grammar. */
+function getNormalizedNodeLists(source: string): string {
+  const tokens: Array<{ text:string; start:number; end:number; square:number }> = [];
+  let pos=0, square=0;
+  while (pos<source.length) {
+    if (/\s/.test(source[pos])) {pos++;continue;}
+    if (source.startsWith('//',pos) || source[pos]==='#') {
+      while (pos<source.length && source[pos]!=='\n') pos++;
+      continue;
+    }
+    if (source.startsWith('/*',pos)) {
+      const end=source.indexOf('*/',pos+2);
+      if (end<0) return source;
+      pos=end+2;continue;
+    }
+    const start=pos;
+    if (source[pos]==='"') {
+      pos++;
+      while (pos<source.length) {
+        if (source[pos]==='\\') {pos+=2;continue;}
+        if (source[pos++]==='"') break;
+      }
+    } else if (source[pos]==='<') {
+      let depth=0, quoted=false;
+      do {
+        const ch=source[pos++];
+        if (ch==='"') quoted=!quoted;
+        if (!quoted && ch==='<') depth++;
+        if (!quoted && ch==='>') depth--;
+      } while (pos<source.length && depth>0);
+    } else if (source.startsWith('->',pos) || source.startsWith('--',pos)) pos+=2;
+    else if ('[]{},;=:'.includes(source[pos])) pos++;
+    else {
+      while (pos<source.length && !/\s/.test(source[pos]) && !'[]{},;=:"<>'.includes(source[pos]) && !source.startsWith('->',pos) && !source.startsWith('--',pos)) pos++;
+      if (pos===start) pos++;
+    }
+    const text=source.slice(start,pos);
+    tokens.push({text,start,end:pos,square});
+    if (text==='[') square++;
+    if (text===']') square--;
+  }
+  const getEndpoint = (start:number): number => {
+    const token=tokens[start];
+    if (!token || token.square!==0 || ['[',']','{','}',',',';','=','->','--',':'].includes(token.text)) return start;
+    let end=start+1;
+    while (token.text.startsWith('"') && tokens[end]?.text==='+' && tokens[end+1]?.text.startsWith('"')) end+=2;
+    for (let part=0;part<2 && tokens[end]?.text===':';part++) {
+      if (!tokens[end+1] || [',',';','=','->','--','{','}','[',']',':'].includes(tokens[end+1].text)) return start;
+      end+=2;
+    }
+    return end;
+  };
+  const edits: Array<{start:number;end:number;text:string}> = [];
+  for (let i=0;i<tokens.length;i++) {
+    const first=getEndpoint(i);
+    if (first===i || tokens[first]?.text!==',') continue;
+    const members=[source.slice(tokens[i].start,tokens[first-1].end)];
+    let end=first;
+    while (tokens[end]?.text===',') {
+      const next=getEndpoint(end+1);
+      if (next===end+1) break;
+      members.push(source.slice(tokens[end+1].start,tokens[next-1].end));
+      end=next;
+    }
+    if (members.length<2) continue;
+    const previous=tokens[i-1]?.text, following=tokens[end]?.text;
+    if (['->','--'].includes(previous ?? '') || ['->','--'].includes(following ?? '')) {
+      edits.push({start:tokens[i].start,end:tokens[end-1].end,text:`{ ${members.map((id)=>`${id};`).join(' ')} }`});
+    } else if (['{','}',';',']'].includes(previous ?? '') && ['[',';','}'].includes(following ?? '')) {
+      const attrsStart=end;
+      while (tokens[end]?.text==='[') {
+        end++;
+        while (end<tokens.length && tokens[end].text!==']') end++;
+        if (end===tokens.length) return source;
+        end++;
+      }
+      const attrs=end>attrsStart ? source.slice(tokens[attrsStart].start,tokens[end-1].end) : '';
+      edits.push({start:tokens[i].start,end:tokens[end-1].end,text:members.map((id)=>`${id}${attrs}`).join('; ')});
+    }
+    i=end-1;
+  }
+  let result=source;
+  for (const edit of edits.reverse()) result=result.slice(0,edit.start)+edit.text+result.slice(edit.end);
+  return result;
+}
+
+/** Exact DOT source with a partial Graph view and conservative literal-label patches. */
+export const dotDocumentConverter = createGraphDocumentConverter({
+  format: 'dot', codec: { from: fromDOT, to: toDOT },
+  project: (source) => getDOTDocumentProjection(source, fromDOT),
+  patch: getDOTDocumentPatch,
+});

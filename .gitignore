@@ -6,3 +6,10 @@ ASSESSMENT.md
 .thoughts
 
 docs/superpowers
+
+coverage/
+
+.venv-native/
+__pycache__/
+
+.tools-native/

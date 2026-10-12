@@ -2,6 +2,24 @@
 
 Converter for [D3.js](https://d3js.org/) force-directed graph JSON — the `{ nodes, links }` format used by `d3-force`.
 
+## Preservation
+
+<!-- preservation contract for d3 derived from src/formats/support.ts and converter implementation -->
+
+Graph round-trip: **partial**. Native semantic round-trip: **partial**.
+Source document preservation: **none**. These are separate guarantees;
+selected-field round-trip tests do not prove unrestricted losslessness.
+
+Numeric endpoints resolve as node indices and are rebased after node edits. String IDs and live node references are supported. Imported native properties, including fixed positions and velocities, are retained in a JSON snapshot; serializable node lineage preserves native attributes across renames. New replacement nodes require their own attributes. Null labels, independent geometry and Graph field presence use versioned metadata.
+
+
+<!-- native metadata policy derived from src/formats/preservation.ts -->
+
+Native snapshots use a private JSON convention on Graph data. Import options
+`{ metadata: 'native' }` disable adapter marker interpretation. A foreign value
+that deliberately matches the marker schema remains ambiguous in automatic mode.
+Comments, lexical formatting and source locations are not preserved.
+
 ## Resources
 
 - [d3-force documentation](https://d3js.org/d3-force)
@@ -54,11 +72,11 @@ const imported = fromD3Graph({
 // edges: - (app -> auth) - (app -> store) - (auth -> store)
 ```
 
-Handles D3's mutated link objects where `source`/`target` may be node objects (after simulation) or strings.
+Handles D3's mutated link objects where `source`/`target` may be node objects (after simulation) strings, or numeric node indices.
 
 <!-- D3 fidelity notes derived from src/formats/d3/index.ts -->
 
-Also preserves graph `id`, `mode`, `initialNodeId`, `data`, `direction`, `style`, node hierarchy/layout/style fields, and edge layout/style/weight fields through the loose `{ nodes, links }` object shape. Ports and edge port references round-trip as `ports`, `sourcePort`, and `targetPort`.
+Also maps selected graph `id`, `mode`, `initialNodeId`, `data`, `direction`, `style`, node hierarchy/layout/style fields, and edge layout/style/weight fields through the loose `{ nodes, links }` object shape. Ports and edge port references round-trip as `ports`, `sourcePort`, and `targetPort`.
 
 ### `d3Converter`
 
@@ -75,4 +93,23 @@ const graph = d3Converter.from(d3);
 |------|-------------|
 | `D3Graph` | `{ nodes: D3Node[], links: D3Link[] }` |
 | `D3Node` | `{ id: string, [key: string]: any }` |
-| `D3Link` | `{ source: string, target: string, [key: string]: any }` |
+| `D3Link` | String IDs, numeric indices or live node objects as endpoints |
+| `D3ImportOptions` | Reserved metadata interpretation override |
+
+
+## Native documents
+
+<!-- d3DocumentConverter derived from src/formats/d3/index.ts and src/formats/document/index.ts -->
+
+`d3DocumentConverter.from(source)` creates a plain JSON document with the
+original source and a separate Graph projection. `.to(document)` preserves exact
+source when unchanged, including after JSON serialization. Supported edits patch
+verified native fields; unsupported edits throw with diagnostics. `.getUpdate(document)`
+returns a diagnostic-bearing result. Native semantic projection remains partial.
+
+Labels, Graph data, styles, weights and mapped geometry use direct native fields. Node/edge IDs, endpoints, hierarchy and array order edits reject. Numeric and object endpoint tokens retain their original source representation. Node edits that would leave duplicated fields in embedded object endpoints stale reject: runtime alias identity is outside the JSON source domain. ID-only object endpoints support independent node edits.
+
+Bare exports interpret recognized import carriers by default. Use
+`{ nativeCarrier: false }` when Graph data is user-authored and could match the
+private carrier schema. Document projection pins importer state to its external
+source before unwrapping it, preserving foreign lookalikes.

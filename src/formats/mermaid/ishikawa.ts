@@ -3,7 +3,10 @@ import { createFormatConverter } from '../converter';
 import {
   validateInput,
   prepareLines,
+  getMermaidPreamble,
+  type MermaidSourceData,
   escapeMermaidLabel,
+  unescapeMermaidLabel,
   generateEdgeId,
 } from './shared';
 
@@ -15,7 +18,7 @@ export interface IshikawaNodeData {
 
 export interface IshikawaEdgeData {}
 
-export interface IshikawaGraphData {
+export interface IshikawaGraphData extends MermaidSourceData {
   diagramType: 'ishikawa';
 }
 
@@ -41,7 +44,7 @@ type IshikawaNode = GraphNode<IshikawaNodeData>;
  */
 export function fromMermaidIshikawa(input: string): MermaidIshikawaGraph {
   validateInput(input, 'Mermaid Ishikawa');
-  const { lines } = prepareLines(input);
+  const { lines, source } = prepareLines(input);
 
   const header = lines[0]?.trim();
   if (!header || !header.startsWith('ishikawa-beta')) {
@@ -59,7 +62,7 @@ export function fromMermaidIshikawa(input: string): MermaidIshikawaGraph {
     if (!rawLine.trim()) continue;
 
     const indent = rawLine.length - rawLine.trimStart().length;
-    const label = rawLine.trim();
+    const label = unescapeMermaidLabel(rawLine.trim());
     const id = `ish_${nodeCounter++}`;
 
     while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
@@ -97,7 +100,7 @@ export function fromMermaidIshikawa(input: string): MermaidIshikawaGraph {
     initialNodeId: null,
     nodes,
     edges,
-    data: { diagramType: 'ishikawa' },
+    data: { diagramType: 'ishikawa', ...(source && { source }) },
   };
 }
 
@@ -111,7 +114,7 @@ export function fromMermaidIshikawa(input: string): MermaidIshikawaGraph {
  * // "ishikawa-beta\nProblem\n    Cause"
  */
 export function toMermaidIshikawa(graph: MermaidIshikawaGraph): string {
-  const lines: string[] = ['ishikawa-beta'];
+  const lines: string[] = [...getMermaidPreamble(graph.data ?? {}), 'ishikawa-beta'];
 
   const childrenMap = new Map<string | null, IshikawaNode[]>();
   for (const node of graph.nodes) {
@@ -121,15 +124,12 @@ export function toMermaidIshikawa(graph: MermaidIshikawaGraph): string {
     childrenMap.set(parentId, children);
   }
 
-  const addIshikawaNodes = (parentId: string | null, depth: number) => {
-    for (const node of childrenMap.get(parentId) ?? []) {
-      const indent = '    '.repeat(depth);
-      lines.push(`${indent}${escapeMermaidLabel(node.label ?? node.id)}`);
-      addIshikawaNodes(node.id, depth + 1);
-    }
-  };
-
-  addIshikawaNodes(null, 0);
+  const stack: Array<{ node: IshikawaNode; depth: number }> = (childrenMap.get(null) ?? []).slice().reverse().map((node) => ({ node, depth: 0 }));
+  while (stack.length) {
+    const { node, depth } = stack.pop()!;
+    lines.push(`${'    '.repeat(depth)}${escapeMermaidLabel(node.label ?? node.id)}`);
+    for (const child of (childrenMap.get(node.id) ?? []).slice().reverse()) stack.push({ node: child, depth: depth + 1 });
+  }
   return lines.join('\n');
 }
 

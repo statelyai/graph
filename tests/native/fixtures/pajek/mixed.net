@@ -1,0 +1,7 @@
+*Vertices 2
+1 "one"
+2 "two"
+*Arcs
+1 2 1
+*Edges
+2 1 2

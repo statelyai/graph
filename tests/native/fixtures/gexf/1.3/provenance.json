@@ -1,0 +1,48 @@
+{
+  "retrieved": "2026-10-12",
+  "entry": "gexf.xsd",
+  "license": "CC BY 4.0; ../LICENSE.md",
+  "files": [
+    {
+      "file": "gexf.xsd",
+      "url": "https://gexf.net/1.3/gexf.xsd",
+      "retrievedFrom": "https://gexf.net/1.3/gexf.xsd",
+      "sha256": "a8e1d0a6a5237fc4ce0825692fa3db49fb04d70cf3a84334f7a87c15422c1257",
+      "resolverRewrites": [
+        {
+          "from": "dynamics.xsd",
+          "to": "dynamics.xsd"
+        },
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "dynamics.xsd",
+      "url": "https://gexf.net/1.3/dynamics.xsd",
+      "retrievedFrom": "https://gexf.net/1.3/dynamics.xsd",
+      "sha256": "d5ee084a858baf6efebe210d4799050723bfce71fb44c9ddbf20a53f45be8298",
+      "resolverRewrites": [
+        {
+          "from": "viz.xsd",
+          "to": "viz.xsd"
+        }
+      ]
+    },
+    {
+      "file": "viz.xsd",
+      "url": "https://gexf.net/1.3/viz.xsd",
+      "retrievedFrom": "https://gexf.net/1.3/viz.xsd",
+      "sha256": "e20e40bcfd4531026d4d1c74da5cbadc413ff5b81cf4418ca14f42ea994e2dc4",
+      "resolverRewrites": [
+        {
+          "from": "gexf.xsd",
+          "to": "gexf.xsd"
+        }
+      ]
+    }
+  ],
+  "changes": "Schema bytes are unmodified. Test resolver replaces only schemaLocation URLs in memory with vendored filenames; semantic schema components unchanged."
+}

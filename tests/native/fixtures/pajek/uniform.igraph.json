@@ -1,0 +1,68 @@
+{
+  "oracle": "igraph",
+  "version": "1.0.0",
+  "python": "3.14.8",
+  "summary": {
+    "directed": true,
+    "graph": {},
+    "nodes": [
+      {
+        "id": 0,
+        "attributes": {
+          "name": "Alpha & α",
+          "x": 0.1,
+          "y": 0.2,
+          "shape": "ellipse",
+          "color": "Red"
+        }
+      },
+      {
+        "id": 1,
+        "attributes": {
+          "name": "",
+          "x": 0.5,
+          "y": 0.6,
+          "shape": "box",
+          "color": "LightOrange"
+        }
+      },
+      {
+        "id": 2,
+        "attributes": {
+          "name": "isolated",
+          "x": 0.0,
+          "y": 0.0,
+          "shape": "ellipse",
+          "color": "LightOrange"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": 0,
+        "target": 1,
+        "attributes": {
+          "weight": 2.5,
+          "label": "edge"
+        }
+      },
+      {
+        "source": 0,
+        "target": 1,
+        "attributes": {
+          "weight": -3.0,
+          "label": ""
+        }
+      },
+      {
+        "source": 0,
+        "target": 0,
+        "attributes": {
+          "weight": 0.0,
+          "label": ""
+        }
+      }
+    ]
+  },
+  "warnings": []
+}

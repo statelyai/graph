@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<g:graphml xmlns:g="http://graphml.graphdrawing.org/xmlns">
+  <g:key id="L" for="all" attr.name="label" attr.type="string"><g:default>Default</g:default></g:key>
+  <g:key id="custom" for="node" attr.name="score" attr.type="int"><g:default>7</g:default></g:key>
+  <g:graph id="native" edgedefault="directed">
+    <g:node id="parent"/><g:node id="a"><g:data key="L">A &#x3B1;</g:data><g:port name="p"><g:desc>Port</g:desc><g:port name="child"/></g:port></g:node><g:node id="b"/><g:edge id="nestedEdge" source="a" target="b" sourceport="p" directed="0"/>
+    <g:node id="isolated"><g:data key="L"></g:data><g:data key="custom">9</g:data></g:node>
+    <g:edge id="nativeEdge" source="parent" target="isolated" directed="0"><g:data key="L">Edge</g:data></g:edge>
+  </g:graph>
+</g:graphml>

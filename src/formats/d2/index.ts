@@ -30,3 +30,5 @@ export type {
  * ```
  */
 export const d2Converter = createFormatConverter(toD2, fromD2);
+
+export { d2DocumentConverter } from './document';

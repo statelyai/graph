@@ -8,6 +8,18 @@ Converter for the [DOT language](https://graphviz.org/doc/info/lang.html) used b
 npm install dotparser
 ```
 
+## Preservation
+
+<!-- preservation contract for dot derived from src/formats/support.ts and converter implementation -->
+
+Graph round-trip: **partial**. Native semantic round-trip: **partial**.
+Bare Graph APIs preserve no source document. `dotDocumentConverter` retains
+exact native source, including comments and unknown syntax, after JSON persistence.
+Its Graph projection and supported edits remain partial; selected-field tests do
+not prove unrestricted semantic losslessness.
+
+Merges repeated declarations and strict edges, keeps rank-subgraph contents and emits native clusters. Resolved defaults, independent fill/border/style, HTML labels, record/HTML ports and compass-only endpoints are preserved. A lexical adapter handles comma node lists for the older parser. Comments, complete grammar coverage and exact declaration order remain outside this Graph converter.
+
 ## Resources
 
 - [DOT language specification](https://graphviz.org/doc/info/lang.html)
@@ -19,7 +31,7 @@ npm install dotparser
 <!-- exported symbols from src/formats/dot/index.ts -->
 
 ```ts
-import { toDOT, fromDOT, dotConverter } from '@statelyai/graph/dot';
+import { toDOT, fromDOT, dotConverter, dotDocumentConverter } from '@statelyai/graph/dot';
 import { createGraph } from '@statelyai/graph';
 
 // Export
@@ -82,29 +94,16 @@ Parses:
 
 ### Round-trip preservation
 
-Constructs that have no native `Graph`/`Node`/`Edge` field are preserved under a
-single namespaced `dot` key inside the relevant entity's `data`, so
-`fromDOT` → `toDOT` is non-lossy for them (matching how the graphml/gexf/gml
-converters store unmapped state in `data`). The value is plain JSON.
+<!-- DOT preservation metadata and limitations derived from src/formats/dot/index.ts -->
 
-- **Graph** `data.dot`:
-  - `attrs` — leftover `graph [...]` attributes (`bgcolor`, `fontname`, …; `rankdir` is excluded, it maps to `direction`).
-  - `nodeDefaults` / `edgeDefaults` — the `node [...]` / `edge [...]` default attribute bags declared at graph scope.
-  - `ranks` — `rank=same` (and `min`/`max`/…) groups, as `{ rank, nodes }`. Rank subgraphs are treated as layout constraints, not compound nodes.
-- **Node / Edge** `data.dot`:
-  - `attrs` — any attribute not mapped to a native field (`label`, `shape`, `color`).
-  - `labelHtml` — set when the label came from an HTML-like `<...>` value; the label string is stored verbatim and re-emitted with `<>` delimiters.
-  - `sourceCompass` / `targetCompass` (edges) — compass points from `node:port:compass` port syntax, re-emitted as the third `:`-segment.
+Native attributes and rank/subgraph membership are retained in legacy `data.dot` bags. When user data also needs preserving, a discriminated `_dot` carrier keeps that data, including primitives and foreign `dot` payloads. DOT `_stately` attributes carry Graph-only fields such as original edge IDs, initial states, geometry, ports, arbitrary data and nullable-label presence. Native label presence, including explicit empty labels, remains authoritative.
 
-**Remaining known losses:**
-- Compass points only survive when written in the full three-segment
-  `node:port:compass` form. A two-segment `node:se` is ambiguous (dotparser
-  reports `se` as the port id, not a compass), so it round-trips as a port.
-- Statement ordering and comments are not preserved (attributes are re-emitted
-  in a canonical order).
-- `style` on nodes is partly interpreted: `color`/`fillcolor` become the native
-  `color` field; the raw `style` attribute is otherwise kept in the `dot.attrs`
-  bag rather than reconstructed field-by-field.
+- Graph metadata retains strictness, graph/default attributes, rank groups and additional subgraph membership.
+- Node metadata retains HTML label markers, resolved inherited attributes, border color and style independently of fill.
+- Record and HTML port declarations become advisory Graph ports. A bare compass token is a compass when no matching port is declared; full `node:port:compass` syntax retains both.
+- Strict redeclarations update explicit ports/compass and attributes while retaining untouched endpoints/attributes.
+
+**Remaining limits:** comments, statement spelling/order, complete Graphviz attribute semantics and arbitrary unsupported grammar are not preserved by this Graph API. Reserved metadata names have adapter meaning; source-document guarantees require a separate document layer. The installed parser still supplies the underlying grammar beyond the tested comma-list normalization.
 
 ### `dotConverter`
 
@@ -114,3 +113,48 @@ Pre-built `GraphFormatConverter<string>`:
 const dot = dotConverter.to(graph);
 const graph = dotConverter.from(dot);
 ```
+
+### `dotDocumentConverter`
+
+<!-- native document API and bounded edit contract derived from converter index and document hook -->
+
+```ts
+const document = dotDocumentConverter.from(dot);
+const persisted = JSON.parse(JSON.stringify(document));
+const unchanged = dotDocumentConverter.to(persisted); // exact original text
+if (document.graph) {
+  document.graph.nodes[0].label = 'Updated';
+  const edited = dotDocumentConverter.to(document);
+}
+```
+
+`from` retains source when projection is unavailable (`graph: null`) and reports
+its diagnostics; `{ strict: true }` rejects unavailable projections. `to` patches
+verified literal node/edge labels and proves the resulting Graph projection by
+reparsing. Independent source edits survive; conflicting native and Graph field
+edits throw an ordinary error carrying diagnostics. Unedited bytes stay intact.
+
+Label patches target the last explicit quoted node label, or add a local override to an explicit node statement with a resolved plain label default. Edge patches require one simple statement per projected edge. Missing native default-ID labels, HTML/bare/concatenated labels, implicit nodes, cluster labels, strict merged edges and chains reject safe patching. Grammar unsupported by the legacy parser retains source with an unavailable projection. Graph streams project the first graph with an explicit diagnostic.
+
+Nullable labels, structure, data, geometry and style edits currently require explicit
+regeneration: `dotDocumentConverter.getUpdate(document, { mode: 'regenerate' })` returns a
+result with loss diagnostics. Strict `to` never silently regenerates or replays
+stale source after unsupported Graph edits. Native explicit labels, including empty strings,
+are authoritative over private null metadata; null exports omit native labels.
+
+<!-- DOT native label presence and independent reader proof derived from native Graphviz tests -->
+
+Explicit Graph empty labels emit `label=""`; null labels omit the native label.
+A missing native node label uses Graphviz's default `\N`, which displays its ID.
+The importer retains this distinction in versioned `implicitLabel` provenance;
+bare import keeps its historical empty-string Graph view, while document import
+uses `null` for this absent native label. Edit native source to choose an explicit
+literal in that case. The native suite uses Graphviz 15.0.0 to check topology,
+parallel edges, ranks/clusters, strict merges, ports, attributes and label presence;
+Graphviz JSON fixtures record engine/package versions and hashes.
+
+<!-- Native wire string validity derived from DOT escaping and independent Graphviz negative controls -->
+
+Native display strings/IDs and strict document label patches reject literal NUL
+and lone surrogates. Arbitrary user data remains JSON-escaped in private metadata,
+including these values, and is not rejected merely for containing them.

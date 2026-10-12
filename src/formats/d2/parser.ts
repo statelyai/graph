@@ -12,6 +12,7 @@ import {
   NUMERIC_STYLE_KEYS,
   unquoteD2,
   validateD2Input,
+  getD2ScalarGraph,
 } from './shared';
 
 // --- Statement scanning ---
@@ -26,6 +27,7 @@ interface RawStatement {
   head: string;
   /** Block body (between braces), or undefined. */
   block?: string;
+  commentsAfter?: string[];
 }
 type RawToken = RawComment | RawStatement;
 
@@ -71,6 +73,7 @@ function splitStatements(body: string): RawToken[] {
   const len = body.length;
   let buf = '';
   let braceDepth = 0;
+  let bracketDepth = 0;
   let blockStart = -1; // index in buf where top-level block began
 
   const flush = () => {
@@ -106,16 +109,20 @@ function splitStatements(body: string): RawToken[] {
       continue;
     }
 
-    // Inline trailing comment (dropped, best-effort)
+    // Inline annotations belong to the preceding statement.
     if (ch === '#' && braceDepth === 0 && buf.trim() !== '') {
       const nl = body.indexOf('\n', i);
-      i = nl === -1 ? len : nl;
+      const end = nl === -1 ? len : nl;
+      const comment = body.slice(i + 1, end).trim();
+      i = end;
       flush();
+      const previous = tokens[tokens.length - 1];
+      if (previous?.type === 'stmt') previous.commentsAfter = [comment];
       continue;
     }
 
     // Quoted string
-    if (ch === '"') {
+    if (ch === '"' || ch === "'") {
       const endQuote = (() => {
         let j = i + 1;
         while (j < len) {
@@ -123,7 +130,7 @@ function splitStatements(body: string): RawToken[] {
             j += 2;
             continue;
           }
-          if (body[j] === '"') return j;
+          if (body[j] === ch) return j;
           j++;
         }
         return len - 1;
@@ -143,6 +150,17 @@ function splitStatements(body: string): RawToken[] {
       }
     }
 
+    // Substitution braces are expressions, not map delimiters.
+    if (ch === '$' && body[i + 1] === '{') {
+      const end = body.indexOf('}', i + 2);
+      if (end < 0) throw new Error('D2: unterminated substitution');
+      buf += body.slice(i, end + 1);
+      i = end + 1;
+      continue;
+    }
+    if (ch === '[') bracketDepth++;
+    if (ch === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+
     if (ch === '{') {
       if (braceDepth === 0) blockStart = buf.length;
       braceDepth++;
@@ -157,7 +175,7 @@ function splitStatements(body: string): RawToken[] {
       continue;
     }
 
-    if ((ch === '\n' || ch === ';') && braceDepth === 0) {
+    if ((ch === '\n' || ch === ';') && braceDepth === 0 && bracketDepth === 0) {
       flush();
       i++;
       continue;
@@ -206,7 +224,7 @@ function skipQuoted(s: string, i: number): number {
       j += 2;
       continue;
     }
-    if (s[j] === '"') return j;
+    if (s[j] === s[i]) return j;
     j++;
   }
   return s.length;
@@ -334,7 +352,7 @@ interface ParseCtx {
 }
 
 function nodeId(path: string[]): string {
-  return path.join('.');
+  return path.map((segment) => /[."\\]/.test(segment) ? JSON.stringify(segment) : segment).join('.');
 }
 
 function ensureNode(
@@ -352,7 +370,7 @@ function ensureNode(
       id,
       parentId,
       label: null,
-      data: { declarationForm },
+      data: { declarationForm, ...(path.some((segment) => /[."\\]/.test(segment)) && { keyPath: [...path], sourceId: id }) },
     };
     ctx.nodes.set(id, node);
     registerChildOrder(ctx, parentId, id);
@@ -386,6 +404,7 @@ function applyReserved(
       const { text, labelBlock } = parseLabelBlock(value);
       node.label = text;
       if (labelBlock) node.data.labelBlock = labelBlock;
+      if (/^["']/.test(value)) { node.data.labelSource = value; node.data.sourceLabel = text; }
       break;
     }
     case 'icon':
@@ -402,6 +421,7 @@ function applyReserved(
       break;
     case 'class':
       node.data.classes = unquoteD2(value)
+        .replace(/^\[|\]$/g, '')
         .split(/[\s;]+/)
         .filter(Boolean);
       break;
@@ -506,21 +526,24 @@ function parseStructuredBody(
   classMember: boolean,
 ): void {
   node.ports = node.ports ?? [];
+  let comments: string[] = [];
   for (const tok of splitStatements(block)) {
-    if (tok.type !== 'stmt') continue;
+    if (tok.type === 'comment') { comments.push(tok.text); continue; }
     const kv = splitKeyValue(tok.head);
-    if (kv && kv.key === 'shape') {
-      node.shape = unquoteD2(kv.value);
-      continue;
-    }
-    if (kv && (kv.key === 'style' || kv.key.startsWith('style.'))) {
-      applyStyleBlock(node, tok.block ?? kv.value);
+    const rawPath = kv ? parseKeyPath(kv.key) : [];
+    if (rawPath.length && isReservedSegment(rawPath[0])) {
+      applyReserved(node, rawPath[0], rawPath.slice(1), kv!.value);
+      if (rawPath[0] === 'style' && tok.block !== undefined) applyStyleBlock(node, tok.block);
       continue;
     }
     const fieldName = kv ? kv.key : tok.head.trim();
     const fieldType = kv ? kv.value : '';
-    node.ports.push(parseFieldPort(fieldName, fieldType, tok.block, classMember));
+    const port = parseFieldPort(fieldName, fieldType, tok.block, classMember);
+    if (comments.length) port.data.commentsBefore = comments;
+    comments = [];
+    node.ports.push(port);
   }
+  if (comments.length) node.data.trailingComments = comments;
 }
 
 // --- Connection parsing ---
@@ -588,6 +611,36 @@ function resolveEndpoint(
   return { nodeId: nodeId(path) };
 }
 
+function getResolvedPath(scopePath: string[], rawSegments: string[]): string[] {
+  const path = [...scopePath];
+  let index = 0;
+  while (rawSegments[index] === '_') { path.pop(); index++; }
+  return [...path, ...unquotePath(rawSegments.slice(index))];
+}
+
+function hasConnectionReference(ctx: ParseCtx, head: string, block: string | undefined, scopePath: string[], comments: string[]): boolean {
+  const kv = splitKeyValue(head);
+  const match = (kv?.key ?? head).match(/^\((.+)\)\s*\[(\d+)\](?:\.(.+))?$/s);
+  if (!match) return false;
+  const connector = findConnector(match[1]);
+  if (!connector) throw new Error('D2: invalid connection reference');
+  const left = resolveEndpoint(ctx, getResolvedPath(scopePath, parseKeyPath(match[1].slice(0, connector.index).trim())));
+  const right = resolveEndpoint(ctx, getResolvedPath(scopePath, parseKeyPath(match[1].slice(connector.index + connector.arrow.length).trim())));
+  const source = connector.arrow === '<-' ? right : left;
+  const target = connector.arrow === '<-' ? left : right;
+  const matches = ctx.edges.filter((edge) => edge.sourceId === source.nodeId && edge.targetId === target.nodeId
+    && edge.sourcePort === source.port && edge.targetPort === target.port && edge.data.arrow === connector.arrow);
+  const edge = matches[Number(match[2])];
+  if (!edge) throw new Error(`D2: connection reference index ${match[2]} not found`);
+  if (comments.length) edge.data.commentsBefore = [...(edge.data.commentsBefore ?? []), ...comments];
+  if (match[3]) applyEdgeBlock(edge, `${match[3]}: ${kv?.value ?? ''}${block === undefined ? '' : ` {${block}}`}`);
+  else {
+    if (kv?.value) edge.label = unquoteD2(kv.value);
+    if (block !== undefined) applyEdgeBlock(edge, block);
+  }
+  return true;
+}
+
 // --- Top-level scope parsing ---
 
 function parseScope(
@@ -607,12 +660,30 @@ function parseScope(
 
     const head = tok.head;
 
+    if (hasConnectionReference(ctx, head, tok.block, scopePath, comments)) {
+      comments = [];
+      continue;
+    }
+
+    // Globs and boards require an expansion/document model. Preserve them as
+    // unsupported source constructs instead of introducing fabricated nodes.
+    if (/^(?:layers|scenarios|steps)(?:\s*:|$)|^(?:\*|!&|&)|^\.\.\.\$\{/.test(head)) {
+      ctx.graph.data.source ??= {};
+      (ctx.graph.data.source.unknownStatements ??= []).push(head + (tok.block === undefined ? '' : ` {${tok.block}}`));
+      continue;
+    }
+
     // Import: `key: @path` or `...@path`
     if (head.startsWith('...@') || head.startsWith('@')) {
       const importPath = head.replace(/^\.\.\./, '').replace(/^@/, '').trim();
       ctx.graph.data.source = ctx.graph.data.source ?? {};
       ctx.graph.data.source.imports = ctx.graph.data.source.imports ?? [];
       ctx.graph.data.source.imports.push(importPath);
+      const ref = `@import:${ctx.graph.data.source.importRecords?.length ?? 0}`;
+      (ctx.graph.data.source.importRecords ??= []).push({ path: importPath, spread: head.startsWith('...@'), scopeId: scopePath.length ? nodeId(scopePath) : null, ref });
+      if (scopePath.length) registerChildOrder(ctx, nodeId(scopePath), ref);
+      else (ctx.graph.data.order ??= []).push(ref);
+      if (comments.length) (ctx.graph.data.leadingComments ??= []).push(...comments);
       comments = [];
       continue;
     }
@@ -621,6 +692,7 @@ function parseScope(
     const conn = findConnector(head);
     if (conn && scopePath.length >= 0) {
       handleConnection(ctx, head, tok.block, scopePath, comments);
+      if (tok.commentsAfter) ctx.edges[ctx.edges.length - 1].data.commentsAfter = tok.commentsAfter;
       comments = [];
       continue;
     }
@@ -638,17 +710,27 @@ function parseScope(
       scopePath.length === 0
     ) {
       handleScopeReserved(ctx, rawSegs, value, tok.block, scopePath);
+      if (comments.length) (ctx.graph.data.leadingComments ??= []).push(...comments);
       comments = [];
       continue;
     }
 
     handleDeclaration(ctx, rawSegs, value, tok.block, scopePath, comments);
+    const declared = ctx.nodes.get(nodeId(getResolvedPath(scopePath, rawSegs)));
+    if (declared && tok.commentsAfter) declared.data.commentsAfter = tok.commentsAfter;
+    if (scopePath.length === 0 && declared) {
+      const order = ctx.graph.data.order ??= [];
+      if (!order.includes(declared.id)) order.push(declared.id);
+    }
     comments = [];
   }
 
   // Leftover comments → attach to graph trailing (only at root)
   if (scopePath.length === 0 && comments.length > 0) {
     ctx.graph.data.trailingComments = comments;
+  } else if (comments.length) {
+    const parent = ctx.nodes.get(nodeId(scopePath));
+    if (parent) parent.data.trailingComments = comments;
   }
 }
 
@@ -693,32 +775,59 @@ function handleScopeReserved(
   }
 }
 
+function getSourceValue(value: string): any {
+  const text = value.trim();
+  if (text.startsWith('[') && text.endsWith(']')) {
+    const items: any[] = [];
+    const body = text.slice(1, -1);
+    let start = 0;
+    let depth = 0;
+    for (let index = 0; index <= body.length; index++) {
+      if (body[index] === '"' || body[index] === "'") { index = skipQuoted(body, index); continue; }
+      if (body[index] === '[') depth++;
+      if (body[index] === ']') depth--;
+      if (index === body.length || (depth === 0 && (body[index] === ';' || body[index] === '\n'))) {
+        const item = body.slice(start, index).trim();
+        if (item) items.push(getSourceValue(item));
+        start = index + 1;
+      }
+    }
+    return items;
+  }
+  if (/^["']/.test(text)) return unquoteD2(text);
+  if (text === 'true') return true;
+  if (text === 'false') return false;
+  if (text === 'null') return null;
+  if (/^-?\d+(?:\.\d+)?$/.test(text)) return Number(text);
+  return text;
+}
+
 function parseVarsBlock(block: string): Record<string, any> {
-  const out: Record<string, any> = {};
+  const out: Record<string, any> = Object.create(null);
   for (const tok of splitStatements(block)) {
     if (tok.type !== 'stmt') continue;
     const kv = splitKeyValue(tok.head);
-    if (kv) out[kv.key] = unquoteD2(kv.value);
+    if (kv) out[unquoteD2(kv.key)] = tok.block === undefined ? getSourceValue(kv.value) : parseVarsBlock(tok.block);
   }
   return out;
 }
 
 function parseClassesBlock(
   block: string,
-): Record<string, Record<string, string | number | boolean>> {
-  const out: Record<string, Record<string, string | number | boolean>> = {};
+): Record<string, Record<string, any>> {
+  const out: Record<string, Record<string, any>> = Object.create(null);
   for (const tok of splitStatements(block)) {
     if (tok.type !== 'stmt' || tok.block === undefined) continue;
     const kv = splitKeyValue(tok.head);
     const className = (kv ? kv.key : tok.head).trim();
-    const style: Record<string, string | number | boolean> = {};
+    const style: Record<string, any> = Object.create(null);
     for (const inner of splitStatements(tok.block)) {
       if (inner.type !== 'stmt') continue;
       const ikv = splitKeyValue(inner.head);
       if (!ikv) continue;
-      const segs = parseKeyPath(ikv.key);
-      const styleKey = segs[0] === 'style' ? segs[1] : segs[0];
-      style[styleKey] = coerceStyleValue(styleKey, ikv.value);
+      const segs = unquotePath(parseKeyPath(ikv.key));
+      const styleKey = segs[0] === 'style' && segs.length > 1 ? segs[1] : segs[0];
+      style[styleKey] = inner.block === undefined ? coerceStyleValue(styleKey, ikv.value) : parseVarsBlock(inner.block);
     }
     out[className] = style;
   }
@@ -764,23 +873,22 @@ function handleConnection(
   parts.push({ text: rest.trim() });
 
   for (let k = 0; k < arrows.length; k++) {
-    const sourcePath = unquotePath(parseKeyPath(parts[k].text));
-    const targetPath = unquotePath(parseKeyPath(parts[k + 1].text));
-    const fullSource = [...scopePath, ...sourcePath];
-    const fullTarget = [...scopePath, ...targetPath];
+    const fullSource = getResolvedPath(scopePath, parseKeyPath(parts[k].text));
+    const fullTarget = getResolvedPath(scopePath, parseKeyPath(parts[k + 1].text));
     const edge = makeEdge(
       ctx,
       fullSource,
       fullTarget,
       arrows[k],
-      k === arrows.length - 1 ? label : null,
-      k === arrows.length - 1 ? labelBlock : undefined,
+      label,
+      labelBlock,
     );
+    if (kv && /^["']/.test(kv.value)) { edge.data.labelSource = kv.value; edge.data.sourceLabel = label ?? ''; }
     if (comments.length > 0 && k === 0) edge.data.commentsBefore = comments;
     ctx.edges.push(edge);
     registerChildOrder(ctx, scopePath.length ? nodeId(scopePath) : null, edge.id);
     // edge style/arrowhead block
-    if (block !== undefined && k === arrows.length - 1) {
+    if (block !== undefined) {
       applyEdgeBlock(edge, block);
     }
   }
@@ -806,8 +914,19 @@ function applyEdgeBlock(edge: GraphEdge<D2EdgeData>, block: string): void {
     } else if (segs[0] === 'source-arrowhead' || segs[0] === 'target-arrowhead') {
       const side = segs[0] === 'source-arrowhead' ? 'sourceArrowhead' : 'targetArrowhead';
       edge.data[side] = edge.data[side] ?? {};
-      if (segs[1] === 'shape') edge.data[side]!.shape = unquoteD2(kv.value);
-      else edge.data[side]!.label = unquoteD2(kv.value);
+      const arrowhead = edge.data[side]!;
+      if (segs[1] === 'shape') arrowhead.shape = unquoteD2(kv.value);
+      else if (segs[1] === 'style' && segs[2]) (arrowhead.style ??= {})[segs[2]] = coerceStyleValue(segs[2], kv.value);
+      else if (segs[1] === 'label' || segs.length === 1) {
+        if (kv.value) arrowhead.label = unquoteD2(kv.value);
+        if (tok.block !== undefined) {
+          const attributes = parseVarsBlock(tok.block);
+          if (attributes.shape !== undefined) arrowhead.shape = attributes.shape;
+          if (attributes.label !== undefined) arrowhead.label = attributes.label;
+          if (attributes.style) arrowhead.style = Object.fromEntries(Object.entries(attributes.style).map(([key, value]) => [key, coerceStyleValue(key, String(value))]));
+          arrowhead.attributes = Object.fromEntries(Object.entries(attributes).filter(([key]) => !['shape', 'label', 'style'].includes(key)));
+        }
+      }
     } else if (segs[0] === 'label') {
       edge.label = unquoteD2(kv.value);
     } else {
@@ -827,7 +946,7 @@ function handleDeclaration(
 ): void {
   // Node-id segments (quotes stripped); scopePath is already unquoted.
   const segs = unquotePath(rawSegs);
-  const fullPath = [...scopePath, ...segs];
+  const fullPath = getResolvedPath(scopePath, rawSegs);
 
   // If the leading segment(s) form a node path and the trailing is a reserved
   // attribute, find the split. Quoted segments are literal ids, never reserved.
@@ -846,9 +965,13 @@ function handleDeclaration(
     if (comments.length > 0 && !node.data.commentsBefore) {
       node.data.commentsBefore = comments;
     }
-    applyReserved(node, rawSegs[reservedAt], segs.slice(reservedAt + 1), value);
+    if (!(['vars', 'classes'].includes(rawSegs[reservedAt]) && block !== undefined)) applyReserved(node, rawSegs[reservedAt], segs.slice(reservedAt + 1), value);
     if (rawSegs[reservedAt] === 'style' && block !== undefined) {
       applyStyleBlock(node, block);
+    } else if (rawSegs[reservedAt] === 'vars' && block !== undefined) {
+      (node.data.source ??= {}).vars = parseVarsBlock(block);
+    } else if (rawSegs[reservedAt] === 'classes' && block !== undefined) {
+      (node.data.source ??= {}).classes = parseClassesBlock(block);
     }
     return;
   }
@@ -864,6 +987,7 @@ function handleDeclaration(
     const { text, labelBlock } = parseLabelBlock(value);
     node.label = text;
     if (labelBlock) node.data.labelBlock = labelBlock;
+    if (/^["']/.test(value)) { node.data.labelSource = value; node.data.sourceLabel = text; }
   }
 
   if (block !== undefined) {
@@ -977,5 +1101,5 @@ export function fromD2(input: string): D2Graph {
     }
   }
 
-  return graph;
+  return getD2ScalarGraph(graph);
 }

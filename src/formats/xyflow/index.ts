@@ -1,310 +1,182 @@
+import type { FormatExportOptions } from '../preservation';
+import { createGraphDocumentConverter } from '../document';
+import { getStructuredDocumentProjectionGraph, getStructuredDocumentPatch } from '../preservation';
 import type { NodeBase, EdgeBase } from '@xyflow/system';
 import type { VisualGraph, VisualGraphFormatConverter } from '../../types';
+import { createMetadata, createNativeCarrier, getCarrierData, getClonedJSON, getMetadata,
+  getNativeCarrier, getRestoredRecord, getMergedNative, isJSONEqual, type FormatMetadata, type FormatImportOptions } from '../preservation';
 
-const STATELYAI_METADATA_KEY = '__statelyai';
-
-/** xyflow Node — re-exported from `@xyflow/system`. */
-export type XYFlowNode<
-  TNodeData extends Record<string, unknown> = Record<string, unknown>,
-> = NodeBase<TNodeData>;
-
-/**
- * xyflow Edge — `EdgeBase` from `@xyflow/system` plus the top-level `label`
- * that React Flow / Svelte Flow actually render (it's a renderer prop, so
- * `EdgeBase` itself doesn't declare it).
- */
-export type XYFlowEdge<
-  TEdgeData extends Record<string, unknown> = Record<string, unknown>,
-> = EdgeBase<TEdgeData> & { label?: string };
-
-export interface XYFlow<
-  TNodeData extends Record<string, unknown> = Record<string, unknown>,
-  TEdgeData extends Record<string, unknown> = Record<string, unknown>,
-> {
+export type XYFlowNode<TNodeData extends Record<string, unknown> = Record<string, unknown>> = NodeBase<TNodeData>;
+export type XYFlowEdge<TEdgeData extends Record<string, unknown> = Record<string, unknown>> = EdgeBase<TEdgeData> & { label?: string };
+export interface XYFlow<TNodeData extends Record<string, unknown> = Record<string, unknown>, TEdgeData extends Record<string, unknown> = Record<string, unknown>> {
   nodes: XYFlowNode<TNodeData>[];
   edges: XYFlowEdge<TEdgeData>[];
   data?: Record<string, unknown>;
+  viewport?: { x: number; y: number; zoom: number };
+  [key: string]: unknown;
 }
+export interface XYFlowImportOptions extends FormatImportOptions {}
 
-interface XYFlowMetadata {
-  graph?: Partial<VisualGraph>;
-  data?: unknown;
-  node?: Record<string, unknown>;
-  edge?: Record<string, unknown>;
+function toDataObject(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? getClonedJSON(value) : {};
 }
-
-function toDataObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? { ...(value as Record<string, unknown>) }
-    : {};
+function getLegacyMetadata(value: any, kind: 'graph' | 'node' | 'edge'): any {
+  const metadata = value?.__statelyai;
+  return metadata && typeof metadata === 'object' && !metadata.kind && metadata[kind] &&
+    typeof metadata[kind] === 'object' && Object.keys(metadata).every((key) => key === kind || key === 'data') ? metadata : undefined;
 }
-
-function withMetadata(
-  value: unknown,
-  metadata: XYFlowMetadata,
-): Record<string, unknown> {
-  return {
-    ...toDataObject(value),
-    [STATELYAI_METADATA_KEY]: {
-      ...(value !== undefined && { data: value }),
-      ...metadata,
-    },
-  };
+function getUserData(value: any, metadata?: FormatMetadata, legacy?: any): any {
+  if (legacy) return legacy.data;
+  if (!metadata) return getClonedJSON(value);
+  const current = { ...value };
+  delete current.__statelyai;
+  const baseline = metadata.mapped.__visibleData ?? {};
+  const original = metadata.original.data;
+  const result = toDataObject(original);
+  let edited = false;
+  for (const key of new Set([...Object.keys(current), ...Object.keys(baseline)])) {
+    if (key === '__statelyai') continue;
+    if (Object.hasOwn(current, key) === Object.hasOwn(baseline, key) && isJSONEqual(current[key], baseline[key])) continue;
+    // The lifted renderer label belongs to Graph.label unless user data already
+    // had a label field. Avoid manufacturing a data.label on unrelated edits.
+    if (key === 'label' && !Object.hasOwn(result, 'label')) continue;
+    edited = true;
+    if (Object.hasOwn(current, key)) Object.defineProperty(result, key, { value: getClonedJSON(current[key]), enumerable: true, writable: true, configurable: true });
+    else delete result[key];
+  }
+  return edited ? result : getClonedJSON(original);
 }
-
-function readMetadata(value: unknown): XYFlowMetadata | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const metadata = (value as Record<string, unknown>)[STATELYAI_METADATA_KEY];
-  return metadata && typeof metadata === 'object'
-    ? (metadata as XYFlowMetadata)
-    : undefined;
+function getFields(value: any, keys: string[]): any {
+  return Object.fromEntries(keys.filter((key) => value && Object.hasOwn(value, key)).map((key) => [key, value[key]]));
 }
-
-function readUserData(value: unknown): unknown {
-  const metadata = readMetadata(value);
-  // No metadata blob: external xyflow input — pass the data through as-is.
-  if (!metadata) return value;
-  // Metadata blob present: the original user data (possibly `undefined`) was
-  // captured at conversion time; never leak the wrapper object itself.
-  return 'data' in metadata ? metadata.data : undefined;
+function getXYRoot(flow: XYFlow, legacy?: any): Omit<VisualGraph, 'nodes' | 'edges'> {
+  return { id: legacy?.graph?.id ?? '', mode: legacy?.graph?.mode ?? 'directed', initialNodeId: legacy?.graph?.initialNodeId ?? null,
+    direction: legacy?.graph?.direction ?? 'down', data: legacy?.graph?.data,
+    ...getFields(legacy?.graph, ['style']) };
+}
+function getXYNode(node: XYFlowNode, metadata?: FormatMetadata, legacy?: any): VisualGraph['nodes'][number] {
+  const preserved = metadata?.original ?? legacy?.node ?? {};
+  const visible = node.data as Record<string, any>;
+  return { type: 'node', id: node.id, parentId: node.parentId ?? null,
+    initialNodeId: preserved.initialNodeId ?? null, label: visible?.label?.toString() ?? '',
+    data: getUserData(node.data, metadata, legacy), x: node.position.x, y: node.position.y,
+    width: node.measured?.width ?? node.width ?? node.initialWidth ?? 0,
+    height: node.measured?.height ?? node.height ?? node.initialHeight ?? 0,
+    ...(Object.hasOwn(node, 'type') && { shape: node.type }),
+    ...getFields(preserved, ['color', 'style', 'ports']) };
+}
+function getXYEdge(edge: XYFlowEdge, index: number, metadata?: FormatMetadata, legacy?: any): VisualGraph['edges'][number] {
+  const preserved = metadata?.original ?? legacy?.edge ?? {};
+  return { type: 'edge', id: edge.id ?? `e${index}`, sourceId: edge.source, targetId: edge.target,
+    label: Object.hasOwn(edge, 'label') ? edge.label : (edge.data as any)?.label?.toString() ?? '',
+    data: getUserData(edge.data, metadata, legacy),
+    x: preserved.x ?? 0, y: preserved.y ?? 0, width: preserved.width ?? 0, height: preserved.height ?? 0,
+    ...(edge.sourceHandle != null && { sourcePort: edge.sourceHandle }),
+    ...(edge.targetHandle != null && { targetPort: edge.targetHandle }),
+    ...getFields(preserved, ['mode', 'weight', 'points', 'routing', 'color', 'style']) };
 }
 
 /**
  * React Flow requires parent nodes to appear before their children in the
- * nodes array. Reorders iteratively, keeping authored order otherwise: each
- * pass emits nodes whose parent is already emitted (or absent). Nodes left
- * over by a parentId cycle are appended in authored order rather than hanging.
+ * nodes array. Uses a linear queue, retaining authored sibling order. Nodes
+ * left over by a parentId cycle are appended in authored order.
  */
 function orderParentsFirst(nodes: XYFlowNode[]): XYFlowNode[] {
-  const nodeIds = new Set(nodes.map((n) => n.id));
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const children = new Map<string, XYFlowNode[]>();
+  const queue: XYFlowNode[] = [];
+  for (const node of nodes) {
+    if (!node.parentId || !nodeIds.has(node.parentId)) queue.push(node);
+    else {
+      const siblings = children.get(node.parentId) ?? [];
+      siblings.push(node); children.set(node.parentId, siblings);
+    }
+  }
   const emitted = new Set<string>();
   const result: XYFlowNode[] = [];
-  let remaining = nodes;
-  while (remaining.length > 0) {
-    const deferred: XYFlowNode[] = [];
-    for (const node of remaining) {
-      if (
-        !node.parentId ||
-        emitted.has(node.parentId) ||
-        // Parent isn't in the graph at all: treat as a root.
-        !nodeIds.has(node.parentId)
-      ) {
-        result.push(node);
-        emitted.add(node.id);
-      } else {
-        deferred.push(node);
-      }
-    }
-    if (deferred.length === remaining.length) {
-      // No progress: parentId cycle. Keep the rest in authored order.
-      result.push(...deferred);
-      break;
-    }
-    remaining = deferred;
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    const node = queue[cursor];
+    result.push(node); emitted.add(node.id);
+    queue.push(...(children.get(node.id) ?? []));
   }
+  // Cycles and their descendants retain authored order, as in legacy exports.
+  result.push(...nodes.filter((node) => !emitted.has(node.id)));
   return result;
 }
 
-// --- Conversion ---
+/** Export renderer-visible fields and versioned metadata; snapshots are independent clones. */
+export interface XYFlowExportOptions extends FormatExportOptions {}
 
-/**
- * Converts a visual graph to xyflow (React Flow / Svelte Flow) format.
- *
- * @example
- * ```ts
- * import { createVisualGraph } from '@statelyai/graph';
- * import { toXYFlow } from '@statelyai/graph/xyflow';
- *
- * const graph = createVisualGraph({
- *   nodes: [
- *     { id: 'a', x: 0, y: 0, width: 100, height: 50 },
- *     { id: 'b', x: 200, y: 100, width: 100, height: 50 },
- *   ],
- *   edges: [{ id: 'e0', sourceId: 'a', targetId: 'b' }],
- * });
- *
- * const flow = toXYFlow(graph);
- * // { nodes: [...], edges: [...] }
- * ```
- */
-export function toXYFlow(graph: VisualGraph): XYFlow {
-  return {
-    data: {
-      [STATELYAI_METADATA_KEY]: {
-        graph: {
-          id: graph.id,
-          mode: graph.mode,
-          initialNodeId: graph.initialNodeId,
-          data: graph.data,
-          direction: graph.direction,
-          style: graph.style,
-        },
-      },
-    },
-    nodes: orderParentsFirst(graph.nodes.map((n) => {
-      const node: XYFlowNode = {
-        id: n.id,
-        position: { x: n.x, y: n.y },
-        data: withMetadata(n.data, {
-          node: {
-            initialNodeId: n.initialNodeId,
-            label: n.label,
-            color: n.color,
-            style: n.style,
-            ports: n.ports,
-          },
-        }),
-      };
-      if (n.parentId) node.parentId = n.parentId;
-      // React Flow's built-in nodes render `data.label`
-      if (n.label) node.data.label = n.label;
-      if (n.shape) node.type = n.shape;
-      if (n.width !== undefined) node.width = n.width;
-      if (n.height !== undefined) node.height = n.height;
-      return node;
-    })),
-    edges: graph.edges.map((e) => {
-      const edge: XYFlowEdge = {
-        id: e.id,
-        source: e.sourceId,
-        target: e.targetId,
-      };
-      if (e.sourcePort) edge.sourceHandle = e.sourcePort;
-      if (e.targetPort) edge.targetHandle = e.targetPort;
-      edge.data = withMetadata(e.data, {
-        edge: {
-          label: e.label,
-          mode: e.mode,
-          weight: e.weight,
-          points: e.points,
-          routing: e.routing,
-          color: e.color,
-          style: e.style,
-          x: e.x,
-          y: e.y,
-          width: e.width,
-          height: e.height,
-        },
-      });
-      // Top-level `label` is what React Flow / Svelte Flow render for edges
-      // (their built-in edge components ignore `data.label`)
-      if (e.label) edge.label = e.label;
-      return edge;
-    }),
-  };
+export function toXYFlow(graph: VisualGraph, options: XYFlowExportOptions = {}): XYFlow {
+  const carrier = options.nativeCarrier === false ? undefined : getNativeCarrier(graph.data, 'xyflow');
+  if (carrier) return getMergedNative(carrier.native, toRawXYFlow(carrier.baseline),
+    toRawXYFlow({ ...graph, data: getCarrierData(graph.data, 'xyflow') }));
+  return toRawXYFlow(graph);
 }
 
-/**
- * Parses an xyflow (React Flow / Svelte Flow) object into a visual graph.
- *
- * @example
- * ```ts
- * import { fromXYFlow } from '@statelyai/graph/xyflow';
- *
- * const graph = fromXYFlow({
- *   nodes: [
- *     { id: 'a', position: { x: 0, y: 0 }, data: {} },
- *     { id: 'b', position: { x: 200, y: 100 }, data: {} },
- *   ],
- *   edges: [{ id: 'e0', source: 'a', target: 'b' }],
- * });
- * ```
- */
-export function fromXYFlow(flow: XYFlow): VisualGraph {
-  if (!flow || typeof flow !== 'object') {
-    throw new Error('XYFlow: expected an object');
-  }
-  if (!Array.isArray(flow.nodes)) {
-    throw new Error('XYFlow: "nodes" must be an array');
-  }
-  if (!Array.isArray(flow.edges)) {
-    throw new Error('XYFlow: "edges" must be an array');
-  }
-  const graphMetadata = readMetadata(flow.data)?.graph;
-  return {
-    id: graphMetadata?.id?.toString() ?? '',
-    mode: graphMetadata?.mode ?? 'directed',
-    initialNodeId:
-      graphMetadata && 'initialNodeId' in graphMetadata
-        ? (graphMetadata.initialNodeId as string | null)
-        : null,
-    data:
-      graphMetadata && 'data' in graphMetadata
-        ? graphMetadata.data
-        : (undefined as any),
-    direction:
-      (graphMetadata?.direction as VisualGraph['direction'] | undefined) ??
-      'down',
-    ...(graphMetadata?.style !== undefined && { style: graphMetadata.style }),
-    nodes: flow.nodes.map((n) => {
-      const metadata = readMetadata(n.data)?.node;
-      return {
-        type: 'node' as const,
-        id: n.id,
-        parentId: n.parentId ?? null,
-        initialNodeId:
-          metadata && 'initialNodeId' in metadata
-            ? (metadata.initialNodeId as string | null)
-            : null,
-        label:
-          metadata && 'label' in metadata
-            ? (metadata.label as string | null)
-            : ((n.data as Record<string, unknown> | undefined)?.label?.toString() ??
-              ''),
-        data: readUserData(n.data),
-        x: n.position.x,
-        y: n.position.y,
-        width: n.measured?.width ?? n.width ?? n.initialWidth ?? 0,
-        height: n.measured?.height ?? n.height ?? n.initialHeight ?? 0,
-        ...(n.type && { shape: n.type }),
-        ...(metadata?.color !== undefined && { color: metadata.color as string }),
-        ...(metadata?.style !== undefined && {
-          style: metadata.style as VisualGraph['style'],
-        }),
-        ...(metadata?.ports !== undefined && {
-          ports: metadata.ports as VisualGraph['nodes'][number]['ports'],
-        }),
-      };
-    }),
-    edges: flow.edges.map((e, i) => {
-      const metadata = readMetadata(e.data)?.edge;
-      return {
-        type: 'edge' as const,
-        id: e.id ?? `e${i}`,
-        sourceId: e.source,
-        targetId: e.target,
-        label:
-          metadata && 'label' in metadata
-            ? (metadata.label as string | null)
-            : (e.label ??
-              (e.data as Record<string, unknown> | undefined)?.label?.toString() ??
-              ''),
-        ...(e.sourceHandle && { sourcePort: e.sourceHandle }),
-        ...(e.targetHandle && { targetPort: e.targetHandle }),
-        data: readUserData(e.data),
-        x: (metadata?.x as number | undefined) ?? 0,
-        y: (metadata?.y as number | undefined) ?? 0,
-        width: (metadata?.width as number | undefined) ?? 0,
-        height: (metadata?.height as number | undefined) ?? 0,
-        ...(metadata?.mode !== undefined && {
-          mode: metadata.mode as VisualGraph['mode'],
-        }),
-        ...(metadata?.weight !== undefined && {
-          weight: metadata.weight as number,
-        }),
-        ...(metadata?.points !== undefined && {
-          points: metadata.points as VisualGraph['edges'][number]['points'],
-        }),
-        ...(metadata?.routing !== undefined && {
-          routing: metadata.routing as VisualGraph['edges'][number]['routing'],
-        }),
-        ...(metadata?.color !== undefined && { color: metadata.color as string }),
-        ...(metadata?.style !== undefined && {
-          style: metadata.style as VisualGraph['style'],
-        }),
-      };
+function toRawXYFlow(graph: VisualGraph): XYFlow {
+  const { nodes, edges, ...root } = graph;
+  const flow: XYFlow = {
+    nodes: orderParentsFirst(nodes.map((node) => {
+      const native: XYFlowNode = { id: node.id, position: { x: node.x, y: node.y }, data: toDataObject(node.data),
+        ...getFields(node, ['width', 'height']),
+        ...(Object.hasOwn(node, 'shape') && { type: node.shape }),
+        ...(node.parentId != null && { parentId: node.parentId }) };
+      if (node.label) native.data.label = node.label;
+      const mapped = { ...getXYNode(native), data: node.data, ...getFields(node, ['color', 'style', 'ports']), __visibleData: getClonedJSON(native.data) };
+      native.data.__statelyai = createMetadata('xyflow.node', node, mapped);
+      return native;
+    })),
+    edges: edges.map((edge, index) => {
+      const native: XYFlowEdge = { id: edge.id, source: edge.sourceId, target: edge.targetId,
+        data: toDataObject(edge.data), ...(edge.label != null && { label: edge.label }),
+        ...(edge.sourcePort !== undefined && { sourceHandle: edge.sourcePort }),
+        ...(edge.targetPort !== undefined && { targetHandle: edge.targetPort }) };
+      const mapped = { ...getXYEdge(native, index), data: edge.data, ...getFields(edge, ['x', 'y', 'width', 'height', 'mode', 'weight', 'points', 'routing', 'color', 'style']), __visibleData: getClonedJSON(native.data) };
+      native.data!.__statelyai = createMetadata('xyflow.edge', edge, mapped);
+      return native;
     }),
   };
+  flow.data = { __statelyai: { ...createMetadata('xyflow.graph', root, getXYRoot(flow)),
+    nodeOrder: nodes.map((node) => node.id), nativeNodeOrder: flow.nodes.map((node) => node.id) } };
+  return getClonedJSON(flow);
+}
+
+/** Import native flows, with an explicit override for reserved wire conventions. */
+export function fromXYFlow(flow: XYFlow, options: XYFlowImportOptions = {}): VisualGraph {
+  if (!flow || typeof flow !== 'object') throw new Error('XYFlow: expected an object');
+  if (!Array.isArray(flow.nodes)) throw new Error('XYFlow: "nodes" must be an array');
+  if (!Array.isArray(flow.edges)) throw new Error('XYFlow: "edges" must be an array');
+  const getWireMetadata = (value: any, format: string) => options.metadata === 'native' ? undefined : getMetadata(value?.__statelyai, format);
+  const getLegacy = (value: any, kind: 'graph' | 'node' | 'edge') => options.metadata === 'native' ? undefined : getLegacyMetadata(value, kind);
+  const metadata = getWireMetadata(flow.data, 'xyflow.graph');
+  const legacy = getLegacy(flow.data, 'graph');
+  const graph: VisualGraph = {
+    ...getRestoredRecord(getXYRoot(flow, legacy), metadata),
+    nodes: flow.nodes.map((node) => {
+      const wire = getWireMetadata(node.data, 'xyflow.node');
+      const mapped: any = getXYNode(node, wire, getLegacy(node.data, 'node'));
+      if (wire) mapped.__visibleData = wire.mapped.__visibleData;
+      const restored = getRestoredRecord(mapped, wire);
+      delete restored.__visibleData;
+      return restored;
+    }),
+    edges: flow.edges.map((edge, index) => {
+      const wire = getWireMetadata(edge.data, 'xyflow.edge');
+      const mapped: any = getXYEdge(edge, index, wire, getLegacy(edge.data, 'edge'));
+      if (wire) mapped.__visibleData = wire.mapped.__visibleData;
+      const restored = getRestoredRecord(mapped, wire);
+      delete restored.__visibleData;
+      return restored;
+    }),
+  };
+  const order = flow.data?.__statelyai as any;
+  if (metadata && Array.isArray(order.nodeOrder) && isJSONEqual(flow.nodes.map((node) => node.id), order.nativeNodeOrder)) {
+    const indices = new Map(order.nodeOrder.map((id: string, index: number) => [id, index]));
+    graph.nodes.sort((a, b) => Number(indices.get(a.id)) - Number(indices.get(b.id)));
+  }
+  if (!metadata) graph.data = createNativeCarrier(graph.data, 'xyflow', flow, graph);
+  return graph;
 }
 
 /**
@@ -331,3 +203,12 @@ export const xyflowConverter: VisualGraphFormatConverter<XYFlow> = {
   to: toXYFlow,
   from: fromXYFlow,
 };
+
+
+/** Exact native source preservation, with strict verified field edits. */
+export const xyflowDocumentConverter = createGraphDocumentConverter({
+  format: 'xyflow',
+  codec: { from: (source: XYFlow) => fromXYFlow(source, { metadata: 'native' }), to: (graph: VisualGraph) => toXYFlow(graph, { nativeCarrier: false }) },
+  project: (source: XYFlow) => ({ graph: getStructuredDocumentProjectionGraph(fromXYFlow(source, { metadata: 'native' }), source, 'xyflow') }),
+  patch: (context) => getStructuredDocumentPatch(context, 'xyflow'),
+});

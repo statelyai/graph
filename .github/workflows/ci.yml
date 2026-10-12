@@ -37,6 +37,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck Repository
+        run: pnpm typecheck:repo
+
+      - name: Check API Conventions
+        run: pnpm check:conventions
+
       - name: Check Generated Artifacts
         run: pnpm check:generated
 
@@ -71,3 +77,41 @@ jobs:
 
       - name: Validate Published Package Surface
         run: pnpm validate:package
+
+
+  native-validation:
+    name: Native Format Validation
+    runs-on: ubuntu-latest
+    env:
+      GRAPH_NATIVE_PYTHON: ${{ github.workspace }}/.venv-native/bin/python
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements/native.txt
+      - name: Install Native Python Oracles
+        run: |
+          python -m venv .venv-native
+          .venv-native/bin/python -m pip install -r requirements/native.txt
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Pinned PlantUML Oracle
+        run: pnpm setup:native:plantuml
+      - name: Validate Native Formats and Converter Coverage
+        run: pnpm test:coverage

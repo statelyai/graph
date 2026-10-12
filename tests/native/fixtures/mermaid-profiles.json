@@ -1,0 +1,46 @@
+{
+  "oracle": "mermaid@12.1.0",
+  "retrieved": "2026-10-12",
+  "fixtures": [
+    {
+      "format": "flowchart",
+      "documentation": "https://mermaid.js.org/syntax/flowchart.html",
+      "source": "flowchart LR\n  A[\"Start 東京\"] -->|Go| B{Decision}\n  B -.-> C@{ shape: cloud, label: \"Future\" }\n  Isolated[\"No edges\"]\n  classDef blue fill:#def,stroke:#123\n  class A blue\n  style B fill:#fed\n"
+    },
+    {
+      "format": "sequence",
+      "documentation": "https://mermaid.js.org/syntax/sequenceDiagram.html",
+      "source": "sequenceDiagram\n  autonumber 10 5\n  participant A as Client\n  participant B@{ \"type\": \"database\" } as Store\n  A->>B: Save 東京\n  note over A,B: Keep this note\n  B-->>A: Saved\n"
+    },
+    {
+      "format": "state",
+      "documentation": "https://mermaid.js.org/syntax/stateDiagram.html",
+      "source": "stateDiagram-v2\n  state \"Idle 東京\" as Idle\n  [*] --> Idle\n  Idle --> Running: start\n  Running --> [*]\n  note right of Idle: Waiting\n  state Group {\n    Inner1 --> Inner2: nested\n  }\n  Idle --> Group: enter\n"
+    },
+    {
+      "format": "class",
+      "documentation": "https://mermaid.js.org/syntax/classDiagram.html",
+      "source": "classDiagram\n  namespace Domain {\n    class Customer {\n      +String name\n      +save()\n    }\n    class Order\n  }\n  Customer \"1\" --> \"many\" Order : places\n  note for Customer \"Keeps records\"\n"
+    },
+    {
+      "format": "er",
+      "documentation": "https://mermaid.js.org/syntax/entityRelationshipDiagram.html",
+      "source": "erDiagram\n  CUSTOMER {\n    string id PK, UK \"Identity\"\n    string name\n  }\n  CUSTOMER ||--o{ ORDER : places\n  ISOLATED\n"
+    },
+    {
+      "format": "block",
+      "documentation": "https://mermaid.js.org/syntax/block.html",
+      "source": "block-beta\n  columns 3\n  A[\"First block\"] B((\"Second block\")) C{\"Third block\"}\n  A --> B\n  style A fill:#def\n  block:group\n    columns 2\n    D[\"Nested one\"] E[\"Nested two\"]\n  end\n"
+    },
+    {
+      "format": "mindmap",
+      "documentation": "https://mermaid.js.org/syntax/mindmap.html",
+      "source": "mindmap\n  root((Root 東京))\n    a[First child]\n      Deep child\n    b(Second child)\n"
+    },
+    {
+      "format": "ishikawa",
+      "documentation": "https://mermaid.js.org/syntax/ishikawa.html",
+      "source": "ishikawa-beta\n  Effect 東京\n    People\n      Training\n    Process\n      Review\n"
+    }
+  ]
+}

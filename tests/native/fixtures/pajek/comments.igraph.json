@@ -1,0 +1,33 @@
+{
+  "oracle": "igraph",
+  "version": "1.0.0",
+  "python": "3.14.8",
+  "summary": {
+    "directed": true,
+    "graph": {},
+    "nodes": [
+      {
+        "id": 0,
+        "attributes": {
+          "name": "one"
+        }
+      },
+      {
+        "id": 1,
+        "attributes": {
+          "name": "two"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": 0,
+        "target": 1,
+        "attributes": {
+          "weight": 1.0
+        }
+      }
+    ]
+  },
+  "warnings": []
+}
