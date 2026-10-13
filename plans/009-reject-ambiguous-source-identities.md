@@ -1,6 +1,6 @@
 # Plan 009: Reject wrong-entity document updates after source identity drift
 
-Planned at `8d1b139`, 2026-10-12. P1 bug; M effort; MED risk; HIGH confidence. Depends on DONE003. Dedicated worktree `/Users/davidkpiano/.codex/worktrees/graph/domain-formats`, branch feature/domain-formats. Shared checkout preserved.
+Planned at `8d1b139`, 2026-10-12. P1 bug; M effort; MED risk; HIGH confidence. Depends on DONE003. Dedicated `feature/domain-formats` worktree. Shared checkout preserved.
 
 ## Why/current state
 

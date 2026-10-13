@@ -103,8 +103,8 @@ function getJSONSource(value: unknown): void {
     if (prototype !== Object.prototype && prototype !== null && !(Array.isArray(current) && prototype === Array.prototype) || Object.getOwnPropertySymbols(current).length) throw new Error('RDF: dataset requires plain JSON objects/arrays');
     if (Array.isArray(current) && Object.keys(current).length !== current.length) throw new Error('RDF: sparse/extended arrays are not plain dataset JSON');
     active.add(current); pending.push({ value: current, exit: true });
-    for (const property of Object.values(Object.getOwnPropertyDescriptors(current))) {
-      if (property.get || property.set) throw new Error('RDF: dataset JSON cannot contain accessors');
+    for (const [name, property] of Object.entries(Object.getOwnPropertyDescriptors(current))) {
+      if (property.get || property.set || !property.enumerable && !(Array.isArray(current) && name === 'length')) throw new Error('RDF: dataset JSON cannot contain accessors/nonenumerable properties');
       if (property.enumerable) pending.push({ value: property.value });
     }
   }

@@ -642,6 +642,8 @@ export function fromGraphSON(
 ): Graph {
   const graph = getProjection(source, options).graph;
   graph.data = createNativeCarrier(graph.data, "graphson", source, graph);
+  (graph.data as any).__statelyaiNative.baselineNative =
+    getClonedJSON(source);
   return graph;
 }
 function getProperty(value: any, key: string): GraphSONTypedValue {
@@ -960,7 +962,15 @@ export function toGraphSON(
       ? undefined
       : getNativeCarrier(graph.data, "graphson");
   if (!carrier) return toRawGraphSON(graph, options);
-  const document = graphsonDocumentConverter.from(carrier.native);
+  const originalSource = (
+    carrier as typeof carrier & { baselineNative?: GraphSONGraph }
+  ).baselineNative;
+  if (originalSource === undefined)
+    throw new Error("GraphSON: missing native provenance baseline");
+  const document = graphsonDocumentConverter.from(originalSource);
+  if (!isJSONEqual(document.baseline.graph, carrier.baseline))
+    throw new Error("GraphSON: invalid native provenance baseline");
+  document.source = carrier.native;
   document.graph = {
     ...getClonedJSON(graph),
     data: getCarrierData(graph.data, "graphson"),

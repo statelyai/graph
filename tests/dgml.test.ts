@@ -186,6 +186,15 @@ it.each([
     expect(fromDGML(xml).nodes[1].data.properties!.Count).toEqual(expected);
   }
 );
+it('keeps unsupported and untyped declared property values as lexical strings', () => {
+  const xml = `<DirectedGraph xmlns="${ns}"><Nodes><Node Id="a" Background="#fff" Bounds="1,2,3,4"/></Nodes><Properties><Property Id="Background" DataType="System.Windows.Media.Brush"/><Property Id="Bounds"/></Properties></DirectedGraph>`;
+  const graph = fromDGML(xml);
+  expect(graph.nodes[0].data.properties).toEqual({
+    Background: '#fff',
+    Bounds: '1,2,3,4',
+  });
+  expect(toDGML(graph)).toBe(xml);
+});
 it.each([
   '<Wrong/>',
   '<DirectedGraph/>',

@@ -216,6 +216,15 @@ describe("explicit typed GraphSON3 tinker:graph", () => {
     expect(graph.edges[0].data).toBe(42);
     expect(toGraphSON(graph)).toEqual(source);
   });
+  it("retains independent native label edits when the Graph projection is unchanged", () => {
+    const source = createNative();
+    const graph = fromGraphSON(source);
+    (graph.data as any).__statelyaiNative.native["@value"].vertices[0][
+      "@value"
+    ].label = "Native";
+    const output = toGraphSON(graph);
+    expect(output["@value"].vertices[0]["@value"].label).toBe("Native");
+  });
   it("added unknown native properties survive label patches without replacing original user payload", () => {
     const source = toGraphSON(
       createGraph({ nodes: [{ id: "a", data: 42, label: "A" }] }),

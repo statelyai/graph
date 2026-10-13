@@ -15,8 +15,8 @@ source supplies an explicit declaration.
 
 Node/edge data separates category memberships, raw string attributes and declared
 property values. Supported CLR property types are String, Boolean, Int32, Int64
-(unsafe magnitudes retained as exact lexical strings under their declaration) and Double (finite only). Unsupported declared property
-values reject projection. Category/property definitions remain in graph data;
+(unsafe magnitudes retained as exact lexical strings under their declaration) and Double (finite only). Missing or unsupported CLR types
+remain exact lexical strings; invalid values for supported types reject projection. Category/property definitions remain in graph data;
 category appearance inheritance, Styles and other XML extensions remain opaque.
 Native links have no schema-defined stable ID; Graph edge IDs are their original
 link positions (`dgml_link_N`, counting Contains links). Strict fresh output

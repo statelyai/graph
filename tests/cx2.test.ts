@@ -80,6 +80,25 @@ it('fresh export accepts canonical numeric identities and rejects arbitrary IDs'
   graph.edges[0].sourceId = 'named';
   expect(() => toCX2(graph, { nativeCarrier: false })).toThrow(/canonical/);
 });
+it('widens inferred mixed numeric scalars and lists regardless of value order', () => {
+  const graph = createGraph({
+    nodes: [
+      {
+        id: '0',
+        data: { attributes: { score: 1, samples: [1, 1.5] } },
+      },
+      { id: '1', data: { attributes: { score: 1.5 } } },
+    ],
+  });
+  const output: any = toCX2(graph);
+  const declarations = output[1].attributeDeclarations[0].nodes;
+  expect(declarations.score.d).toBe('double');
+  expect(declarations.samples.d).toBe('list_of_double');
+  expect(fromCX2(output).nodes.map((node) => node.data.attributes?.score)).toEqual([
+    1,
+    1.5,
+  ]);
+});
 it.each([
   (s: any) => s[2].nodes.push({ id: 0 }),
   (s: any) => (s[3].edges[0].t = 99),

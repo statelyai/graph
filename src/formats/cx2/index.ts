@@ -461,12 +461,14 @@ function getInferredType(value: any): CX2AttributeType {
   if (typeof value === 'number' && Number.isFinite(value))
     return Number.isInteger(value) ? 'long' : 'double';
   if (Array.isArray(value) && value.length) {
-    const type = getInferredType(value[0]);
-    if (
-      type.startsWith('list_of_') ||
-      value.some((v) => getInferredType(v) !== type)
-    )
+    const types = new Set(value.map(getInferredType));
+    if ([...types].some((type) => type.startsWith('list_of_')))
       throw new Error('CX2: homogeneous scalar list required');
+    if (types.size === 2 && types.has('long') && types.has('double'))
+      return 'list_of_double';
+    if (types.size !== 1)
+      throw new Error('CX2: homogeneous scalar list required');
+    const type = [...types][0];
     return `list_of_${type}` as CX2AttributeType;
   }
   throw new Error(
@@ -494,15 +496,26 @@ function getFreshDeclarations(graph: CX2Graph): CX2Declarations {
     ],
   ] as const) {
     const defs = declarations[aspect] ?? {};
+    const inferred = new Set<string>();
     for (const attrs of records)
       for (const [key, value] of Object.entries(attrs)) {
-        if (!Object.hasOwn(defs, key))
+        if (!Object.hasOwn(defs, key)) {
+          inferred.add(key);
           Object.defineProperty(defs, key, {
             value: { d: getInferredType(value) },
             enumerable: true,
             writable: true,
             configurable: true,
           });
+        } else if (inferred.has(key)) {
+          const current = defs[key].d,
+            next = getInferredType(value);
+          if (
+            (current === 'long' && next === 'double') ||
+            (current === 'list_of_long' && next === 'list_of_double')
+          )
+            defs[key].d = next;
+        }
         getTypedValue(value, defs[key].d);
       }
     declarations[aspect] = defs;

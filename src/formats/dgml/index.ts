@@ -130,7 +130,18 @@ function getProperty(
   value: string,
   type: string | undefined
 ): string | number | boolean {
-  if (type === 'System.String') return value;
+  if (
+    type === undefined ||
+    ![
+      'System.String',
+      'System.Boolean',
+      'System.Int32',
+      'System.Int64',
+      'System.Double',
+    ].includes(type) ||
+    type === 'System.String'
+  )
+    return value;
   if (type === 'System.Boolean' && /^(true|false)$/i.test(value))
     return value.toLowerCase() === 'true';
   if (type === 'System.Int32' || type === 'System.Int64') {
@@ -152,7 +163,7 @@ function getProperty(
     Number.isFinite(Number(value))
   )
     return Number(value);
-  throw new Error(`DGML: unsupported/invalid property type ${type}`);
+  throw new Error(`DGML: invalid property value for ${type}`);
 }
 function getData(
   element: XMLElement,

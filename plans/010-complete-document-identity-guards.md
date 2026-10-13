@@ -1,6 +1,6 @@
 # Plan 010: Close the remaining verified document identity gaps
 
-Planned at `8d1b139`, 2026-10-12. P1 bug; effort M; risk MED; HIGH confidence. Depends on 009's frozen eight-format helper fixes. Worktree `/Users/davidkpiano/.codex/worktrees/graph/domain-formats`, feature/domain-formats; no shared checkout changes.
+Planned at `8d1b139`, 2026-10-12. P1 bug; effort M; risk MED; HIGH confidence. Depends on 009's frozen eight-format helper fixes. Dedicated `feature/domain-formats` worktree; no shared checkout changes.
 
 ## Why/current state
 
@@ -12,7 +12,7 @@ Own `src/formats/structured-json.ts` scoped Graphology/NetworkX identity guards;
 
 ## Steps
 
-1. Read AGENTS and README skill. Compare `git diff 8d1b139 --` scoped paths to current code; shared preservation already contains 009, adapt to it. Exact dependencies installed. Host default Node changed to22.11; use `env PATH=/Users/davidkpiano/.nvm/versions/node/v24.17.0/bin:$PATH pnpm ...` (verified project pnpm10.28.2), not global environment edits.
+1. Read AGENTS and README skill. Compare `git diff 8d1b139 --` scoped paths to current code; shared preservation already contains 009, adapt to it. Exact dependencies installed. Use Node 24.17.0 with project pnpm 10.28.2; do not change the global environment.
 2. RED tests using exact audit inputs:
    - JGF: `{graph:{nodes:[{id:'a'},{id:'b'}],edges:[{source:'a',target:'b',label:'Same',metadata:{Marker:'original'}}]}}`; prepend same ends/label `id:'e0',metadata:{Marker:'inserted'}`.
    - Graphology: `{options:{type:'directed',multi:true},attributes:{},nodes:[{key:'a'},{key:'b'}],edges:[{source:'a',target:'b',attributes:{label:'Same',Marker:'original'}}]}`; prepend same ends/label `key:'e0',attributes:{label:'Same',Marker:'inserted'}`.

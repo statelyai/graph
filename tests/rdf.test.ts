@@ -63,6 +63,7 @@ it('rejects non-JSON unknown metadata without silent normalization or role bypas
   for (const vendor of [undefined, () => 1, BigInt(1), NaN, Infinity, new Date(), [,]]) expect(() => fromRDFDataset({ version: '1.1', quads: [], vendor })).toThrow(/JSON/);
   const cyclic: any = { version: '1.1', quads: [] }; cyclic.vendor = cyclic; expect(() => fromRDFDataset(cyclic)).toThrow(/cycles/);
   const source: any = { version: '1.1', quads: [] }; Object.defineProperty(source, 'vendor', { get: () => 'DATA', enumerable: true }); expect(() => fromRDFDataset(source)).toThrow(/accessors/);
+  const hidden: any = { version: '1.1', quads: [] }; Object.defineProperty(hidden, 'vendor', { value: 'DATA', enumerable: false }); expect(() => fromRDFDataset(hidden)).toThrow(/nonenumerable/);
 });
 
 it('RDF 1.1 accepts rdf:dirLangString as an ordinary unknown datatype without direction fields', () => {
