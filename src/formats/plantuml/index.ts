@@ -178,8 +178,30 @@ function toRawPlantUML(graph: Graph, options: PlantUMLExportOptions): string {
   lines.splice(1, 0, `${SIDECAR}${JSON.stringify(sidecar)}`); return `${lines.join('\n')}\n`;
 }
 
+/** Relationship ordinals and sidecar occurrences are not durable native IDs. */
+function getRelationshipSequence(parsed: ReturnType<typeof getParsedPlantUML>): string[] {
+  const relationshipLines = new Set(parsed.edges.map((edge) => edge.line));
+  const records: string[] = [];
+  let blockComment = false;
+  for (let index = 0; index < parsed.lines.length; index++) {
+    const line = parsed.lines[index], trimmed = line.trimStart();
+    const startsBlock = trimmed.startsWith("/'");
+    if (relationshipLines.has(index) || blockComment || startsBlock || trimmed.startsWith("'")) {
+      records.push(line + parsed.endings[index]);
+    }
+    if (blockComment && trimmed.includes("'/")) blockComment = false;
+    else if (startsBlock && !trimmed.slice(2).includes("'/")) blockComment = true;
+  }
+  return records;
+}
+
 function getPlantUMLPatch(context: GraphDocumentPatchContext<string>, dialect: PlantUMLDialect): GraphDocumentPatchResult<string> {
   const parsed = getParsedPlantUML(context.source, { dialect });
+  const edgeChange = context.changes.find((change) => change.entity === 'edge');
+  if (edgeChange && !isJSONEqual(getRelationshipSequence(getParsedPlantUML(context.baselineSource, { dialect })), getRelationshipSequence(parsed))) {
+    return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: edgeChange.path,
+      message: 'PlantUML relationship identity is ambiguous after native relationship/comment sequence changes, including occurrence-indexed sidecars' }] };
+  }
   const aliases = new Map(parsed.sidecar?.aliases.map((item) => [item.id, item.alias]));
   const nodes = new Map(context.graph.nodes.map((node) => [node.id, node])), nodeSources = new Map(parsed.nodes.map((record) => [record.alias, record]));
   const edges = new Map(context.graph.edges.map((edge) => [edge.id, edge])), positions = new Map(context.sourceGraph.edges.map((edge, index) => [edge.id, index]));

@@ -156,15 +156,11 @@ export function getXMLDocumentProjection(source: string, format: 'graphml' | 'ge
   return { graph, diagnostics: [{ code: count > 1 ? 'projection-multiple-graphs' : 'projection-partial', message: count > 1 ? 'Only the first graph is projected; every native graph remains in the preserved source' : 'The Graph view is partial; comments, extensions and unmodeled semantics remain in native source', severity: 'warning' }] };
 }
 
-/** Patch only unambiguous native literal labels; the document core proves reparsed semantics. */
-export function getXMLDocumentPatch(context: GraphDocumentPatchContext<string>, format: 'graphml' | 'gexf'): GraphDocumentPatchResult<string> {
-  const invalid = getLabelChangeError(context.changes);
-  if (invalid) return invalid;
-  const elements = getXMLElements(context.source);
+function getXMLEntityScope(elements: XMLElement[], format: 'graphml' | 'gexf') {
   const rootIndex = elements.findIndex((element) => element.parent === null && element.local === (format === 'graphml' ? 'graphml' : 'gexf') && isCoreXML(element, format));
-  if (rootIndex < 0) return getUnsupported(context.changes[0], 'Cannot locate the native root');
+  if (rootIndex < 0) return undefined;
   const graphIndex = elements[rootIndex].children.find((index) => elements[index].local === 'graph' && isCoreXML(elements[index], format));
-  if (graphIndex === undefined) return getUnsupported(context.changes[0], 'Cannot locate the projected graph');
+  if (graphIndex === undefined) return undefined;
   const selected = new Set<number>();
   if (format === 'graphml') {
     const pending = [graphIndex];
@@ -192,11 +188,24 @@ export function getXMLDocumentPatch(context: GraphDocumentPatchContext<string>, 
     const wrapped = wrappers.length === 1 ? elements[wrappers[0]].children.filter((index) => elements[index].local === 'edge' && isCoreXML(elements[index], format)) : [];
     for (const index of wrapped.length ? wrapped : elements[graphIndex].children.filter((index) => elements[index].local === 'edge' && isCoreXML(elements[index], format))) selected.add(index);
   }
+  const identities = new Map<string, XMLElement[]>();
+  for (const index of selected) { const entity = elements[index], id = getXMLAttribute(entity, 'id')?.value; if (id === undefined) continue; const key = JSON.stringify([entity.local, id]), entries = identities.get(key) ?? []; entries.push(entity); identities.set(key, entries); }
+  return { rootIndex, identities };
+}
+
+/** Patch only unambiguous native literal labels; the document core proves reparsed semantics. */
+export function getXMLDocumentPatch(context: GraphDocumentPatchContext<string>, format: 'graphml' | 'gexf'): GraphDocumentPatchResult<string> {
+  const invalid = getLabelChangeError(context.changes);
+  if (invalid) return invalid;
+  const elements = getXMLElements(context.source);
+  const scope = getXMLEntityScope(elements, format), baseline = getXMLEntityScope(getXMLElements(context.baselineSource), format);
+  if (!scope) return getUnsupported(context.changes[0], 'Cannot locate the projected native graph');
+  const rootIndex = scope.rootIndex;
   const keys = elements[rootIndex].children.map((index) => elements[index]).filter((element) => element.local === 'key' && isCoreXML(element, format));
   const edits: TextEdit[] = [];
   for (const change of context.changes) {
-    const matches = [...selected].map((index) => elements[index]).filter((element) => element.local === change.entity && isCoreXML(element, format) && getXMLAttribute(element, 'id')?.value === change.id);
-    if (matches.length !== 1) return getUnsupported(change, 'A unique explicit native entity ID is required for label edits');
+    const key = JSON.stringify([change.entity, change.id]), matches = scope.identities.get(key) ?? [];
+    if (matches.length !== 1 || baseline?.identities.get(key)?.length !== 1) return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', message: 'A unique explicit native entity ID must exist in both baseline and current projected graphs; a generated ID cannot be validated by a newly inserted declaration', path: change.path, severity: 'error' }] };
     const element = matches[0], label = change.after as string;
     try { getEncodedXML(label); }
     catch (error) { return { ok: false, diagnostics: [{ code: 'invalid-native-label', message: error instanceof Error ? error.message : String(error), path: change.path, severity: 'error' }] }; }

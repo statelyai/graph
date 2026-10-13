@@ -1,7 +1,7 @@
 import { createFormatData } from '../xml-preservation';
 import type { Graph } from '../../types';
 import { createFormatConverter } from '../converter';
-import { createGraphDocumentConverter } from '../document';
+import { createGraphDocumentConverter, type GraphDocumentPatchContext, type GraphDocumentPatchResult } from '../document';
 import { createMetadata, getMetadata, getRestoredRecord, createNativeCarrier, getNativeCarrier, getCarrierData, getClonedJSON, getNativeDocumentGraph, isJSONEqual, type FormatImportOptions, type FormatExportOptions } from '../preservation';
 import { getValidatedGraph, getUniformMode } from '../structured-json';
 
@@ -19,6 +19,12 @@ function getWireMetadata(record: Record<string, any>, kind: string, native = fal
   }
   return undefined;
 }
+function getPrivateEdgeId(record: GraphvizJSONEdge): string | undefined {
+  const protocols = Object.entries(record).flatMap(([key, value]) => { if (!/^_stately(?:_\d+)?$/.test(key) || typeof value !== 'string') return []; try { const metadata = getMetadata(JSON.parse(value), `${FORMAT}.edge`); return metadata ? [metadata] : []; } catch { return []; } });
+  if (protocols.length !== 1) return undefined;
+  const original = protocols[0].original, mapped = protocols[0].mapped;
+  return original?.type === 'edge' && mapped?.type === 'edge' && typeof original.id === 'string' && /^graphviz:edge:(?:0|[1-9]\d*)$/.test(mapped.id) && ['sourceId', 'targetId'].every((key) => typeof original[key] === 'string' && typeof mapped[key] === 'string') ? original.id : undefined;
+}
 function getAttributes(record: Record<string, any>, known: string[], metadataKey?: string) {
   return Object.fromEntries(Object.entries(record).filter(([key]) => !known.includes(key) && key !== metadataKey));
 }
@@ -26,6 +32,8 @@ function getRecord(record: Record<string, any>, mapped: any, kind: string, known
   const wire = getWireMetadata(record, kind, native);
   mapped.data = getAttributes(record, known, wire?.key);
   const restored = getRestoredRecord(mapped, wire?.metadata);
+  // _gvid is a file-local ordinal; a verified private edge ID survives pure renumbering.
+  if (!native && kind === 'edge' && getPrivateEdgeId(record as GraphvizJSONEdge) !== undefined && mapped.sourceId === wire!.metadata.original.sourceId && mapped.targetId === wire!.metadata.original.targetId) restored.id = wire!.metadata.original.id;
   if (wire && !isJSONEqual(mapped.data, wire.metadata.mapped.data)) restored.data = createFormatData(wire.metadata.original.data, FORMAT, { native: mapped.data });
   return restored;
 }
@@ -183,6 +191,18 @@ export function toGraphvizJSON(graph: Graph, options: GraphvizJSONExportOptions 
   return source;
 }
 export const graphvizJSONConverter = createFormatConverter(toGraphvizJSON, fromGraphvizJSON);
+function getGraphvizDocumentPatch(context: GraphDocumentPatchContext<GraphvizJSON>): GraphDocumentPatchResult<GraphvizJSON> {
+  const getIdentities = (source: GraphvizJSON, graph: Graph) => {
+    const ids = new Map<string, GraphvizJSONEdge[]>();
+    for (const [index, edge] of (source.edges ?? []).entries()) { const id = getPrivateEdgeId(edge); if (id === undefined || id !== graph.edges[index]?.id) continue; const entries = ids.get(id) ?? []; entries.push(edge); ids.set(id, entries); }
+    return ids;
+  };
+  const baselineIds = getIdentities(context.baselineSource, context.baselineGraph), currentIds = getIdentities(context.source, context.sourceGraph);
+  const sameSequence = isJSONEqual(context.baselineSource.edges ?? [], context.source.edges ?? []);
+  for (const change of context.changes) if (change.entity === 'edge' && !sameSequence && (baselineIds.get(change.id!)?.length !== 1 || currentIds.get(change.id!)?.length !== 1)) return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', severity: 'error', path: change.path, message: 'Graphviz _gvid edge ordinals are ambiguous after the native edge record sequence changed; verified private identity must exist in both sources' }] };
+  try { return { ok: true, source: toGraphvizJSON({ ...context.graph, data: createNativeCarrier(context.graph.data, FORMAT, context.source, context.sourceGraph) }) }; }
+  catch (error) { return { ok: false, diagnostics: [{ code: 'unsupported-native-edit', severity: 'error', message: String(error) }] }; }
+}
 export const graphvizJSONDocumentConverter = createGraphDocumentConverter({ format: FORMAT, codec: { from: fromGraphvizJSON, to: (graph) => toGraphvizJSON(graph, { regenerate: true }) },
   project: (source: GraphvizJSON) => ({ graph: getNativeDocumentGraph(fromGraphvizJSON(source), FORMAT, source), diagnostics: [{ code: 'projection-partial', severity: 'warning', message: 'Graphviz output drawing programs and non-tree subgraph memberships remain native state' }] }),
-  patch: (context) => { try { return { ok: true, source: toGraphvizJSON({ ...context.graph, data: createNativeCarrier(context.graph.data, FORMAT, context.source, context.sourceGraph) }) }; } catch (error) { return { ok: false, diagnostics: [{ code: 'unsupported-native-edit', severity: 'error', message: String(error) }] }; } } });
+  patch: getGraphvizDocumentPatch });

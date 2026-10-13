@@ -1,0 +1,10 @@
+{
+  "oracle": "ndex2@3.12.0",
+  "retrieved": "2026-10-12",
+  "specification": "https://cytoscape.org/cx/cx2/specification/cytoscape-exchange-format-specification-(version-2)/",
+  "specificationUpdated": "2025-07-22",
+  "reader": "https://github.com/ndexbio/ndex2-client",
+  "fixture": "profile.json",
+  "sha256": "c70064991117e51c0606eba7b3f3331a592efc9cf992f0b8fe0f14f30472de30",
+  "provenance": "Task-authored fixture; exact maintained reader assertions cover selected typed attributes/topology. Reader false/zero-default omission is characterized separately."
+}

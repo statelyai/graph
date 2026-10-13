@@ -24,3 +24,7 @@ Documents retain exact original source, line endings, comments, class bodies, gr
 
 <!-- independent compiler and semantic tests from tests/native/plantuml.test.ts and tests/native/plantuml-oracle.ts; core tests from tests/formats/plantuml.test.ts -->
 Native proof uses the pinned official PlantUML 1.2026.8 compiler with Java 21: local SVG entity/endpoint identities, hierarchy, display encoding, multiplicities and class XMI members/generalization (`--xmi:star`; default XMI omits relationships). The compiler/JVM are development-only validation tools. [Component syntax](https://plantuml.com/component-diagram) and [class syntax](https://plantuml.com/class-diagram).
+
+<!-- document identity guards from src/formats/plantuml/index.ts and tests/document-identity-additional.test.ts -->
+
+Pending relationship edits require unchanged raw relationship and comment sequences, including block comments and private sidecars. Ordinals and occurrence-indexed sidecars cannot identify relationships after insertion, removal, reordering or independent record/comment edits; these operations reject with `ambiguous-native-identity`. This conservative guard also rejects independent comment edits during a relationship patch. Source-only updates and stable node-alias patches remain supported.

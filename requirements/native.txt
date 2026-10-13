@@ -4,3 +4,7 @@ networkx==3.7
 scipy==1.18.1
 numpy==2.5.4
 igraph==1.0.0
+
+# Domain interchange native readers
+ndex2==3.12.0
+rdflib==7.6.0

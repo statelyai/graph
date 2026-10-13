@@ -68,3 +68,15 @@ JSON schema. The published schema places `additionalProperties` inside
 `properties`, so schema acceptance alone does not validate known attribute types;
 independent adapter checks cover that gap. No JSON-to-Graphviz input capability or
 complete renderer equivalence is claimed.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+Native `_gvid` values are required array ordinals, not durable edge identities
+across source revisions. A strict edge patch after a changed native edge sequence
+requires a unique verified private original edge ID in both source snapshots.
+Generated identities otherwise reject with `ambiguous-native-identity`, even when
+endpoints and labels coincide. Verified private IDs survive pure `_gvid`
+renumbering with unchanged endpoints; cluster/node identity scope is unchanged.
+Duplicate/header-only private metadata cannot authorize ambiguous patches. Active
+layout/drawing restrictions still apply. Source-only updates remain authoritative,
+and stable node-label edits do not require stable edge identities.

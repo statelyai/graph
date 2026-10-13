@@ -97,3 +97,12 @@ verified native fields; unsupported edits throw with diagnostics. `.getUpdate(do
 returns a diagnostic-bearing result. Native semantic projection remains partial.
 
 Original line endings, separator whitespace and declaration spacing stay intact. Node and edge labels can be edited on verified declaration lines. Embedded newlines, structural changes and fields outside TGF reject.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+TGF edge IDs are ordinal, because edge lines have no explicit identity field.
+Strict Graph edge patches require the native edge record sequence to remain
+unchanged between baseline and current source, including distinguishing whitespace.
+Insertion, removal, reordering or record changes reject with
+`ambiguous-native-identity`. Changes outside edge records and stable node-label
+patches remain supported; source-only updates retain their exact text.

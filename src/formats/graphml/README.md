@@ -140,3 +140,12 @@ their own schema; this option is not a runtime XSD validator. A nested keyref
 fixture exposes ambiguity in the published descendant identity constraints under
 libxml2. Source documents retain the original nested structure; the bare exporter
 uses flat nodes plus parent metadata, matching its existing wire behavior.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+Strict label patches require a unique explicit native entity `id` in both the
+baseline and current projected graph scopes. A newly inserted explicit ID cannot
+validate an older generated edge ID, even if its text matches that fallback.
+Other graphs and foreign namespaces cannot supply this identity. Stable IDs permit
+independent native data edits; source-only changes retain exact source text.
+Ambiguous identity rejects with path-bearing `ambiguous-native-identity` diagnostics.

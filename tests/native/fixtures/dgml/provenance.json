@@ -1,0 +1,9 @@
+{
+  "entry": "dgml.xsd",
+  "oracle": "Microsoft DGML XSD through xmllint-wasm@5.3.0",
+  "retrieved": "2026-10-12",
+  "source": "https://schemas.microsoft.com/vs/2009/dgml/dgml.xsd",
+  "documentation": "https://learn.microsoft.com/en-us/visualstudio/modeling/directed-graph-markup-language-dgml-reference?view=visualstudio",
+  "license": "Official Microsoft-published schema; no license notice embedded. Schema retained unmodified, including CRLF.",
+  "sha256": "9ea61dbc18534d37eed9c0fe994fd9c171a5928dff2619aa1abc251a287e7b1a"
+}
