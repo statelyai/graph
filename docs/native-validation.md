@@ -78,7 +78,7 @@ promote that profile to standards compliance.
 <!-- Mermaid and D2 native corpus assertions from tests/native/mermaid.test.ts, tests/native/d2.test.ts and fixtures -->
 
 Mermaid fixtures are independently authored from official syntax documentation,
-with URLs and oracle versions in `mermaid-profiles.json`. All fourteen scoped
+with URLs and oracle versions in `mermaid-profiles.json`. All eight base
 diagram dialects validate both native input and emitted output. Database checks
 assert selected graph labels, shapes, edge strokes, participant/message/note
 order, namespaces/members/multiplicities, ER attributes/cardinalities, state
