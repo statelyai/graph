@@ -1,0 +1,103 @@
+[
+  {
+    "CXVersion": "2.0",
+    "hasFragments": false
+  },
+  {
+    "attributeDeclarations": [
+      {
+        "nodes": {
+          "name": {
+            "d": "string",
+            "a": "n"
+          },
+          "score": {
+            "d": "double",
+            "v": 2.5
+          },
+          "alias": {
+            "d": "list_of_string"
+          }
+        },
+        "edges": {
+          "name": {
+            "d": "string"
+          },
+          "confidence": {
+            "d": "double"
+          }
+        },
+        "networkAttributes": {
+          "name": {
+            "d": "string"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "networkAttributes": [
+      {
+        "name": "Native fixture"
+      }
+    ]
+  },
+  {
+    "nodes": [
+      {
+        "id": 0,
+        "v": {
+          "n": "東京 \"quoted\" \\",
+          "alias": [
+            "A",
+            "B"
+          ]
+        }
+      },
+      {
+        "id": 1,
+        "v": {
+          "n": "",
+          "score": 4
+        }
+      }
+    ]
+  },
+  {
+    "edges": [
+      {
+        "id": 2,
+        "s": 0,
+        "t": 1,
+        "v": {
+          "name": "Go",
+          "confidence": 0.7
+        }
+      },
+      {
+        "id": 3,
+        "s": 0,
+        "t": 1
+      },
+      {
+        "id": 4,
+        "s": 1,
+        "t": 1
+      }
+    ]
+  },
+  {
+    "vendor": [
+      {
+        "opaque": true
+      }
+    ]
+  },
+  {
+    "status": [
+      {
+        "success": true
+      }
+    ]
+  }
+]

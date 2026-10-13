@@ -27,3 +27,7 @@ Bare export preserves an imported simple/multigraph profile. Compatible node/edg
 
 <!-- independent native tests from tests/native/networkx.test.ts and core tests from tests/formats/primary-json.test.ts -->
 Native proof uses pinned Python NetworkX 3.7 `node_link_graph`/`node_link_data`: native flags, scalar IDs, per-pair keys, loops, parallels, legacy links, data edits and native defaults. [Official node-link API](https://networkx.org/documentation/stable/reference/readwrite/generated/networkx.readwrite.json_graph.node_link_data.html).
+
+<!-- document identity guards from src/formats/structured-json.ts and tests/document-identity-additional.test.ts -->
+
+Pending Graph multigraph edge edits require an explicit per-endpoint-pair key in both baseline and current source when the native edge sequence changes. Generated keys cannot acquire identity from later explicit keys. Python-equivalent boolean/numeric keys retain their existing equivalence; simple graphs use intrinsic endpoint-pair identity. Ambiguous insertion, removal, reordering or edge-record changes reject with `ambiguous-native-identity`. Source-only updates and stable node-ID edits remain supported.

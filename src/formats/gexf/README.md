@@ -160,3 +160,12 @@ and rejects invalid XML characters/nonfinite native numbers. The native suite pi
 and validates official 1.2draft and 1.3 schemas through libxml2. This is a tested
 export profile, not runtime XSD validation of arbitrary foreign extensions or full
 execution of dynamic graph semantics.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+Strict label patches require a unique explicit native entity `id` in both the
+baseline and current projected graph scopes. A newly inserted `id="e0"` cannot
+validate a historical generated `e0` edge. Foreign namespaces/unselected graphs
+cannot supply the baseline identity. Stable native IDs still permit independent
+source edits; source-only updates remain authoritative. Ambiguity reports the
+field path with `ambiguous-native-identity` instead of patching another edge.

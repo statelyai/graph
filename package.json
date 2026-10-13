@@ -31,9 +31,11 @@
     "./adjacency-matrix": "./dist/formats/adjacency-matrix/index.mjs",
     "./converter": "./dist/formats/converter/index.mjs",
     "./csv": "./dist/formats/csv/index.mjs",
+    "./cx2": "./dist/formats/cx2/index.mjs",
     "./cytoscape": "./dist/formats/cytoscape/index.mjs",
     "./d2": "./dist/formats/d2/index.mjs",
     "./d3": "./dist/formats/d3/index.mjs",
+    "./dgml": "./dist/formats/dgml/index.mjs",
     "./document": "./dist/formats/document/index.mjs",
     "./dot": "./dist/formats/dot/index.mjs",
     "./drawio": "./dist/formats/drawio/index.mjs",
@@ -44,6 +46,7 @@
     "./graphlib": "./dist/formats/graphlib/index.mjs",
     "./graphml": "./dist/formats/graphml/index.mjs",
     "./graphology": "./dist/formats/graphology/index.mjs",
+    "./graphson": "./dist/formats/graphson/index.mjs",
     "./graphviz-json": "./dist/formats/graphviz-json/index.mjs",
     "./jgf": "./dist/formats/jgf/index.mjs",
     "./matrix-market": "./dist/formats/matrix-market/index.mjs",
@@ -51,6 +54,8 @@
     "./networkx": "./dist/formats/networkx/index.mjs",
     "./pajek": "./dist/formats/pajek/index.mjs",
     "./plantuml": "./dist/formats/plantuml/index.mjs",
+    "./rdf": "./dist/formats/rdf/index.mjs",
+    "./rdf/syntax": "./dist/formats/rdf/syntax.mjs",
     "./tgf": "./dist/formats/tgf/index.mjs",
     "./xyflow": "./dist/formats/xyflow/index.mjs",
     "./kernel": "./dist/kernel.mjs",
@@ -97,7 +102,8 @@
     "bench:report": "tsx bench/compare/report.ts",
     "test:native": "vitest run --config vitest.native.config.ts",
     "test:coverage": "vitest run --config vitest.coverage.config.ts --coverage",
-    "setup:native:plantuml": "node scripts/native/setup-plantuml.mjs"
+    "setup:native:plantuml": "node scripts/native/setup-plantuml.mjs",
+    "setup:native:graphson": "node scripts/native/setup-graphson.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",
@@ -111,6 +117,7 @@
     "@types/d3-force": "^3.0.10",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/jsdom": "30.0.0",
+    "@types/n3": "1.26.4",
     "@types/node": "^25.0.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@xyflow/system": "^0.0.75",
@@ -132,8 +139,10 @@
     "graphology-metrics": "^2.4.0",
     "graphology-shortest-path": "^2.1.0",
     "graphology-types": "^0.24.8",
+    "gremlin": "3.8.2",
     "jsdom": "30.1.2",
     "mermaid": "12.1.0",
+    "n3": "2.13.12",
     "ngraph.graph": "^20.1.2",
     "ngraph.path": "^1.6.1",
     "publint": "^0.3.15",
@@ -160,7 +169,8 @@
     "graphology-layout-forceatlas2": "^0.10.0",
     "webcola": "^3.4.0",
     "xstate": "^5.19.0",
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "n3": "^2.13.12"
   },
   "peerDependenciesMeta": {
     "@dagrejs/dagre": {
@@ -203,6 +213,9 @@
       "optional": true
     },
     "fflate": {
+      "optional": true
+    },
+    "n3": {
       "optional": true
     }
   }

@@ -113,5 +113,7 @@ jobs:
           java-version: '21'
       - name: Install Pinned PlantUML Oracle
         run: pnpm setup:native:plantuml
+      - name: Install Pinned GraphSON Oracle
+        run: pnpm setup:native:graphson
       - name: Validate Native Formats and Converter Coverage
         run: pnpm test:coverage

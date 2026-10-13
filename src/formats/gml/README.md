@@ -144,3 +144,12 @@ Portable native-validation CI uses pinned NetworkX 3.7 `parse_gml(..., label=Non
 for numeric identity, Unicode/entity labels, missing/empty label presence, isolated
 nodes, numeric weights, parallel edges and malformed blocks. This validates the
 tested NetworkX profile, without claiming complete GML semantics.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+Strict label patches require a unique native `id` or independently recognized
+versioned `originalId` in both baseline and current projected scopes. A new explicit
+`id "e0"` cannot validate a historical generated edge identity. Repeated private
+identity values do not authorize a patch. Stable IDs permit independent native
+attribute edits; source-only updates retain exact text. Ambiguous identity reports
+`ambiguous-native-identity` with the requested field path.

@@ -9,7 +9,7 @@ export function getValidatedDOTString(value: string): string {
 }
 
 interface Token { start: number; end: number; text: string; kind: 'id' | 'quoted' | 'html' | 'punctuation' }
-interface Statement { kind: 'node' | 'edge'; private: boolean; id?: string; sourceId?: string; targetId?: string; labels: Token[]; end: number }
+interface Statement { kind: 'node' | 'edge'; private: boolean; id?: string; sourceId?: string; targetId?: string; labels: Token[]; start: number; end: number; privateId?: string }
 
 function getTokens(source: string): Token[] {
   const tokens: Token[] = [];
@@ -74,15 +74,17 @@ function getStatements(tokens: Token[]): Statement[] {
       if (['->', '--', ',', '+'].includes(tokens[next]?.text)) { cursor++; continue; }
     } else if (['=', ',', '+'].includes(tokens[next]?.text)) { cursor++; continue; }
     const labels: Token[] = [];
-    let hasPrivate = false;
+    let hasPrivate = false, privateId: string | undefined;
     while (tokens[next]?.text === '[') {
       next++;
       while (next < tokens.length && tokens[next].text !== ']') {
         if (tokens[next + 1]?.text === '=' && tokens[next + 2]) {
           if (getId(tokens[next]) === '_stately') {
+            hasPrivate = false; privateId = undefined;
             try {
               const value = JSON.parse(getId(tokens[next + 2]).replace(/\\(\\|n)/g, (_, character) => character === 'n' ? '\n' : '\\'));
-              hasPrivate ||= value?.format === 'stately' && value.version === 1;
+              hasPrivate = tokens[next + 2].kind === 'quoted' && tokens[next + 3]?.text !== '+' && value?.format === 'stately' && value.version === 1;
+              if (hasPrivate && typeof value.id === 'string') privateId = value.id;
             } catch { /* Invalid reserved strings remain native source, not a private carrier. */ }
           }
           if (getId(tokens[next]) === 'label') {
@@ -98,8 +100,8 @@ function getStatements(tokens: Token[]): Statement[] {
     }
     if (!tokens[next] || ![';', '}', ']'].includes(tokens[next].text) && !['id', 'quoted'].includes(tokens[next].kind)) { cursor++; continue; }
     const end = tokens[next - 1].end;
-    statements.push(kind === 'node' ? { kind, id: getId(first), labels, end, private: hasPrivate }
-      : { kind, sourceId: getId(first), targetId: getId(target!), labels, end, private: hasPrivate });
+    statements.push(kind === 'node' ? { kind, id: getId(first), labels, start: first.start, end, private: hasPrivate, privateId }
+      : { kind, sourceId: getId(first), targetId: getId(target!), labels, start: first.start, end, private: hasPrivate, privateId });
     cursor = next;
   }
   return statements;
@@ -111,7 +113,12 @@ export function getDOTDocumentPatch(context: GraphDocumentPatchContext<string>):
   if (invalid) return invalid;
   const statements = getStatements(getTokens(context.source));
   const nodeStatements = new Map<string, Statement[]>();
-  const edges = statements.filter((statement) => statement.kind === 'edge');
+  const edges = statements.filter((statement) => statement.kind === 'edge'), baselineEdges = getStatements(getTokens(context.baselineSource)).filter((statement) => statement.kind === 'edge');
+  const getPrivateIds = (records: Statement[]) => { const ids = new Map<string, Statement[]>(); for (const statement of records) if (statement.privateId !== undefined) { const entries = ids.get(statement.privateId) ?? []; entries.push(statement); ids.set(statement.privateId, entries); } return ids; };
+  const currentIds = getPrivateIds(edges), baselineIds = getPrivateIds(baselineEdges);
+  const sameSequence = JSON.stringify(edges.map((statement) => context.source.slice(statement.start, statement.end))) === JSON.stringify(baselineEdges.map((statement) => context.baselineSource.slice(statement.start, statement.end)));
+  const edgeIndices = new Map(context.sourceGraph.edges.map((edge, index) => [edge.id, index]));
+  const simpleEdges = edges.length === context.sourceGraph.edges.length && edges.every((statement, index) => statement.sourceId === context.sourceGraph.edges[index].sourceId && statement.targetId === context.sourceGraph.edges[index].targetId);
   for (const statement of statements) if (statement.kind === 'node') {
     const group = nodeStatements.get(statement.id!) ?? []; group.push(statement); nodeStatements.set(statement.id!, group);
   }
@@ -120,8 +127,9 @@ export function getDOTDocumentPatch(context: GraphDocumentPatchContext<string>):
     let candidates: Statement[];
     if (change.entity === 'node') candidates = nodeStatements.get(change.id!) ?? [];
     else {
-      const index = context.sourceGraph.edges.findIndex((edge) => edge.id === change.id);
-      if (edges.length !== context.sourceGraph.edges.length || index < 0 || edges.some((statement, offset) => statement.sourceId !== context.sourceGraph.edges[offset].sourceId || statement.targetId !== context.sourceGraph.edges[offset].targetId)) return getUnsupported(change, 'DOT edge labels require one simple statement per projected edge; chains, strict merging and subgraph endpoints are unsupported');
+      const index = edgeIndices.get(change.id!) ?? -1;
+      if ((baselineIds.get(change.id!)?.length ?? 0) > 1 || (currentIds.get(change.id!)?.length ?? 0) > 1 || !sameSequence && (baselineIds.get(change.id!)?.length !== 1 || currentIds.get(change.id!)?.length !== 1)) return { ok: false, diagnostics: [{ code: 'ambiguous-native-identity', message: 'DOT generated edge identity is ambiguous after the native edge record sequence changed; a unique private ID must exist in both source snapshots', path: change.path, severity: 'error' }] };
+      if (!simpleEdges || index < 0) return getUnsupported(change, 'DOT edge labels require one simple statement per projected edge; chains, strict merging and subgraph endpoints are unsupported');
       candidates = [edges[index]];
     }
     if (!candidates.length) return getUnsupported(change, 'DOT label editing requires an explicit entity statement; implicit nodes and clusters are unsupported');

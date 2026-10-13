@@ -1,9 +1,10 @@
+import { graphvizJSONDocumentConverter } from '../../src/formats/graphviz-json';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createGraph } from '../../src/graph';
-import { fromDOT, toDOT } from '../../src/formats/dot';
+import { fromDOT, toDOT, dotDocumentConverter } from '../../src/formats/dot';
 
 interface NativeGraph { name: string; directed: boolean; strict: boolean; rankdir?: string; objects: Array<Record<string, any> & { _gvid: number; name: string }>; edges?: Array<Record<string, any> & { tail: number; head: number }> }
 let engine: Awaited<ReturnType<typeof Graphviz.load>>;
@@ -95,4 +96,17 @@ it('rejects actual native NUL scanning and guards emitted strings without reject
   }
   const source = toDOT(createGraph({ nodes: [{ id: 'a', label: 'A', data: { nul: '\u0000', surrogate: '\ud800' } }] }));
   expect(getNative(source).objects[0].label).toBe('A'); expect(fromDOT(source).nodes[0].data).toEqual({ nul: '\u0000', surrogate: '\ud800' });
+});
+
+it('native parser confirms stable DOT private identities retain the original edge after insertion', () => {
+  const baseline = toDOT(createGraph({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'original', sourceId: 'a', targetId: 'b', label: 'Same', data: { dot: { attrs: { Marker: 'original' } } } }] }));
+  const document = dotDocumentConverter.from(baseline); document.source = baseline.replace('a -> b', 'a -> b [label="Same",Marker="inserted"]; a -> b'); document.graph!.edges[0].label = 'GraphEdit';
+  const native = getNative(dotDocumentConverter.to(document)); expect(native.edges!.find((edge) => edge.Marker === 'original')!.label).toBe('GraphEdit'); expect(native.edges!.find((edge) => edge.Marker === 'inserted')!.label).toBe('Same');
+});
+it('actual native dot_json regeneration shows _gvid renumbering and is rejected as ambiguous before patching', () => {
+  const baseline = JSON.parse(engine.layout('digraph {a;b;a->b[label="Same",Marker="original"]}', 'dot_json', 'dot'));
+  const current = JSON.parse(engine.layout('digraph {a;b;a->b[label="Same",Marker="inserted"];a->b[label="Same",Marker="original"]}', 'dot_json', 'dot'));
+  expect(baseline.edges[0]).toMatchObject({ _gvid: 0, Marker: 'original' }); expect(current.edges[1]).toMatchObject({ _gvid: 1, Marker: 'original' });
+  const document = graphvizJSONDocumentConverter.from(baseline); document.source = current; document.graph!.edges[0].label = 'GraphEdit';
+  const result = graphvizJSONDocumentConverter.getUpdate(document); expect(result.ok).toBe(false); if (!result.ok) expect(result.diagnostics[0].code).toBe('ambiguous-native-identity');
 });

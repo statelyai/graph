@@ -158,3 +158,13 @@ Graphviz JSON fixtures record engine/package versions and hashes.
 Native display strings/IDs and strict document label patches reject literal NUL
 and lone surrogates. Arbitrary user data remains JSON-escaped in private metadata,
 including these values, and is not rejected merely for containing them.
+
+<!-- Strict document identity constraints derived from baseline/current native record guards -->
+
+Generated DOT edge IDs follow statement expansion order. A strict edge-label
+patch after any change to the native edge record sequence requires one matching
+versioned `_stately.id` in both baseline and current source. Insertions, removals,
+reordering or record edits otherwise reject with `ambiguous-native-identity`.
+The ordinary DOT `id` attribute is retained native data and is not this private
+Graph identity protocol. Comments/defaults outside unchanged edge records and
+stable node-label edits remain mergeable; source-only updates remain authoritative.

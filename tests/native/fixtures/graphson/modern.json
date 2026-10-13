@@ -1,0 +1,441 @@
+{
+  "@type": "tinker:graph",
+  "@value": {
+    "vertices": [
+      {
+        "@type": "g:Vertex",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 1
+          },
+          "label": "person",
+          "properties": {
+            "name": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 0
+                  },
+                  "value": "marko",
+                  "label": "name"
+                }
+              }
+            ],
+            "age": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 1
+                  },
+                  "value": {
+                    "@type": "g:Int32",
+                    "@value": 29
+                  },
+                  "label": "age"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "@type": "g:Vertex",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 2
+          },
+          "label": "person",
+          "properties": {
+            "name": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 2
+                  },
+                  "value": "vadas",
+                  "label": "name"
+                }
+              }
+            ],
+            "age": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 3
+                  },
+                  "value": {
+                    "@type": "g:Int32",
+                    "@value": 27
+                  },
+                  "label": "age"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "@type": "g:Vertex",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 3
+          },
+          "label": "software",
+          "properties": {
+            "name": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 4
+                  },
+                  "value": "lop",
+                  "label": "name"
+                }
+              }
+            ],
+            "lang": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 5
+                  },
+                  "value": "java",
+                  "label": "lang"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "@type": "g:Vertex",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 4
+          },
+          "label": "person",
+          "properties": {
+            "name": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 6
+                  },
+                  "value": "josh",
+                  "label": "name"
+                }
+              }
+            ],
+            "age": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 7
+                  },
+                  "value": {
+                    "@type": "g:Int32",
+                    "@value": 32
+                  },
+                  "label": "age"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "@type": "g:Vertex",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 5
+          },
+          "label": "software",
+          "properties": {
+            "name": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 8
+                  },
+                  "value": "ripple",
+                  "label": "name"
+                }
+              }
+            ],
+            "lang": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 9
+                  },
+                  "value": "java",
+                  "label": "lang"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "@type": "g:Vertex",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 6
+          },
+          "label": "person",
+          "properties": {
+            "name": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 10
+                  },
+                  "value": "peter",
+                  "label": "name"
+                }
+              }
+            ],
+            "age": [
+              {
+                "@type": "g:VertexProperty",
+                "@value": {
+                  "id": {
+                    "@type": "g:Int64",
+                    "@value": 11
+                  },
+                  "value": {
+                    "@type": "g:Int32",
+                    "@value": 35
+                  },
+                  "label": "age"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "@type": "g:Edge",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 7
+          },
+          "label": "knows",
+          "inVLabel": "person",
+          "outVLabel": "person",
+          "inV": {
+            "@type": "g:Int32",
+            "@value": 2
+          },
+          "outV": {
+            "@type": "g:Int32",
+            "@value": 1
+          },
+          "properties": {
+            "weight": {
+              "@type": "g:Property",
+              "@value": {
+                "key": "weight",
+                "value": {
+                  "@type": "g:Double",
+                  "@value": 0.5
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "@type": "g:Edge",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 8
+          },
+          "label": "knows",
+          "inVLabel": "person",
+          "outVLabel": "person",
+          "inV": {
+            "@type": "g:Int32",
+            "@value": 4
+          },
+          "outV": {
+            "@type": "g:Int32",
+            "@value": 1
+          },
+          "properties": {
+            "weight": {
+              "@type": "g:Property",
+              "@value": {
+                "key": "weight",
+                "value": {
+                  "@type": "g:Double",
+                  "@value": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "@type": "g:Edge",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 9
+          },
+          "label": "created",
+          "inVLabel": "software",
+          "outVLabel": "person",
+          "inV": {
+            "@type": "g:Int32",
+            "@value": 3
+          },
+          "outV": {
+            "@type": "g:Int32",
+            "@value": 1
+          },
+          "properties": {
+            "weight": {
+              "@type": "g:Property",
+              "@value": {
+                "key": "weight",
+                "value": {
+                  "@type": "g:Double",
+                  "@value": 0.4
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "@type": "g:Edge",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 10
+          },
+          "label": "created",
+          "inVLabel": "software",
+          "outVLabel": "person",
+          "inV": {
+            "@type": "g:Int32",
+            "@value": 5
+          },
+          "outV": {
+            "@type": "g:Int32",
+            "@value": 4
+          },
+          "properties": {
+            "weight": {
+              "@type": "g:Property",
+              "@value": {
+                "key": "weight",
+                "value": {
+                  "@type": "g:Double",
+                  "@value": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "@type": "g:Edge",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 11
+          },
+          "label": "created",
+          "inVLabel": "software",
+          "outVLabel": "person",
+          "inV": {
+            "@type": "g:Int32",
+            "@value": 3
+          },
+          "outV": {
+            "@type": "g:Int32",
+            "@value": 4
+          },
+          "properties": {
+            "weight": {
+              "@type": "g:Property",
+              "@value": {
+                "key": "weight",
+                "value": {
+                  "@type": "g:Double",
+                  "@value": 0.4
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "@type": "g:Edge",
+        "@value": {
+          "id": {
+            "@type": "g:Int32",
+            "@value": 12
+          },
+          "label": "created",
+          "inVLabel": "software",
+          "outVLabel": "person",
+          "inV": {
+            "@type": "g:Int32",
+            "@value": 3
+          },
+          "outV": {
+            "@type": "g:Int32",
+            "@value": 6
+          },
+          "properties": {
+            "weight": {
+              "@type": "g:Property",
+              "@value": {
+                "key": "weight",
+                "value": {
+                  "@type": "g:Double",
+                  "@value": 0.2
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

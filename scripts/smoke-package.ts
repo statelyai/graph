@@ -644,7 +644,78 @@ async function main(): Promise<void> {
       ],
     },
   };
+  Object.assign(exportChecks, {
+    "./graphson": {
+      phase: "core",
+      runtime: [
+        `const graph = m0.createGraph({ nodes:[{id:'a',label:'A'},{id:'b',label:'B'}], edges:[{id:'e',sourceId:'a',targetId:'b'}] });`,
+        `const source = $MOD.toGraphSON(graph); assert.equal(source['@type'],'tinker:graph'); assert.equal($MOD.fromGraphSON(source).edges[0].id,'e');`,
+      ],
+      types: [
+        `const source: $MOD.GraphSONGraph = $MOD.toGraphSON(m0.createGraph({})); $MOD.graphsonConverter.from(source);`,
+      ],
+    },
+    "./cx2": {
+      phase: "core",
+      runtime: [
+        `const source = $MOD.toCX2(m0.createGraph({nodes:[{id:'0',label:'A'},{id:'1',label:'B'}],edges:[{id:'2',sourceId:'0',targetId:'1',label:'Go'}]})); assert.equal($MOD.fromCX2(source).edges[0].id,'2');`,
+      ],
+      types: [
+        `const source: $MOD.CX2JSON = $MOD.toCX2(m0.createGraph({})); $MOD.cx2Converter.from(source);`,
+      ],
+    },
+    "./dgml": {
+      phase: "optional",
+      runtime: [
+        `const source = $MOD.toDGML(m0.createGraph({nodes:[{id:'a',label:'A'},{id:'b',label:'B'}],edges:[{id:'dgml_link_0',sourceId:'a',targetId:'b',label:'Go'}]})); assert.equal($MOD.fromDGML(source).edges[0].id,'dgml_link_0');`,
+      ],
+      types: [
+        `const source: string = $MOD.toDGML(m0.createGraph({})); const graph: $MOD.DGMLGraph = $MOD.fromDGML(source); void graph;`,
+      ],
+    },
+    "./rdf": {
+      phase: "core",
+      runtime: [
+        `const source = {version:'1.1',quads:[{subject:{termType:'NamedNode',value:'urn:a'},predicate:{termType:'NamedNode',value:'urn:p'},object:{termType:'NamedNode',value:'urn:b'},graph:{termType:'DefaultGraph',value:''}}]}; assert.deepEqual($MOD.toRDFDataset($MOD.fromRDFDataset(source)),source);`,
+        `assert.equal(typeof $MOD.getRDFTermId($MOD.getRDFTerm(source.quads[0].subject)),'string'); assert.equal(typeof $MOD.getRDFQuadId(source.quads[0]),'string');`,
+      ],
+      types: [
+        `const source: $MOD.RDFDataset = {version:'1.1',quads:[]}; const term: $MOD.RDFTerm = $MOD.getRDFTerm({termType:'NamedNode',value:'urn:a'}); $MOD.getRDFTermId(term); $MOD.rdfDatasetConverter.from(source);`,
+      ],
+    },
+    "./rdf/syntax": {
+      phase: "optional",
+      runtime: [
+        `const text = '<urn:a> <urn:p> <urn:b> .'; const graph = $MOD.fromRDF(text,{format:'N-Triples'}); assert.equal(graph.edges.length,1); assert.ok($MOD.toRDF(graph,{format:'N-Triples'}).includes('urn:p')); const codec = $MOD.createRDFDocumentConverter({format:'N-Triples'}); assert.equal(codec.to(JSON.parse(JSON.stringify(codec.from(text)))),text);`,
+      ],
+      types: [
+        `const options: $MOD.RDFSyntaxOptions = {format:'N-Triples'}; const graph = $MOD.fromRDF('<urn:a> <urn:p> <urn:b> .',options); $MOD.toRDF(graph,{format:'N-Triples'}); $MOD.createRDFDocumentConverter(options);`,
+      ],
+    },
+  } satisfies Record<string, ExportCheck>);
   const documentExports: Array<[string, string, string]> = [
+   [
+      "./graphson",
+      "graphsonDocumentConverter",
+      '({"@type": "tinker:graph", "@value": {"vertices": [{"@type": "g:Vertex", "@value": {"id": "a", "label": "A"}}], "edges": []}})',
+    ],
+    [
+      "./cx2",
+      "cx2DocumentConverter",
+      '([{"CXVersion": "2.0", "hasFragments": false}, {"nodes": [{"id": 0}]}, {"edges": []}, {"status": [{"success": true}]}])',
+    ],
+    [
+      "./rdf",
+      "rdfDatasetDocumentConverter",
+      '({"version": "1.1", "quads": []})',
+    ],
+    [
+      "./dgml",
+      "dgmlDocumentConverter",
+      '"<DirectedGraph xmlns=\\"http://schemas.microsoft.com/vs/2009/dgml\\"><Nodes><Node Id=\\"a\\"/></Nodes></DirectedGraph>"',
+    ],
+
+
     ['./adjacency-list', 'adjacencyListDocumentConverter', '({a:["b"]})'],
     ['./adjacency-matrix', 'adjacencyMatrixDocumentConverter', '({matrix:[[0,1],[0,0]],nodeIds:["a","b"],mode:"directed"})'],
     ['./matrix-market', 'matrixMarketDocumentConverter', '"%%MatrixMarket matrix coordinate real general\\n2 2 1\\n1 2 1\\n"'],
@@ -797,6 +868,7 @@ async function main(): Promise<void> {
         '--ignore-workspace',
         'dotparser',
         'fast-xml-parser',
+        'n3',
         'fflate',
         'zod',
         // Layout adapter optional peers

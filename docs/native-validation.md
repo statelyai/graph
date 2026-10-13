@@ -21,7 +21,8 @@ Global floors remain 95% lines, 91% statements, 93% functions and 84% branches.
 [The committed configuration](../vitest.config.ts) also sets line/branch floors
 for selected D2, Mermaid, XML, ELK and primary CSV/JSON adapters, plus adjacency
 matrix/core, Matrix Market, Graphviz JSON, draw.io, Pajek, PlantUML and all six
-expanded Mermaid profiles with their shared parser helpers. Coverage output is
+expanded Mermaid profiles with their shared parser helpers, plus scoped GraphSON,
+DGML, CX2 and RDF core/syntax modules. Coverage output is
 ignored. Native semantic assertions complement coverage; neither proves full
 language coverage.
 
@@ -40,6 +41,9 @@ language coverage.
 | NetworkX (Python) | 3.7 | Native node-link JSON and GML readers/writers |
 | SciPy / NumPy (Python) | 1.18.1 / 2.5.4 | Matrix Market numeric/math interoperability |
 | igraph (Python) | 1.0.0 | Pajek reader vertices/sections/attributes |
+| Apache TinkerPop Java / Gremlin JavaScript | 3.8.2 | GraphSON3 typed TinkerGraph object/element/property semantics |
+| NDEx ndex2 (Python) | 3.12.0 | CX2 native declarations/defaults/topology |
+| RDFLib (Python) / N3 (JavaScript) | 7.6.0 / 2.13.12 | RDF1.1 selected syntax/dataset semantics |
 | PlantUML | 1.2026.8 | Compiler-produced SVG and class XMI, scoped component/class dialect |
 
 Python oracles use an isolated task environment, with exact versions in
@@ -140,3 +144,31 @@ label emission/projection/patches reject them, while astral characters and safe 
 aliases remain supported. D2's compiler retains NUL label fields but replaces lone
 surrogates; its adapters reject only that proven surrogate loss. These tests
 inspect native compiled/display fields rather than asserting file-byte encoding.
+
+<!-- domain profile tooling/proof from scripts/native/graphson-tools.json, tests/native/{graphson,dgml,cx2,rdf}.test.ts -->
+
+GraphSON native setup uses `pnpm setup:native:graphson`: twelve Maven Central
+JARs pinned individually by SHA256, derived from the verified official Apache
+TinkerPop 3.8.2 distribution. The manifest records URLs, versions, distribution
+provenance and licensing. Tools stay in ignored `.tools-native/` and never enter
+runtime imports or package contents. Java subprocesses have a 20-second bound;
+`GRAPH_NATIVE_JAVA` selects the task Java 21 executable. Actual Java mapper tests
+use `TinkerIoRegistryV3` plus extended value types, preserve unsafe magnitudes in
+raw serialized strings, and assert observed native topology/property semantics.
+No GraphSON adjacency/writeGraph interoperability is claimed.
+
+DGML uses the official Microsoft 2009 XSD with xmllint, including negative schema
+controls for dynamic property attributes; this does not establish Windows renderer
+behavior. CX2 uses the maintained NDEx Python reader with observed default/null
+limitations. RDF uses N3 strict grammars and independent RDFLib parser/store
+observations and dataset isomorphism; empty-graph and language-case distinctions
+are checked before the native store normalizes them. Per-format READMEs and
+fixture provenance describe each bounded interpretation claim. Exact document
+source retention is separate from these native semantic assertions.
+
+<!-- combined domain verification evidence from plans/011-domain-formats-verification.md -->
+
+Final combined evidence belongs in the
+[domain formats verification report](../plans/011-domain-formats-verification.md).
+Isolated measurements do not establish a combined release gate; existing global
+coverage thresholds remain unchanged.
