@@ -1,5 +1,13 @@
 # @statelyai/graph
 
+## 2.7.0
+
+### Minor Changes
+
+- [#54](https://github.com/statelyai/graph/pull/54) [`639d743`](https://github.com/statelyai/graph/commit/639d7436e4a6340b608fea2c1e3ae842f48d2a06) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add explicit GraphSON 3 typed TinkerGraph, DGML, CX2 and RDF 1.1 dataset/syntax adapters with strict native profiles and source-preserving document converters. RDF syntax uses optional N3; pure JSON/dataset modules remain dependency-free.
+
+  Fix wrong-entity document edits across 13 legacy converters and new DGML. Ambiguous source identity changes and unsupported mappings now reject with diagnostics rather than targeting another entity or replaying stale source. Expand pinned independent native validators, package subpath contracts and measured coverage gates.
+
 ## 2.6.0
 
 ### Minor Changes
