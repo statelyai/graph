@@ -349,3 +349,20 @@ export {
 // Formats — use subpath imports: @statelyai/graph/dot, @statelyai/graph/mermaid, etc.
 // Only createFormatConverter is re-exported from the main entry for convenience.
 export { createFormatConverter } from './formats/converter';
+
+export {
+  getSourceCoverageReport,
+  genSourceCoverageWitnesses,
+  genReducedSourceCoverageWitnesses,
+  getReducedSourceCoverageWitnesses,
+  getSourceCoverageReplay,
+  getMinimizedSourceCoverageWitness,
+  getSourceCoverageWitnesses,
+  type SourceCoverageManifest,
+  type SourceCoverageObligation,
+  type SourceCoverageWitness,
+  type SourceCoverageReport,
+  type SourceCoverageStep,
+  type SourceCoverageSession,
+  type SourceCoverageSearchOptions,
+} from './source-coverage';
