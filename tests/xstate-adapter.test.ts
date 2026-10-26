@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { assign, createMachine, setup } from 'xstate';
+import { describe, it, expect, vi } from 'vitest';
+import { assign, createActor, createMachine, setup } from 'xstate';
 import {
   getShortestPaths as getCoreShortestPaths,
   getSimplePaths as getCoreSimplePaths,
@@ -20,6 +20,45 @@ const trafficLight = createMachine({
 });
 
 describe('createGraphFromMachine', () => {
+  it('preserves supplied v5 actor identity while keeping exploration effects inert', () => {
+    const effect = vi.fn();
+    const machine = createMachine({
+      context: ({ self }) => ({ owner: `${self.id}|${self.sessionId}`, current: '' }),
+      initial: 'idle',
+      states: {
+        idle: {
+          on: {
+            CONTINUE: {
+              target: 'checking',
+              actions: [assign({ current: ({ self }) => `${self.id}|${self.sessionId}` }), effect],
+            },
+          },
+        },
+        checking: {
+          always: [
+            { guard: ({ context }) => context.owner === context.current, target: 'done' },
+            { target: 'failed' },
+          ],
+        },
+        done: { type: 'final' },
+        failed: { type: 'final' },
+      },
+    });
+    const actor = createActor(machine, { id: 'resumed' }).start();
+    try {
+      const graph = createGraphFromMachine(machine, {
+        fromState: actor.getSnapshot(),
+        actorIdentity: actor,
+      });
+      expect(graph.nodes.map((node) => node.data.value)).toEqual(['idle', 'done']);
+      expect(actor.getSnapshot().value).toBe('idle');
+      expect(effect).not.toHaveBeenCalled();
+      actor.send({ type: 'CONTINUE' });
+      expect(actor.getSnapshot().value).toBe('done');
+    } finally {
+      actor.stop();
+    }
+  });
   describe('simple machine', () => {
     const graph = createGraphFromMachine(trafficLight);
 

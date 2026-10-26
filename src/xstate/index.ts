@@ -84,6 +84,8 @@ export interface MachineGraphOptions<T extends MachineGraphLogic> {
   filterEvents?: (snapshot: MachineSnapshot<T>, event: MachineEvent<T>) => boolean;
   stopWhen?: (snapshot: MachineSnapshot<T>) => boolean;
   fromState?: MachineSnapshot<T>;
+  /** v5 string identity for an isolated exploration actor, usually the source actor. */
+  actorIdentity?: { readonly id: string; readonly sessionId: string };
   limit?: number;
   input?: MachineInput<T>;
   id?: string;
@@ -126,7 +128,7 @@ function getHistory(snapshot: any): Record<string, string[]> | undefined {
   const history = snapshot.historyValue;
   return history && Object.keys(history).length
     ? Object.fromEntries(
-        Object.entries(history).map(([id, nodes]) => [id, (nodes as any[]).map((node) => node.id)]),
+        Object.keys(history).sort().map((id) => [id, history[id].map((node: any) => node.id)]),
       )
     : undefined;
 }
@@ -190,6 +192,8 @@ export function createGraphFromMachine<T extends MachineGraphLogic>(
 ): MachineGraph<T> {
   const runtime = options.runtime ?? XState;
   const v6 = "eventSchema" in machine && "sources" in machine;
+  if (v6 && options.actorIdentity)
+    throw new Error("actorIdentity is supported only for XState v5 machines");
   const serializeState = options.serializeState ?? getSerializedSnapshot;
   const serializeEvent = options.serializeEvent ?? JSON.stringify;
   const includeGuards = options.includeGuards ?? true;
@@ -204,13 +208,17 @@ export function createGraphFromMachine<T extends MachineGraphLogic>(
   const selected: any[] = [];
   // v5 inspection attributes every microstep without evaluating guards twice.
   const self = v6 ? undefined : runtime.createEmptyActor();
+  if (self && options.actorIdentity) {
+    self.id = options.actorIdentity.id;
+    self.sessionId = options.actorIdentity.sessionId;
+  }
   const subscription = self?.system.inspect((event: any) => {
     if (event.type === "@xstate.microstep") selected.push(...event._transitions);
   });
   const scope = self && {
     self,
     system: self.system,
-    id: "",
+    id: self.id,
     sessionId: self.sessionId,
     logger: () => {},
     defer: () => {},
@@ -277,6 +285,7 @@ export function createGraphFromMachine<T extends MachineGraphLogic>(
       const steps = runtime.getInitialMicrosteps!(machine, options.input);
       initial = steps.at(-1)![0];
       selected.push(...steps.flatMap((step) => step[2] ?? []));
+      if (steps.some((step) => !Array.isArray(step[2]))) attributionComplete = false;
     } else initial = machine.getInitialSnapshot(scope, options.input);
     const initialTransitions = selected.map((t) => getTransitionData(t, includeGuards));
     selected.length = 0;

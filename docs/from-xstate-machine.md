@@ -113,7 +113,11 @@ Because node and edge ids are stable, a run report listing covered targets can b
 
 | Option | Default | Effect |
 |---|---|---|
-| `events` | `[]` | Event objects with payloads (array, or a function of the snapshot). An entry replaces the bare `{ type }` for its type. |
+| `events` | `[]` | Event objects as an array, an event-type map of payload cases, or a function of the snapshot. Supplied cases replace defaults matching their event type. Other event types retain defaults. |
+| `eventMode` | `'augmentDefaults'` | `'replaceDefaults'` explores only supplied cases. |
+| `fromState` | — | Snapshot that seeds exploration. |
+| `actorIdentity` | — | v5 actor `id` and `sessionId` for the isolated exploration actor. Pass the source actor when a starting snapshot depends on these strings. |
+| `runtime` | Installed `xstate` | Matching runtime module. Required for an aliased v6 package. |
 | `serializeState` | JSON including value/context, state inputs and history | Node id for a snapshot |
 | `serializeEvent` | `JSON.stringify(event)` | Edge id component for an event |
 | `includeGuards` | `true` | Attach guard text to edges |
@@ -163,13 +167,24 @@ const machine = runtime.createMachine({
 const graph = createGraphFromMachine(machine, { runtime });
 ```
 
-Event maps such as `{ GO: [{ ok: true }, { ok: false }] }` augment default cases.
-An applicable empty case list throws. Arrays retain the adapter's legacy augment
-behavior; set `eventMode: 'replaceDefaults'` to use only the supplied array.
+Event maps such as `{ GO: [{ ok: true }, { ok: false }] }` and arrays retain
+defaults for other event types. Supplied cases replace defaults for their type.
+For synthetic v6 events, a supplied case must also match the transition's fields.
+Supplying an `xstate.after` case suppresses all default `xstate.after` cases,
+including delays that the supplied case does not match.
+An applicable empty case list throws. Set `eventMode: 'replaceDefaults'` to
+explore only supplied cases.
 Wildcard descriptors require concrete event cases and are not sent as invented
 literal wildcard events. Synthetic v6 actor events retain their match fields.
 
-`fromState` seeds exploration from an existing snapshot. Transition failures
+`fromState` seeds exploration from an existing snapshot. For v5 snapshots whose
+behavior depends on actor identity strings, pass `actorIdentity: actor` alongside
+`fromState: actor.getSnapshot()`. Exploration copies only `id` and `sessionId`
+onto an isolated actor. It does not reuse the live actor or its system.
+Reference equality, the original actor's `getSnapshot()`, and system lookups
+are not preserved. `actorIdentity` is rejected for v6 machines.
+
+Transition failures
 include the source identity and event, with the original failure as `cause`.
 `limit` bounds expanded active states; exceeding it throws. Terminal snapshots
 are retained without expansion. The queue uses an index rather than shifting

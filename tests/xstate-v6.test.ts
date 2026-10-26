@@ -9,6 +9,48 @@ import { getShortestPaths, getSimplePaths } from "../src/algorithms";
 
 const { createMachine, setup, types, initialTransition, transition } = runtime;
 describe("v6 runtime conformance", () => {
+  it("gives equivalent history records the same identity regardless of visit order", () => {
+    const a = { id: "a" };
+    const b = { id: "b" };
+    expect(
+      getSerializedSnapshot({ value: "outside", historyValue: { A: [a], B: [b] } }),
+    ).toBe(getSerializedSnapshot({ value: "outside", historyValue: { B: [b], A: [a] } }));
+  });
+  it("reports incomplete attribution when initial microsteps omit transitions", () => {
+    const machine = createMachine({ initial: "idle", states: { idle: {} } });
+    const graph = createGraphFromMachine(machine, {
+      runtime: {
+        ...runtime,
+        getInitialMicrosteps: (...args: Parameters<typeof runtime.getInitialMicrosteps>) =>
+          runtime.getInitialMicrosteps(...args).map(([snapshot, actions]) => [snapshot, actions]),
+      },
+    });
+    expect(graph.data.exploration.transitionAttributionComplete).toBe(false);
+  });
+  it("rejects actor identity on v6 instead of ignoring it", () => {
+    const machine = createMachine({ initial: "idle", states: { idle: {} } });
+    expect(() => createGraphFromMachine(machine, {
+      runtime,
+      actorIdentity: { id: "source", sessionId: "session" },
+    })).toThrow("actorIdentity is supported only for XState v5");
+  });
+  it("replaces all synthetic defaults of a supplied event type", () => {
+    const machine = createMachine({
+      initial: "idle",
+      states: {
+        idle: { after: { 7: { target: "seven" }, 8: { target: "eight" } } },
+        seven: { type: "final" },
+        eight: { type: "final" },
+      },
+    });
+    expect(createGraphFromMachine(machine, { runtime }).nodes).toHaveLength(3);
+    const events = [{ type: "xstate.after", delay: 7, stateId: "idle" }] as const;
+    const graph = createGraphFromMachine(machine, {
+      runtime,
+      events,
+    });
+    expect(graph.nodes.map((node) => node.data.value)).toEqual(["idle", "seven"]);
+  });
   it("retains state inputs and both outcomes, with paths at least as complete as core", () => {
     const machine = setup({
       schemas: { events: { SELECT: types<{ ok: boolean }>(), FINISH: types<{}>() } },
