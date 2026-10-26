@@ -310,7 +310,7 @@ export async function getMinimizedSourceCoverageWitness<TEvent, TSnapshot>(
   const limit = getPositiveLimit(options.maxExecutions, 1000, 'maxExecutions');
   let executions = 0;
   let best = witness;
-  const tryEvents = async (events: TEvent[]) => {
+  const hasReplayCoverage = async (events: TEvent[]) => {
     if (executions++ >= limit) return false;
     try {
       const replay = await getSourceCoverageReplay(
@@ -335,7 +335,7 @@ export async function getMinimizedSourceCoverageWitness<TEvent, TSnapshot>(
       start + width <= best.events.length && executions < limit;
     ) {
       if (
-        !(await tryEvents([
+        !(await hasReplayCoverage([
           ...best.events.slice(0, start),
           ...best.events.slice(start + width),
         ]))
@@ -355,7 +355,7 @@ export async function getMinimizedSourceCoverageWitness<TEvent, TSnapshot>(
           seen.add(key);
           const events = [...best.events];
           events[index] = candidate;
-          if (await tryEvents(events)) {
+          if (await hasReplayCoverage(events)) {
             changed = true;
             break;
           }
@@ -391,13 +391,40 @@ export async function* genSourceCoverageWitnesses<TEvent, TSnapshot>(
   );
   const hit = new Set<string>();
   const witnesses: SourceCoverageWitness<TEvent>[] = [];
-  const queue: TEvent[][] = [[]];
-  const visited = new Set<string>();
+  const queue: Array<{ events: TEvent[]; stateId?: string }> = [{ events: [] }];
+  const pending = new Map<string, { events: TEvent[]; stateId: string }>();
+  const visited = new Map<string, { events: TEvent[]; version: number }>();
+  const addPrefix = (events: TEvent[], stateId: string) => {
+    const known = visited.get(stateId);
+    if (known && events.length < known.events.length) {
+      known.events = events;
+      known.version = -1;
+    } else if (known && (!options.suggestEvents || known.version === hit.size)) return;
+    const scheduled = pending.get(stateId);
+    if (scheduled) {
+      if (events.length < scheduled.events.length) scheduled.events = events;
+    } else {
+      const entry = { events: known?.events ?? events, stateId };
+      queue.push(entry);
+      pending.set(stateId, entry);
+    }
+  };
+  let runtimeId: string | undefined;
+  const addRuntime = (id: string) => {
+    if (
+      typeof id !== 'string' || !id ||
+      (runtimeId !== undefined && id !== runtimeId)
+    )
+      throw createSourceCoverageError(
+        'Search sessions must identify one execution runtime',
+      );
+    runtimeId = id;
+  };
   let executions = 0;
   let yielded = 0;
   const truncation = new Set<string>();
   const errors: Array<{ events: TEvent[]; message: string }> = [];
-  const record = (
+  const addWitness = (
     events: TEvent[],
     ids: readonly string[],
     runtimeId: string,
@@ -408,6 +435,12 @@ export async function* genSourceCoverageWitnesses<TEvent, TSnapshot>(
     ids = ids.filter((id) => index.get(id)!.machineIndex === machineIndex);
     if (!ids.some((id) => !hit.has(id))) return;
     ids.forEach((id) => hit.add(id));
+    if (options.suggestEvents)
+      for (const [stateId, state] of visited)
+        if (
+          state.version < hit.size &&
+          state.events.length < maxDepth
+        ) addPrefix(state.events, stateId);
     witnesses.push({
       schemaVersion: 1,
       sourceHash: manifest.source.hash,
@@ -419,31 +452,47 @@ export async function* genSourceCoverageWitnesses<TEvent, TSnapshot>(
     });
   };
   for (let head = 0; head < queue.length; head++) {
-    if (required.size && [...required].every((id) => hit.has(id))) break;
-    if (visited.size >= maxStates) {
+    if ([...required].every((id) => hit.has(id))) break;
+    if (maxStates === 0) {
       truncation.add('maxStates');
       break;
     }
-    const prefix = queue[head];
+    const { events: prefix, stateId } = queue[head];
+    if (stateId !== undefined) pending.delete(stateId);
     const session = await options.createSession(options.input);
     let state = session.initial;
     const ids = new Set(state.outcomeIds);
     try {
+      addRuntime(session.runtimeId);
       let validPrefix = true;
       for (const event of prefix) {
-        if (++executions > maxExecutions) {
+        if (executions >= maxExecutions) {
           truncation.add('maxExecutions');
           validPrefix = false;
           break;
         }
+        executions++;
         state = await session.step(event);
         state.outcomeIds.forEach((id) => ids.add(id));
       }
       if (!validPrefix) break;
-      record(prefix, [...ids], session.runtimeId);
+      addWitness(prefix, [...ids], session.runtimeId);
       while (yielded < witnesses.length) yield witnesses[yielded++];
-      if (visited.has(state.stateId) || state.terminal) continue;
-      visited.add(state.stateId);
+      if ([...required].every((id) => hit.has(id))) break;
+      if (state.terminal) continue;
+      let known = visited.get(state.stateId);
+      if (known && (!options.suggestEvents || known.version === hit.size)) continue;
+      if (!known) {
+        if (visited.size >= maxStates) {
+          truncation.add('maxStates');
+          continue;
+        }
+        known = { events: prefix, version: hit.size };
+        visited.set(state.stateId, known);
+      } else {
+        if (prefix.length < known.events.length) known.events = prefix;
+        known.version = hit.size;
+      }
       if (prefix.length >= maxDepth) {
         truncation.add('maxDepth');
         continue;
@@ -468,8 +517,6 @@ export async function* genSourceCoverageWitnesses<TEvent, TSnapshot>(
           ]),
         ).values(),
       ];
-      // Each case starts from a fresh replay so its context and observer state
-      // cannot leak into another candidate. Prefixes may intentionally repeat.
       for (const event of cases) {
         if (executions >= maxExecutions) {
           truncation.add('maxExecutions');
@@ -479,20 +526,23 @@ export async function* genSourceCoverageWitnesses<TEvent, TSnapshot>(
         let next = candidate.initial;
         const outcomes = new Set(next.outcomeIds);
         try {
+          addRuntime(candidate.runtimeId);
+          let validCandidate = true;
           for (const prior of [...prefix, event]) {
-            if (++executions > maxExecutions) {
+            if (executions >= maxExecutions) {
               truncation.add('maxExecutions');
+              validCandidate = false;
               break;
             }
+            executions++;
             next = await candidate.step(prior);
             next.outcomeIds.forEach((id) => outcomes.add(id));
           }
-          if (executions <= maxExecutions) {
+          if (validCandidate) {
             const events = [...prefix, event];
-            record(events, [...outcomes], candidate.runtimeId);
+            addWitness(events, [...outcomes], candidate.runtimeId);
             while (yielded < witnesses.length) yield witnesses[yielded++];
-            if (!visited.has(next.stateId) && !next.terminal)
-              queue.push(events);
+            if (!next.terminal) addPrefix(events, next.stateId);
           }
         } catch (error) {
           if (isSourceCoverageError(error)) throw error;

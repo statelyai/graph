@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getSourceCoverageReport,
   getSourceCoverageWitnesses,
@@ -257,4 +257,169 @@ it('rejects an invalid machine scope even when there are no observations', async
       events: [],
     }),
   ).rejects.toThrow('machine identity');
+});
+
+
+describe('coverage-directed search boundaries', () => {
+  const pair = { ...manifest, obligations: manifest.obligations.slice(0, 2) };
+  const createLoopSession = (): SourceCoverageSession<Event> => ({
+    runtimeId: 'fixture/1',
+    initial: { stateId: 'idle', outcomeIds: [], snapshot: {} },
+    step: (event) => ({ stateId: 'idle', outcomeIds: [event.type], snapshot: {} }),
+  });
+
+  it('revisits self-loop suggestions after coverage changes without consuming more states', async () => {
+    const result = await getSourceCoverageWitnesses({
+      manifest: pair,
+      createSession: createLoopSession,
+      events: [],
+      suggestEvents: ({ uncovered }) => [{ type: uncovered[0].id }],
+      maxStates: 1,
+    });
+    expect(result.report.complete).toBe(true);
+    expect(result.exploration.states).toBe(1);
+    expect(result.exploration.truncated).toBe(false);
+    for (const fixture of result.witnesses)
+      await getSourceCoverageReplay(pair, fixture, createLoopSession);
+  });
+
+  it('revisits earlier states when coverage gained elsewhere changes suggestions', async () => {
+    const result = await getSourceCoverageWitnesses({
+      manifest: pair,
+      createSession: () => {
+        let stateId = 'A';
+        return {
+          runtimeId: 'fixture/1',
+          initial: { stateId, outcomeIds: [], snapshot: {} },
+          step: (event: Event) => {
+            const outcomeIds = stateId === 'B' && event.type === 'reject'
+              ? ['reject'] : stateId === 'A' && event.type === 'left' ? ['left'] : [];
+            if (event.type === 'NEXT') stateId = 'B';
+            return { stateId, outcomeIds, snapshot: {} };
+          },
+        };
+      },
+      events: [{ type: 'NEXT' }],
+      suggestEvents: ({ state, uncovered }) => {
+        if (state.stateId === 'B' && uncovered.some((o) => o.id === 'reject'))
+          return [{ type: 'reject' }];
+        if (state.stateId === 'A' && !uncovered.some((o) => o.id === 'reject'))
+          return [{ type: 'left' }];
+        return [];
+      },
+      maxStates: 2,
+    });
+    expect(result.report.complete).toBe(true);
+    expect(result.exploration.states).toBe(2);
+  });
+
+  it.each([false, true])('rejects a changed runtime even when candidate observations are retained: %s', async (withObservations) => {
+    const close = vi.fn();
+    let sessions = 0;
+    await expect(getSourceCoverageWitnesses({
+      manifest: pair,
+      createSession: () => ({
+        ...createLoopSession(),
+        runtimeId: ++sessions === 1 ? 'runtime/A' : 'runtime/B',
+        step: () => ({ stateId: 'idle', snapshot: {}, outcomeIds: withObservations ? ['reject', 'left'] : [] }),
+        close,
+      }),
+      events: [{ type: 'GO' }],
+    })).rejects.toThrow(/runtime/);
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a changed runtime in a replayed prefix session', async () => {
+    const close = vi.fn();
+    let sessions = 0;
+    await expect(getSourceCoverageWitnesses({
+      manifest: pair,
+      createSession: () => ({
+        ...createLoopSession(),
+        runtimeId: ++sessions < 3 ? 'runtime/A' : 'runtime/B',
+        step: () => ({ stateId: 'next', snapshot: {}, outcomeIds: [] }),
+        close,
+      }),
+      events: [{ type: 'GO' }],
+    })).rejects.toThrow(/runtime/);
+    expect(close).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops before providers when initial observations cover the selected scope', async () => {
+    const events = vi.fn(() => { throw new Error('unnecessary events'); });
+    const suggestEvents = vi.fn(() => { throw new Error('unnecessary suggestions'); });
+    const close = vi.fn();
+    const result = await getSourceCoverageWitnesses({
+      manifest: pair,
+      createSession: () => ({
+        ...createLoopSession(),
+        initial: { stateId: 'idle', snapshot: {}, outcomeIds: ['reject', 'left'] },
+        close,
+      }),
+      events,
+      suggestEvents,
+    });
+    expect(result.report.complete).toBe(true);
+    expect(events).not.toHaveBeenCalled();
+    expect(suggestEvents).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('does not open sessions for an empty selected scope', async () => {
+    const createSession = vi.fn(() => { throw new Error('unnecessary session'); });
+    const result = await getSourceCoverageWitnesses({
+      manifest: { ...pair, obligations: [] },
+      createSession,
+      events: [],
+    });
+    expect(result.report.complete).toBe(true);
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps execution bounds effective during suggestion revisits', async () => {
+    const result = await getSourceCoverageWitnesses({
+      manifest: pair,
+      createSession: createLoopSession,
+      events: [],
+      suggestEvents: ({ uncovered }) => [{ type: uncovered[0].id }],
+      maxStates: 1,
+      maxExecutions: 1,
+    });
+    expect(result.report.complete).toBe(false);
+    expect(result.exploration.truncationReasons).toContain('maxExecutions');
+    expect(result.exploration.executions).toBeLessThanOrEqual(1);
+  });
+  it('uses shorter routes revealed by suggestions to recover remaining depth', async () => {
+    const scoped = {
+      ...pair,
+      obligations: pair.obligations.map((o, i) => ({ ...o, id: i ? 'h' : 'g' })),
+    };
+    const result = await getSourceCoverageWitnesses({
+      manifest: scoped,
+      createSession: () => {
+        let stateId = 'R';
+        return {
+          runtimeId: 'fixture/1',
+          initial: { stateId, snapshot: {}, outcomeIds: [] },
+          step: (event: Event) => {
+            const outcomeIds = stateId === 'B' && event.type === 'g' ? ['g']
+              : stateId === 'D' && event.type === 'h' ? ['h'] : [];
+            if (stateId === 'R' && ['C', 'B'].includes(event.type)) stateId = event.type;
+            else if ((stateId === 'R' && event.type === 'jump') ||
+              (stateId === 'C' && event.type === 'D')) stateId = 'D';
+            return { stateId, snapshot: {}, outcomeIds };
+          },
+        };
+      },
+      events: ({ stateId }) => stateId === 'R' ? [{ type: 'C' }, { type: 'B' }]
+        : stateId === 'C' ? [{ type: 'D' }] : [{ type: stateId === 'B' ? 'g' : 'h' }],
+      suggestEvents: ({ state, uncovered }) =>
+        state.stateId === 'R' && !uncovered.some((o) => o.id === 'g')
+          ? [{ type: 'jump' }] : [],
+      maxDepth: 2,
+    });
+    expect(result.report.complete).toBe(true);
+    expect(result.witnesses.find((w) => w.outcomeIds.includes('h'))?.events)
+      .toEqual([{ type: 'jump' }, { type: 'h' }]);
+  });
 });

@@ -75,6 +75,17 @@ stop exploration, but exhausting a bound is never an unreachability proof.
 An incomplete extraction remains incomplete even when every known obligation
 was observed. Suggestions alone never count as evidence.
 
+Search requests fresh suggestions for previously explored states when newly
+observed outcomes change the uncovered set. Self-loops can therefore expose
+successive targeted cases. Revisits count against the execution and depth
+bounds. `maxStates` counts distinct explored states. Reaching that count still
+allows revisits to known states.
+
+Every search session must identify the same nonempty runtime, including sessions
+that produce no new witness. A mismatch closes active sessions and rejects the
+search. Once initial observations cover the selected scope, search skips event
+providers. An empty scope opens no sessions.
+
 The data-only protocol is version 1, with SHA-256 source identity and an explicit
 execution runtime identifier. `tests/fixtures/source-coverage.json` is shared
 with Viz and XState as a conformance fixture. It includes two same-target
