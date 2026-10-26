@@ -12,10 +12,10 @@ import {
   getSourceCoverageWitnesses,
   getSourceCoverageReplay,
 } from '@statelyai/graph';
-import { createXStateSourceCoverageSession } from '@xstate/test';
+import { createSourceCoverageSession } from '@xstate/test';
 
 const createSession = (input) =>
-  createXStateSourceCoverageSession(machine, control, {
+  createSourceCoverageSession(machine, control, {
     input,
     runtimeId: 'xstate@6.0.0-alpha.70',
   });
