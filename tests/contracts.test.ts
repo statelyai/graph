@@ -352,6 +352,13 @@ const specs: Record<string, Spec> = {
 };
 
 const excluded: Record<string, string> = {
+  genSourceCoverageWitnesses: 'Async source witness stream, covered by source-coverage.test.ts.',
+  genReducedSourceCoverageWitnesses: 'Source witness reduction, covered by source-coverage.test.ts.',
+  getSourceCoverageReport: 'Source manifest protocol, covered by source-coverage.test.ts.',
+  getReducedSourceCoverageWitnesses: 'Source witnesses, covered by source-coverage.test.ts.',
+  getSourceCoverageReplay: 'Execution-session protocol, covered by source-coverage.test.ts.',
+  getMinimizedSourceCoverageWitness: 'Execution-session shrinking, covered by source-coverage.test.ts.',
+  getSourceCoverageWitnesses: 'Coverage-directed execution sessions, covered by source-coverage.test.ts.',
   ...Object.fromEntries(
     [
       'createGraph', 'createGraphNode', 'createGraphEdge', 'createGraphPort',

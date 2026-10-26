@@ -195,3 +195,6 @@ initial microstep transitions, and whether transition attribution was available.
 These are observed behavioral edges for supplied event cases. Complete source
 transition coverage additionally needs an independently extracted obligation
 universe; a sampled graph cannot supply that denominator by itself.
+
+For source-backed coverage with an independent denominator, see
+[source transition coverage](source-coverage.md).
