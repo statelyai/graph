@@ -1,5 +1,17 @@
 # @statelyai/graph
 
+## 2.7.0
+
+### Minor Changes
+
+- [#54](https://github.com/statelyai/graph/pull/54) [`639d743`](https://github.com/statelyai/graph/commit/639d7436e4a6340b608fea2c1e3ae842f48d2a06) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Add explicit GraphSON 3 typed TinkerGraph, DGML, CX2 and RDF 1.1 dataset/syntax adapters with strict native profiles and source-preserving document converters. RDF syntax uses optional N3; pure JSON/dataset modules remain dependency-free.
+
+  Fix wrong-entity document edits across 13 legacy converters and new DGML. Ambiguous source identity changes and unsupported mappings now reject with diagnostics rather than targeting another entity or replaying stale source. Expand pinned independent native validators, package subpath contracts and measured coverage gates.
+
+- [#57](https://github.com/statelyai/graph/pull/57) [`834e41d`](https://github.com/statelyai/graph/commit/834e41d923a6c0e55ce2f32c99e02a5a399861a8) Thanks [@davidkpiano](https://github.com/davidkpiano)! - Support XState v6 machine graphs alongside v5. Preserve state inputs and remembered history in snapshot IDs, include resolved eventless and raised-event transitions in edge metadata, and expose event-case maps, explicit default replacement, starting snapshots and exploration metadata. Pass `runtime` when using an aliased XState runtime. Transition functions are evaluated once per explored event and external effects are not executed.
+
+  Canonicalize history record order and report missing initial transition attribution. Pass `actorIdentity` with a v5 starting snapshot to preserve actor ID and session ID comparisons during isolated exploration.
+
 ## 2.6.0
 
 ### Minor Changes
