@@ -1,346 +1,365 @@
-/**
- * XState adapter — one machine → graph path shared by mbt, viz, and PBT.
- *
- * Requires the optional `xstate` peer dependency (v5).
- *
- * @module @statelyai/graph/xstate
- */
-import {
-  createEmptyActor,
-  __unsafe_getAllOwnEventDescriptors,
-  type AnyMachineSnapshot,
-  type AnyStateMachine,
-  type AnyTransitionDefinition,
-  type EventFromLogic,
-  type EventObject,
-  type InputFrom,
-  type MachineContext,
-  type SnapshotFrom,
-  type StateValue,
-  type UnknownAction,
-} from 'xstate';
-import { createGraph } from '../graph';
-import type { EdgeConfig, Graph, NodeConfig } from '../types';
+/** XState v5/v6 behavioral graph adapter. No external effects are executed. */
+import * as XState from "xstate";
+import type { EventObject, MachineContext, StateValue } from "xstate";
+import { createGraph } from "../graph";
+import type { EdgeConfig, Graph, NodeConfig } from "../types";
 
-/** Serializable projection of a machine snapshot, stored as node `data`. */
-export interface MachineNodeData {
-  /** Snapshot state value (`'a'`, `{ a: 'b' }`, ...). */
-  value: StateValue;
-  /** Snapshot context, or `undefined` when empty. */
-  context: MachineContext | undefined;
-  /** Resolved ids of every active state node, in document order. */
-  stateIds: string[];
-  /** Dotted paths of the active atomic/final state nodes, e.g. `['a.b', 'c']`. */
-  statePaths: string[];
-  /** Snapshot tags. */
-  tags: string[];
-  /** Snapshot status. */
-  status: 'active' | 'done' | 'error' | 'stopped';
+/** Structural boundary also accepts machines imported through a runtime alias. */
+export interface MachineGraphLogic {
+  id: string;
+  root: any;
+  getInitialSnapshot(...args: any[]): any;
+  transition(...args: any[]): any;
+}
+type MachineSnapshot<T extends MachineGraphLogic> = ReturnType<T["getInitialSnapshot"]>;
+type MachineEvent<T extends MachineGraphLogic> = Parameters<T["transition"]>[1] & EventObject;
+type MachineInput<T extends MachineGraphLogic> = Parameters<T["getInitialSnapshot"]>[1];
+
+/** Helpers must come from the same runtime as the machine (including aliases). */
+export interface MachineGraphRuntime {
+  createEmptyActor(): any;
+  getInitialMicrosteps?: (...args: any[]) => any[];
+  getMicrosteps?: (...args: any[]) => any[];
 }
 
-/** A guard rendered as text. `hypothesized` marks that the text is a label, not a verified predicate. */
+export interface MachineNodeData {
+  value: StateValue;
+  context: MachineContext | undefined;
+  stateIds: string[];
+  statePaths: string[];
+  tags: string[];
+  status: "active" | "done" | "error" | "stopped";
+  stateInputs?: Record<string, unknown>;
+  historyValue?: Record<string, string[]>;
+}
 export interface MachineGuardData {
   text: string;
   hypothesized: true;
 }
-
-/** One XState transition definition selected for an edge. */
 export interface MachineTransitionData {
-  /** Resolved id of the state node that owns the transition. */
   source: string;
-  /** Resolved ids of the transition targets (`undefined` for targetless). */
   targets: string[] | undefined;
-  /** Whether the transition re-enters its source. */
   reenter: boolean;
+  eventType: string;
   guard?: MachineGuardData;
   actions: string[];
 }
-
-/** Serializable description of a machine step, stored as edge `data`. */
 export interface MachineEdgeData<TEvent extends EventObject = EventObject> {
-  /** The event object sent to the machine. */
   event: TEvent;
-  /** `event.type`. */
   eventType: string;
-  /** Graph node id of the source state (same as `edge.sourceId`; duplicated for path consumers). */
   sourceNodeId: string;
-  /** Guard of the first guarded selected transition, when `includeGuards` is on. */
   guard?: MachineGuardData;
-  /**
-   * Action labels from every selected transition, in order. Entry/exit actions
-   * and actions of `always` transitions taken after the event are not listed.
-   */
+  /** Transition action labels; entry/exit effects are not included. */
   actions: string[];
-  /**
-   * Transition definitions XState selected for the event itself. Eventless
-   * (`always`) transitions taken afterwards are folded into `targetId` but not
-   * listed here. Empty for unhandled events.
-   */
+  /** All selected microstep transitions, including eventless/raised events. */
   transitions: MachineTransitionData[];
 }
-
-export interface MachineGraphOptions<TMachine extends AnyStateMachine> {
-  /**
-   * Event objects (with payloads) to try. Event types are enumerated from the
-   * machine's own descriptors at each state and sent as bare `{ type }`; an
-   * entry here whose type matches a descriptor (exact, `*`, or `prefix.*`)
-   * replaces that bare event. Wildcard descriptors need a supplied event to be
-   * explored with a concrete type.
-   */
-  events?:
-    | readonly EventFromLogic<TMachine>[]
-    | ((snapshot: SnapshotFrom<TMachine>) => readonly EventFromLogic<TMachine>[]);
-  /** Node id for a snapshot. Default: JSON of `{ value, context }` (matches `xstate/graph`). */
-  serializeState?: (snapshot: SnapshotFrom<TMachine>) => string;
-  /** Edge id component for an event. Default: `JSON.stringify(event)` (matches `xstate/graph`). */
-  serializeEvent?: (event: EventFromLogic<TMachine>) => string;
-  /** Attach guard text to edges. Default: `true`. */
-  includeGuards?: boolean;
-  /** Skip an event at a state. */
-  filterEvents?: (
-    snapshot: SnapshotFrom<TMachine>,
-    event: EventFromLogic<TMachine>,
-  ) => boolean;
-  /** Keep the node but do not explore its outgoing events. */
-  stopWhen?: (snapshot: SnapshotFrom<TMachine>) => boolean;
-  /** Max states to expand before throwing. Default: `Infinity`. */
-  limit?: number;
-  /** Machine input for the initial snapshot. */
-  input?: InputFrom<TMachine>;
-  /** Graph id. Default: `machine.id`. */
-  id?: string;
-}
-
-export type MachineGraph<TMachine extends AnyStateMachine = AnyStateMachine> =
-  Graph<MachineNodeData, MachineEdgeData<EventFromLogic<TMachine>>>;
-
-function getParameterizedText(
-  value: string | { type: string; params?: unknown } | ((...args: any[]) => unknown),
-): string {
-  if (typeof value === 'string') return value;
-  // Inline `guard: () => ...` / `actions: () => ...` get the property name; treat as anonymous.
-  if (typeof value === 'function') {
-    return value.name && !['guard', 'actions'].includes(value.name)
-      ? value.name
-      : '[inline]';
-  }
-  if (value.params === undefined) return value.type;
-  return `${value.type}(${JSON.stringify(value.params)})`;
-}
-
-function getGuardData(guard: AnyTransitionDefinition['guard']): MachineGuardData | undefined {
-  if (guard === undefined) return undefined;
-  return { text: getParameterizedText(guard as any), hypothesized: true };
-}
-
-function getActionTexts(actions: readonly UnknownAction[]): string[] {
-  return actions.map((action) => getParameterizedText(action as any));
-}
-
-function getTransitionData(
-  transition: AnyTransitionDefinition,
-  includeGuards: boolean,
-): MachineTransitionData {
-  const guard = includeGuards ? getGuardData(transition.guard) : undefined;
-  return {
-    source: transition.source.id,
-    targets: transition.target?.map((target) => target.id),
-    reenter: transition.reenter,
-    ...(guard ? { guard } : {}),
-    actions: getActionTexts(transition.actions),
+export interface MachineGraphData {
+  exploration: {
+    scope: "event-cases";
+    eventMode: "augmentDefaults" | "replaceDefaults";
+    stoppedNodeIds: string[];
+    /** Whether microstep transition attribution was available for every step. */
+    transitionAttributionComplete: boolean;
+    initialTransitions: MachineTransitionData[];
   };
 }
-
-function isMatchingDescriptor(descriptor: string, eventType: string): boolean {
-  if (descriptor === eventType || descriptor === '*') return true;
-  if (!descriptor.endsWith('.*')) return false;
-  const prefix = descriptor.slice(0, -1);
-  return eventType.startsWith(prefix) && eventType !== descriptor;
+type MachineEventCases<T extends MachineGraphLogic> = {
+  [K in MachineEvent<T>["type"]]?:
+    | readonly Omit<Extract<MachineEvent<T>, { type: K }>, "type">[]
+    | ((
+        snapshot: MachineSnapshot<T>,
+      ) => readonly Omit<Extract<MachineEvent<T>, { type: K }>, "type">[]);
+};
+export interface MachineGraphOptions<T extends MachineGraphLogic> {
+  /** Arrays preserve the legacy augment behavior; eventMode can replace defaults. */
+  events?:
+    | readonly MachineEvent<T>[]
+    | ((snapshot: MachineSnapshot<T>) => readonly MachineEvent<T>[])
+    | MachineEventCases<T>;
+  eventMode?: "augmentDefaults" | "replaceDefaults";
+  serializeState?: (snapshot: MachineSnapshot<T>) => string;
+  serializeEvent?: (event: MachineEvent<T>) => string;
+  includeGuards?: boolean;
+  filterEvents?: (snapshot: MachineSnapshot<T>, event: MachineEvent<T>) => boolean;
+  stopWhen?: (snapshot: MachineSnapshot<T>) => boolean;
+  fromState?: MachineSnapshot<T>;
+  /** v5 string identity for an isolated exploration actor, usually the source actor. */
+  actorIdentity?: { readonly id: string; readonly sessionId: string };
+  limit?: number;
+  input?: MachineInput<T>;
+  id?: string;
+  runtime?: MachineGraphRuntime;
 }
+export type MachineGraph<T extends MachineGraphLogic = MachineGraphLogic> = Graph<
+  MachineNodeData,
+  MachineEdgeData<MachineEvent<T>>,
+  MachineGraphData
+>;
 
-/**
- * One inert actor scope for the whole traversal, so `self`, `sessionId`, and
- * the system stay stable across steps (as they would in a running actor).
- */
-function createInertActorScope() {
-  const self = createEmptyActor();
+function getParameterizedText(value: any): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "function")
+    return value.name && !["guard", "actions"].includes(value.name) ? value.name : "[inline]";
+  return value.params === undefined ? value.type : `${value.type}(${JSON.stringify(value.params)})`;
+}
+function getTransitionData(transition: any, includeGuards: boolean): MachineTransitionData {
+  const guard =
+    includeGuards && transition.guard !== undefined
+      ? { text: getParameterizedText(transition.guard), hypothesized: true as const }
+      : undefined;
   return {
+    source: transition.source.id,
+    targets: transition.target?.map((target: any) => target.id),
+    reenter: transition.reenter ?? false,
+    eventType: transition.eventType,
+    ...(guard ? { guard } : {}),
+    actions: (transition.actions ?? []).map(getParameterizedText),
+  };
+}
+function isMatchingDescriptor(descriptor: string, type: string): boolean {
+  return (
+    descriptor === type ||
+    descriptor === "*" ||
+    (descriptor.endsWith(".*") && type.startsWith(descriptor.slice(0, -1)) && type !== descriptor)
+  );
+}
+function getHistory(snapshot: any): Record<string, string[]> | undefined {
+  const history = snapshot.historyValue;
+  return history && Object.keys(history).length
+    ? Object.fromEntries(
+        Object.keys(history).sort().map((id) => [id, history[id].map((node: any) => node.id)]),
+      )
+    : undefined;
+}
+function getInputs(snapshot: any): Record<string, unknown> | undefined {
+  const inputs = snapshot.getInputs?.();
+  return inputs && Object.keys(inputs).length ? inputs : undefined;
+}
+/** Default identity includes root context, state inputs and remembered history. */
+export function getSerializedSnapshot(snapshot: {
+  value: StateValue;
+  context?: MachineContext;
+  getInputs?: () => Record<string, unknown>;
+  historyValue?: Record<string, readonly { id: string }[]>;
+}): string {
+  return JSON.stringify({
+    value: snapshot.value,
+    context: Object.keys(snapshot.context ?? {}).length ? snapshot.context : undefined,
+    stateInputs: getInputs(snapshot),
+    historyValue: getHistory(snapshot),
+  });
+}
+function getNodeData(snapshot: any): MachineNodeData {
+  const nodes: any[] = snapshot.nodes ?? snapshot._nodes ?? [];
+  return {
+    value: snapshot.value,
+    context: Object.keys(snapshot.context ?? {}).length ? snapshot.context : undefined,
+    stateIds: nodes.map((node) => node.id),
+    statePaths: nodes
+      .filter((node) => node.type === "atomic" || node.type === "final")
+      .map((node) => node.path.join(".")),
+    tags: [...snapshot.tags],
+    status: snapshot.status,
+    ...(getInputs(snapshot) ? { stateInputs: getInputs(snapshot) } : {}),
+    ...(getHistory(snapshot) ? { historyValue: getHistory(snapshot) } : {}),
+  };
+}
+function getDefaultEvents(snapshot: any): EventObject[] {
+  return (snapshot.nodes ?? snapshot._nodes).flatMap((node: any) =>
+    [...node.transitions.values()].flatMap((definitions: any) =>
+      definitions.map((definition: any) => {
+        const event: any = { type: definition.eventType, ...definition.matches };
+        if (
+          "actorId" in event &&
+          [
+            "xstate.done.actor",
+            "xstate.error.actor",
+            "xstate.snapshot.actor",
+            "xstate.timeout.actor",
+          ].includes(event.type)
+        )
+          event.sessionId = snapshot.children[event.actorId]?.sessionId;
+        return event;
+      }),
+    ),
+  );
+}
+/** Explore the supplied event cases using the machine's own runtime semantics. */
+export function createGraphFromMachine<T extends MachineGraphLogic>(
+  machine: T,
+  options: MachineGraphOptions<T> = {},
+): MachineGraph<T> {
+  const runtime = options.runtime ?? XState;
+  const v6 = "eventSchema" in machine && "sources" in machine;
+  if (v6 && options.actorIdentity)
+    throw new Error("actorIdentity is supported only for XState v5 machines");
+  const serializeState = options.serializeState ?? getSerializedSnapshot;
+  const serializeEvent = options.serializeEvent ?? JSON.stringify;
+  const includeGuards = options.includeGuards ?? true;
+  const eventMode = options.eventMode ?? "augmentDefaults";
+  const limit = options.limit ?? Infinity;
+  if (limit !== Infinity && (!Number.isSafeInteger(limit) || limit < 0))
+    throw new Error("limit must be a nonnegative safe integer or Infinity");
+  if (v6 && (!runtime.getInitialMicrosteps || !runtime.getMicrosteps))
+    throw new Error(
+      "XState v6 requires microstep helpers from the same runtime; pass options.runtime for aliased runtimes.",
+    );
+  const selected: any[] = [];
+  // v5 inspection attributes every microstep without evaluating guards twice.
+  const self = v6 ? undefined : runtime.createEmptyActor();
+  if (self && options.actorIdentity) {
+    self.id = options.actorIdentity.id;
+    self.sessionId = options.actorIdentity.sessionId;
+  }
+  const subscription = self?.system.inspect((event: any) => {
+    if (event.type === "@xstate.microstep") selected.push(...event._transitions);
+  });
+  const scope = self && {
     self,
-    logger: () => {},
-    id: '',
-    sessionId: self.sessionId,
-    defer: () => {},
     system: self.system,
+    id: self.id,
+    sessionId: self.sessionId,
+    logger: () => {},
+    defer: () => {},
     stopChild: () => {},
     emit: () => {},
     actionExecutor: () => {},
   };
-}
-
-/** Default node id — identical to `serializeSnapshot` from `xstate/graph`. */
-export function getSerializedSnapshot(snapshot: {
-  value: StateValue;
-  context?: MachineContext;
-}): string {
-  const { value, context } = snapshot;
-  return JSON.stringify({
-    value,
-    context: Object.keys(context ?? {}).length ? context : undefined,
-  });
-}
-
-function getNodeData(snapshot: AnyMachineSnapshot): MachineNodeData {
-  const nodes: Array<{ id: string; path: string[]; type: string }> =
-    (snapshot as any)._nodes ?? [];
-  const context = snapshot.context as MachineContext | undefined;
-  return {
-    value: snapshot.value,
-    context: Object.keys(context ?? {}).length ? context : undefined,
-    stateIds: nodes.map((node) => node.id),
-    statePaths: nodes
-      .filter((node) => node.type === 'atomic' || node.type === 'final')
-      .map((node) => node.path.join('.')),
-    tags: [...snapshot.tags],
-    status: snapshot.status,
-  };
-}
-
-/**
- * Create a graph by exhaustively exploring an XState machine: every reachable
- * snapshot becomes a node; every `(snapshot, event)` step becomes an edge.
- *
- * - Events come from the machine's own event descriptors at each state, so
- *   callers do not enumerate them. Use `events` to supply payloads.
- * - Node ids default to the JSON of `{ value, context }` and edge ids to
- *   `sourceId|serializedEvent|targetId`, so ids are stable across runs and
- *   `getCoverageTargets` yields diffable state / transition / transition-pair
- *   targets.
- * - Guards are evaluated for real by `xstate`; the guard text on an edge is a
- *   label (`hypothesized: true`), not a proof that the predicate held.
- *
- * @example
- * ```ts
- * import { createMachine } from 'xstate';
- * import { createGraphFromMachine } from '@statelyai/graph/xstate';
- * import { getShortestPaths } from '@statelyai/graph';
- *
- * const graph = createGraphFromMachine(
- *   createMachine({ initial: 'a', states: { a: { on: { NEXT: 'b' } }, b: {} } }),
- * );
- * getShortestPaths(graph).map((p) => p.steps.map((s) => s.edge.data.eventType));
- * // [['NEXT']]
- * ```
- */
-export function createGraphFromMachine<TMachine extends AnyStateMachine>(
-  machine: TMachine,
-  options: MachineGraphOptions<TMachine> = {},
-): MachineGraph<TMachine> {
-  type TSnapshot = SnapshotFrom<TMachine>;
-  type TEvent = EventFromLogic<TMachine>;
-
-  const serializeState =
-    options.serializeState ?? (getSerializedSnapshot as (s: TSnapshot) => string);
-  const serializeEvent = options.serializeEvent ?? ((e: TEvent) => JSON.stringify(e));
-  const includeGuards = options.includeGuards ?? true;
-  const limit = options.limit ?? Infinity;
-  const extraEvents = options.events;
-
-  const getEvents = (snapshot: TSnapshot): TEvent[] => {
-    const supplied =
-      typeof extraEvents === 'function'
-        ? extraEvents(snapshot)
-        : (extraEvents ?? []);
-    const seen = new Set<string>();
-    return __unsafe_getAllOwnEventDescriptors(snapshot)
-      .flatMap((descriptor) => {
-        const matching = supplied.filter((event) =>
-          isMatchingDescriptor(descriptor, event.type),
-        );
-        return matching.length ? matching : [{ type: descriptor } as TEvent];
-      })
-      .filter((event) => {
-        const key = serializeEvent(event);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-  };
-
-  const actorScope = createInertActorScope();
-  const initial = machine.getInitialSnapshot(
-    actorScope as any,
-    options.input as any,
-  ) as TSnapshot;
-  const initialId = serializeState(initial);
-
   const nodes: NodeConfig<MachineNodeData>[] = [];
-  const edges: EdgeConfig<MachineEdgeData<TEvent>>[] = [];
+  const edges: EdgeConfig<MachineEdgeData<MachineEvent<T>>>[] = [];
   const visited = new Set<string>();
   const edgeIds = new Set<string>();
-  const queue: TSnapshot[] = [initial];
-
-  const addNode = (id: string, snapshot: TSnapshot) => {
-    visited.add(id);
-    const data = getNodeData(snapshot as AnyMachineSnapshot);
-    nodes.push({ id, label: data.statePaths.join(', ') || String(id), data });
-  };
-  addNode(initialId, initial);
-
-  let iterations = 0;
-  while (queue.length > 0) {
-    const snapshot = queue.shift()!;
-    const sourceId = serializeState(snapshot);
-    // A stopped/done actor accepts no events; keep the node, do not expand.
-    if ((snapshot as AnyMachineSnapshot).status !== 'active') continue;
-    if (options.stopWhen?.(snapshot)) continue;
-    if (++iterations > limit) throw new Error('Traversal limit exceeded');
-
-    for (const event of getEvents(snapshot)) {
-      if (options.filterEvents && !options.filterEvents(snapshot, event)) continue;
-
-      const selected: AnyTransitionDefinition[] = machine.getTransitionData(
-        snapshot as any,
-        event,
-      );
-      const next = machine.transition(
-        snapshot as any,
-        event,
-        actorScope as any,
-      ) as TSnapshot;
-      const targetId = serializeState(next);
-      if (!visited.has(targetId)) {
-        addNode(targetId, next);
-        queue.push(next);
+  const stoppedNodeIds: string[] = [];
+  let attributionComplete = true;
+  const getEvents = (snapshot: MachineSnapshot<T>): MachineEvent<T>[] => {
+    const defaults = eventMode === "replaceDefaults" ? [] : getDefaultEvents(snapshot);
+    const configured =
+      typeof options.events === "function" ? options.events(snapshot) : options.events;
+    let supplied: EventObject[];
+    if (configured && !Array.isArray(configured)) {
+      supplied = [];
+      for (const [type, cases] of Object.entries(configured)) {
+        if (
+          eventMode !== "replaceDefaults" &&
+          !defaults.some((e) => isMatchingDescriptor(e.type, type))
+        )
+          continue;
+        const values = typeof cases === "function" ? cases(snapshot) : cases;
+        if (!Array.isArray(values) || !values.length)
+          throw new Error(`Event cases for "${type}" must be a non-empty array`);
+        for (const payload of values) supplied.push({ ...payload, type });
       }
-
-      const edgeId = `${sourceId}|${serializeEvent(event)}|${targetId}`;
-      if (edgeIds.has(edgeId)) continue;
-      edgeIds.add(edgeId);
-
-      const transitions = selected.map((t) => getTransitionData(t, includeGuards));
-      const guard = transitions.find((t) => t.guard)?.guard;
-      edges.push({
-        id: edgeId,
-        sourceId,
-        targetId,
-        label: event.type,
-        data: {
-          event,
-          eventType: event.type,
-          sourceNodeId: sourceId,
-          ...(guard ? { guard } : {}),
-          actions: transitions.flatMap((t) => t.actions),
-          transitions,
-        },
-      });
+    } else supplied = (configured ?? []) as EventObject[];
+    const candidates = defaults.flatMap((def) => {
+      const replacements = supplied.filter((event) => isMatchingDescriptor(def.type, event.type));
+      const matches = replacements.filter(
+        (e) =>
+          isMatchingDescriptor(def.type, e.type) &&
+          Object.entries(def).every(
+            ([key, value]) => key === "type" || Object.is((e as any)[key], value),
+          ),
+      );
+      return matches.length ? matches : replacements.length || def.type.includes("*") ? [] : [def];
+    });
+    const all = eventMode === "replaceDefaults" ? supplied : candidates;
+    const seen = new Set<string>();
+    return all.filter((event) => {
+      const id = serializeEvent(event as MachineEvent<T>);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }) as MachineEvent<T>[];
+  };
+  const addNode = (snapshot: MachineSnapshot<T>) => {
+    const id = serializeState(snapshot);
+    visited.add(id);
+    const data = getNodeData(snapshot);
+    nodes.push({ id, label: data.statePaths.join(", ") || id, data });
+    return id;
+  };
+  try {
+    let initial: MachineSnapshot<T>;
+    if (options.fromState) initial = options.fromState;
+    else if (v6) {
+      const steps = runtime.getInitialMicrosteps!(machine, options.input);
+      initial = steps.at(-1)![0];
+      selected.push(...steps.flatMap((step) => step[2] ?? []));
+      if (steps.some((step) => !Array.isArray(step[2]))) attributionComplete = false;
+    } else initial = machine.getInitialSnapshot(scope, options.input);
+    const initialTransitions = selected.map((t) => getTransitionData(t, includeGuards));
+    selected.length = 0;
+    const initialId = addNode(initial);
+    const queue = [initial];
+    let expanded = 0;
+    for (let head = 0; head < queue.length; head++) {
+      const snapshot = queue[head];
+      if (snapshot.status !== "active") continue;
+      const sourceId = serializeState(snapshot);
+      if (options.stopWhen?.(snapshot)) {
+        stoppedNodeIds.push(sourceId);
+        continue;
+      }
+      if (++expanded > limit) throw new Error("Traversal limit exceeded");
+      for (const event of getEvents(snapshot)) {
+        if (options.filterEvents && !options.filterEvents(snapshot, event)) continue;
+        selected.length = 0;
+        let next: MachineSnapshot<T>;
+        try {
+          if (v6) {
+            const steps = runtime.getMicrosteps!(machine, snapshot, event);
+            next = steps.at(-1)?.[0] ?? snapshot;
+            selected.push(...steps.flatMap((step) => step[2] ?? []));
+            if (steps.some((step) => !Array.isArray(step[2]))) attributionComplete = false;
+          } else next = machine.transition(snapshot, event, scope);
+        } catch (cause) {
+          throw new Error(`Transition failed from ${sourceId} on ${serializeEvent(event)}`, {
+            cause,
+          });
+        }
+        const targetId = serializeState(next);
+        if (!visited.has(targetId)) {
+          addNode(next);
+          queue.push(next);
+        }
+        const edgeId = `${sourceId}|${serializeEvent(event)}|${targetId}`;
+        if (edgeIds.has(edgeId)) continue;
+        edgeIds.add(edgeId);
+        const transitions = selected.map((t) => getTransitionData(t, includeGuards));
+        const guard = transitions.find((t) => t.guard)?.guard;
+        edges.push({
+          id: edgeId,
+          sourceId,
+          targetId,
+          label: event.type,
+          data: {
+            event,
+            eventType: event.type,
+            sourceNodeId: sourceId,
+            ...(guard ? { guard } : {}),
+            actions: transitions.flatMap((t) => t.actions),
+            transitions,
+          },
+        });
+      }
     }
+    return createGraph({
+      id: options.id ?? machine.id,
+      mode: "directed",
+      initialNodeId: initialId,
+      nodes,
+      edges,
+      data: {
+        exploration: {
+          scope: "event-cases",
+          eventMode,
+          stoppedNodeIds,
+          transitionAttributionComplete: attributionComplete,
+          initialTransitions,
+        },
+      },
+    });
+  } finally {
+    subscription?.unsubscribe();
   }
-
-  return createGraph({
-    id: options.id ?? machine.id,
-    mode: 'directed',
-    initialNodeId: initialId,
-    nodes,
-    edges,
-  });
 }

@@ -87,10 +87,11 @@
     "fix:generated": "pnpm generate-schema",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
+    "verify:xstate-v6": "node --import tsx scripts/smoke-xstate-v6.ts",
     "typecheck:repo": "tsc --project tsconfig.repo.json",
     "check:generated": "tsx scripts/generate-json-schema.ts --check",
     "check:conventions": "tsx scripts/check-conventions.ts",
-    "verify": "pnpm typecheck && pnpm typecheck:repo && pnpm check:generated && pnpm check:conventions && pnpm test -- --run && pnpm build && pnpm validate:package",
+    "verify": "pnpm typecheck && pnpm typecheck:repo && pnpm check:generated && pnpm check:conventions && pnpm test -- --run && pnpm build && pnpm verify:xstate-v6 && pnpm validate:package",
     "validate:package": "publint && tsx scripts/smoke-package.ts",
     "generate-schema": "tsx scripts/generate-json-schema.ts",
     "changeset": "changeset",
@@ -153,7 +154,8 @@
     "webcola": "^3.4.0",
     "xmllint-wasm": "5.3.0",
     "xstate": "^5.28.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "xstate-v6": "npm:xstate@6.0.0-alpha.70"
   },
   "peerDependencies": {
     "@dagrejs/dagre": "^3.0.0 || ^4.0.0",
@@ -168,7 +170,7 @@
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.0",
     "webcola": "^3.4.0",
-    "xstate": "^5.19.0",
+    "xstate": "^5.19.0 || ^6.0.0-alpha.70",
     "zod": "^4.0.0",
     "n3": "^2.13.12"
   },

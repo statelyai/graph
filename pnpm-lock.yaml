@@ -149,6 +149,9 @@ importers:
       xstate:
         specifier: ^5.28.0
         version: 5.32.0
+      xstate-v6:
+        specifier: npm:xstate@6.0.0-alpha.70
+        version: xstate@6.0.0-alpha.70
       zod:
         specifier: ^4.3.6
         version: 4.4.3
@@ -2430,6 +2433,10 @@ packages:
   xstate@5.32.0:
     resolution: {integrity: sha512-zsk73aWGmxn9z34P0kbiod5JwTvdYRW3+IDxITq8sd9+VWwMyW7BUzpplnYy9mIEXa6V8IMDv7Hy4m0mhT5+2Q==, tarball: https://registry.npmjs.org/xstate/-/xstate-5.32.0.tgz}
 
+  xstate@6.0.0-alpha.70:
+    resolution: {integrity: sha512-TSFfXYaTNz+ylEpguNsu0L5vDy8cjHRXAqpZBKQnJI++Jm61Vb41TAg1HzeEbC+Mnq9XelKs2dQNOizTwcnssQ==}
+    hasBin: true
+
   yaml@2.9.0:
     resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==, tarball: https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz}
     engines: {node: '>= 14.6'}
@@ -4600,6 +4607,8 @@ snapshots:
       '@types/node': 25.9.3
 
   xstate@5.32.0: {}
+
+  xstate@6.0.0-alpha.70: {}
 
   yaml@2.9.0: {}
 
