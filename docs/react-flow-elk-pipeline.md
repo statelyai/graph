@@ -1,7 +1,7 @@
 # React Flow + ELK: automatic layout cookbook
 
 A recipe for building a React Flow (xyflow v12) node-graph UI where layout is
-computed by ELK and the graph — not React Flow's node array — is the single
+computed by ELK and the graph (not React Flow's node array) is the single
 source of truth.
 
 ## The pipeline
@@ -14,7 +14,7 @@ domain model ─createGraph→ @statelyai/graph ─getElkLayout→ VisualGraph
 
 Layout is a pure function: `getElkLayout(graph)` returns a new `VisualGraph`
 with node positions/sizes, routed edge `points`, and edge-label rects. Child
-node coordinates are parent-relative — the same convention React Flow uses, so
+node coordinates are parent-relative, the same convention React Flow uses, so
 positions map 1:1.
 
 ## 1. Build the graph
@@ -85,7 +85,7 @@ Two render-side notes:
 ## 3. Measure real node sizes (two-pass)
 
 ELK needs node dimensions before it can lay anything out, but real dimensions
-come from the DOM. The honest pattern is two passes: **render → measure →
+come from the DOM. The pattern is two passes: **render → measure →
 layout → re-render**. React Flow measures nodes for you and exposes the result
 on `node.measured`; `useNodesInitialized()` tells you when that's done.
 
@@ -118,7 +118,7 @@ function useElkLayout(setNodes: (n: Node[]) => void, setEdges: (e: Edge[]) => vo
 ```
 
 Pass 1 renders `toXYFlow(graph)` with whatever positions exist (all `0,0` for
-a fresh graph — hide or fade the canvas to avoid a flash). Sizes resolve as
+a fresh graph; hide or fade the canvas to avoid a flash). Sizes resolve as
 `measure` → the node's own `width`/`height` → `DEFAULT_NODE_SIZE` (100×50);
 layout adapters never guess text sizes. Reuse measured sizes on later runs.
 
@@ -129,7 +129,7 @@ worker, and `getElkLayout` accepts any pre-constructed instance via its
 **`elk`** option (anything with a `layout(graph): Promise` method):
 
 ```ts
-import ELK from 'elkjs/lib/elk-api'; // slim API — no bundled engine
+import ELK from 'elkjs/lib/elk-api'; // slim API, no bundled engine
 import { getElkLayout } from '@statelyai/graph/layout/elk';
 
 const elk = new ELK({
@@ -181,20 +181,20 @@ async function relayout() {
 }
 ```
 
-Frames carry node positions only — edge routes are not interpolated, so apply
+Frames carry node positions only. Edge routes are not interpolated, so apply
 the final edge geometry once at the end (as above) or hide edges mid-tween.
-Alternatively, skip the tween entirely and just `setNodes` with the new
+Alternatively, skip the tween entirely and call `setNodes` with the new
 layout; add CSS transitions on `.react-flow__node` if you want easing without
 a loop. `getLayoutBounds(graph)` and `centerGraph(graph, rect)` help keep a
 fresh layout centered in your viewport before converting.
 
 ## 6. Compound nodes and ports
 
-**Compound:** ELK is the engine of choice here — `parentId` hierarchy is
+**Compound:** ELK is the engine of choice here. `parentId` hierarchy is
 first-class, parents are sized around their children, and child coordinates
-come back parent-relative, which is exactly what React Flow expects.
+come back parent-relative, which is what React Flow expects.
 `toXYFlow` sets `parentId` on child nodes and orders parents first. It does
-*not* set `extent` — add it yourself if children should stay confined:
+*not* set `extent`. Add it yourself if children should stay confined:
 
 ```ts
 const nodes = flow.nodes.map((n) =>
@@ -204,7 +204,7 @@ const nodes = flow.nodes.map((n) =>
 
 **Ports:** edges reference ports by name, and `toXYFlow` maps them to
 `sourceHandle`/`targetHandle`. The port definitions themselves travel in node
-metadata — render them as handles in a custom node, with `Handle.id` equal to
+metadata. Render them as handles in a custom node, with `Handle.id` equal to
 the port name:
 
 ```tsx
@@ -218,7 +218,7 @@ function PortNode({ data }: NodeProps) {
       {(meta?.ports ?? []).map((port: { name: string; direction?: string }) => (
         <Handle
           key={port.name}
-          id={port.name} // must match — edges point at it via sourceHandle/targetHandle
+          id={port.name} // must match: edges point at it via sourceHandle/targetHandle
           type={port.direction === 'in' ? 'target' : 'source'}
           position={port.direction === 'in' ? Position.Left : Position.Right}
         />
@@ -234,7 +234,7 @@ layout, and you choose how to render it.
 ## 7. Back to the graph
 
 After the user drags nodes or rewires edges, fold React Flow's state back into
-a graph with `fromXYFlow`. Keep the `data` blob from `toXYFlow` — it carries
+a graph with `fromXYFlow`. Keep the `data` blob from `toXYFlow`. It carries
 graph-level metadata (`id`, `mode`, `direction`, …):
 
 ```ts
@@ -250,6 +250,6 @@ const updated = fromXYFlow({
 `fromXYFlow` prefers `node.measured` sizes (React Flow's DOM measurements)
 over declared `width`/`height`, maps `sourceHandle`/`targetHandle` back to
 ports, and restores original node/edge `data` from the `__statelyai` metadata.
-The result is a `VisualGraph` — your single source of truth — ready for the
+The result is a `VisualGraph` (your single source of truth), ready for the
 next `getElkLayout` pass, persistence, or any of the library's queries and
 algorithms.
