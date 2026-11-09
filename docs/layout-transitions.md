@@ -42,7 +42,7 @@ requestAnimationFrame(tick);
 
 Nodes are matched by id; nodes without a position in `from` (or absent from it) start at their `to` position. `alpha` cools linearly 1 → 0, like the physics layouts, so the same render loop handles both.
 
-## Edges: be honest
+## Edge routes during transitions
 
 From the `genLayoutTransition` JSDoc: *"Edge routes are not interpolated; frames carry node positions only. Hide or re-route edges during the transition."* Interpolating a dagre polyline into an ELK orthogonal route point-by-point is meaningless. The usual moves:
 
