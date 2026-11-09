@@ -1,6 +1,6 @@
 # Layout transitions
 
-In `@statelyai/graph`, a layout is not engine state — it's **data**. Every adapter returns a plain-JSON `VisualGraph`, and the graph itself stays the single source of truth. So "switch from dagre to ELK" is just two `VisualGraph`s, and `genLayoutTransition` tweens between them. Libraries that keep layout state inside engine or class instances can't do this — there's nothing to diff or interpolate; here it's two JSON values.
+In `@statelyai/graph`, a layout is not engine state. It is data. Every adapter returns a plain-JSON `VisualGraph`, and the graph itself stays the single source of truth. So "switch from dagre to ELK" is two `VisualGraph`s, and `genLayoutTransition` tweens between them. Libraries that keep layout state inside engine or class instances can't do this, because there is nothing to diff or interpolate. Here it is two JSON values.
 
 ## Tween between two engines
 
@@ -20,7 +20,7 @@ const graph = createGraph({
   ],
 });
 
-// Same graph, two engines — both pure, the input is never mutated.
+// Same graph, two engines. Both are pure; the input is never mutated.
 const before = getDagreLayout(graph, { direction: 'down' });
 const after = await getElkLayout(graph, { direction: 'down' });
 
@@ -44,14 +44,14 @@ Nodes are matched by id; nodes without a position in `from` (or absent from it) 
 
 ## Edges: be honest
 
-From the `genLayoutTransition` JSDoc: *"Edge routes are not interpolated — frames carry node positions only; hide or re-route edges during the transition."* Interpolating a dagre polyline into an ELK orthogonal route point-by-point is meaningless. The usual moves:
+From the `genLayoutTransition` JSDoc: *"Edge routes are not interpolated; frames carry node positions only. Hide or re-route edges during the transition."* Interpolating a dagre polyline into an ELK orthogonal route point-by-point is meaningless. The usual moves:
 
 - fade edges out, tween nodes, fade the target routes in, or
 - draw straight source→target lines during the tween and restore `edge.points` when it finishes.
 
 ## Diff-driven transitions
 
-Layouts are plain graphs, so `getPatches` plus either immutable `getPatchedGraph` or mutable `updateGraphWithPatches` (from `@statelyai/graph`) work on them directly. A patch set between two layouts tells you exactly which nodes moved — e.g. to skip tweening unmoved nodes:
+Layouts are plain graphs, so `getPatches` plus either immutable `getPatchedGraph` or mutable `updateGraphWithPatches` (from `@statelyai/graph`) work on them directly. A patch set between two layouts tells you exactly which nodes moved, e.g. to skip tweening unmoved nodes:
 
 ```ts
 import { getPatches } from '@statelyai/graph';
@@ -72,11 +72,11 @@ for (const frame of genLayoutTransition(before, after)) {
 }
 ```
 
-And because patches are first-class data, undo/redo falls out for free: keep the patch sets (or use `getDiff` + `getInvertedDiff`) and use `getPatchedGraph` or `updateGraphWithPatches` to step layout history in either direction.
+And because patches are first-class data, undo/redo needs no extra machinery: keep the patch sets (or use `getDiff` + `getInvertedDiff`) and use `getPatchedGraph` or `updateGraphWithPatches` to step layout history in either direction.
 
 ## Physics handoff: the "tidy up" button
 
-Let users fling nodes around with a force simulation, then snap the mess into a hierarchy — settle d3-force, lay out with ELK, tween between them:
+Let users fling nodes around with a force simulation, then snap them into a hierarchy: settle d3-force, lay out with ELK, tween between them:
 
 ```ts
 import { getForceLayout } from '@statelyai/graph/layout/d3-force';
@@ -95,4 +95,4 @@ async function tidyUp() {
 }
 ```
 
-The reverse works too — `genLayoutTransition(tidy, settled)` — or hand the tidy positions back to `genForceLayout`, which seeds its simulation from existing positions for an incremental re-scatter. Engines compose, because the only thing passing between them is the graph.
+The reverse works too (`genLayoutTransition(tidy, settled)`), or hand the tidy positions back to `genForceLayout`, which seeds its simulation from existing positions for an incremental re-scatter. Engines compose, because the only thing passing between them is the graph.

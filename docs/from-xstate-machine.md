@@ -31,7 +31,7 @@ graph.nodes.length; // 2
 graph.edges.map((edge) => edge.data.eventType); // ['TOGGLE', 'TOGGLE']
 ```
 
-Event types are enumerated from the machine's own event descriptors at each state and sent as bare `{ type }` objects. Provide the `events` option when a transition needs payload fields (see [Options](#options)). Transitions are taken by `xstate` itself — the graph contains only real behavior. Completed (`done`) snapshots are kept as nodes but not expanded, since a finished actor accepts no events. The resulting graph is `directed`, with `initialNodeId` set to the initial snapshot's id.
+Event types are enumerated from the machine's own event descriptors at each state and sent as bare `{ type }` objects. Provide the `events` option when a transition needs payload fields (see [Options](#options)). Transitions are taken by `xstate` itself, so the graph contains only behavior the machine can produce. Completed (`done`) snapshots are kept as nodes but not expanded, since a finished actor accepts no events. The resulting graph is `directed`, with `initialNodeId` set to the initial snapshot's id.
 
 ## What nodes and edges carry
 
@@ -61,7 +61,7 @@ Each `MachineTransitionData` carries `source`, `targets`, `reenter`, `guard`, an
 
 ## Ids and stability
 
-- Node id: JSON of `{ value, context, stateInputs, historyValue }`, omitting empty optional records — exported as `getSerializedSnapshot`. History stores state-node IDs, not live node objects. Distinct state inputs and remembered history must remain distinct because they can change future transitions.
+- Node id: JSON of `{ value, context, stateInputs, historyValue }`, omitting empty optional records. Exported as `getSerializedSnapshot`. History stores state-node IDs, not live node objects. Distinct state inputs and remembered history must remain distinct because they can change future transitions.
 - Edge id: `` `${sourceId}|${serializedEvent}|${targetId}` ``, where the event is serialized with `JSON.stringify` by default.
 
 These match the v6 snapshot identity used by `xstate/graph` after its input/history fix. Machines without inputs or history retain their previous IDs. Coverage and path reports keyed by these ids are diffable between commits.
@@ -75,7 +75,7 @@ import { getShortestPaths, getSimplePaths } from '@statelyai/graph';
 
 const shortest = getShortestPaths(graph);
 shortest.map((path) => path.steps.map((step) => step.edge.data.eventType));
-// [['TOGGLE']] — one path, to the `active` state
+// [['TOGGLE']]: one path, to the `active` state
 
 const routes = getSimplePaths(graph, {
   from: graph.initialNodeId!,
@@ -115,16 +115,16 @@ Because node and edge ids are stable, a run report listing covered targets can b
 |---|---|---|
 | `events` | `[]` | Event objects as an array, an event-type map of payload cases, or a function of the snapshot. Supplied cases replace defaults matching their event type. Other event types retain defaults. |
 | `eventMode` | `'augmentDefaults'` | `'replaceDefaults'` explores only supplied cases. |
-| `fromState` | — | Snapshot that seeds exploration. |
-| `actorIdentity` | — | v5 actor `id` and `sessionId` for the isolated exploration actor. Pass the source actor when a starting snapshot depends on these strings. |
+| `fromState` | n/a | Snapshot that seeds exploration. |
+| `actorIdentity` | n/a | v5 actor `id` and `sessionId` for the isolated exploration actor. Pass the source actor when a starting snapshot depends on these strings. |
 | `runtime` | Installed `xstate` | Matching runtime module. Required for an aliased v6 package. |
 | `serializeState` | JSON including value/context, state inputs and history | Node id for a snapshot |
 | `serializeEvent` | `JSON.stringify(event)` | Edge id component for an event |
 | `includeGuards` | `true` | Attach guard text to edges |
-| `filterEvents` | — | `(snapshot, event) => boolean`; skip an event at a state |
-| `stopWhen` | — | `(snapshot) => boolean`; keep the node, do not explore its outgoing events |
+| `filterEvents` | n/a | `(snapshot, event) => boolean`; skip an event at a state |
+| `stopWhen` | n/a | `(snapshot) => boolean`; keep the node, do not explore its outgoing events |
 | `limit` | `Infinity` | Max states to expand before throwing |
-| `input` | — | Machine input for the initial snapshot |
+| `input` | n/a | Machine input for the initial snapshot |
 | `id` | `machine.id` | Graph id |
 
 ```ts
@@ -143,9 +143,9 @@ Node `context` and edge `event` values are stored as-is and the default ids `JSO
 
 ## Guards
 
-Guards are evaluated by `xstate` for real. Only the branch the real guard selected appears in the graph — unlike tools that stub guards out to explore every branch.
+`xstate` evaluates guards during exploration. Only the branch the guard selected appears in the graph. Some tools instead stub guards out to explore every branch.
 
-The `guard` on an edge is therefore a **label**, not a proof: `{ text, hypothesized: true }`. Use it to annotate reports; do not treat it as a verified predicate. To explore a branch the current context does not reach, change the context — supply `input`, or send events that move the machine there.
+The `guard` on an edge is therefore a **label**, not a proof: `{ text, hypothesized: true }`. Use it to annotate reports; do not treat it as a verified predicate. To explore a branch the current context does not reach, change the context: supply `input`, or send events that move the machine there.
 
 ## Relationship to `xstate/graph`
 

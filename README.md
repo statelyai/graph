@@ -2,7 +2,7 @@
 
 Graphs as plain JSON, with the algorithms, formats, and layout engines to do real work with them.
 
-A graph is just `{ nodes, edges }` data, and every operation is a standalone, tree-shakable function. Built and used by [Stately](https://stately.ai) to power its visual tooling for complex systems.
+A graph is plain `{ nodes, edges }` data, and every operation is a standalone, tree-shakable function. Built and used by [Stately](https://stately.ai) to power its visual tooling for complex systems.
 
 **[Documentation](https://stately.ai/docs/packages/graph)**
 
@@ -10,7 +10,7 @@ A graph is just `{ nodes, edges }` data, and every operation is a standalone, tr
 
 <!-- claims derived from src/index.ts, package.json#exports, tests/contracts.test.ts, and docs/benchmarks.md -->
 
-- **Your graph is just data.** No class instances, no import/export step. Save it with `JSON.stringify()`, diff it, or send it to a worker as-is; lookups are indexed transparently.
+- **Your graph is plain data.** No class instances, no import/export step. Save it with `JSON.stringify()`, diff it, or send it to a worker as-is; lookups are indexed transparently.
 - **One model for real diagrams.** Directed and undirected edges (even mixed), nested nodes, named ports, and positions and sizes: what node editors, statecharts, and architecture diagrams need, and most graph libraries leave out.
 - **Fast.** Fastest in most of our [cross-library benchmarks](./docs/benchmarks.md) against graphology, ngraph, graphlib, and cytoscape. For example, it builds a 100k-node graph 9–15× faster than graphology.
 - **Algorithms you can trust.** Shortest paths, centrality, communities, flow, matching, isomorphism, and more. Every query and algorithm is tested against edge cases such as self-loops, parallel edges, and unknown ids, and algorithms are iterative, so deep graphs won't overflow the stack.
@@ -163,7 +163,7 @@ The core (`@statelyai/graph`) and the pure-JSON formats have no runtime
 dependencies. Each adapter subpath that wraps a third-party library declares it
 as an **optional** peer dependency, so you only install the ones you use. If the
 peer isn't installed, importing that subpath throws a module-resolution error
-for the peer — install it and the import works.
+for the peer. Install the peer and the import works.
 
 | Subpath import | Peer dependency to install |
 | --- | --- |
