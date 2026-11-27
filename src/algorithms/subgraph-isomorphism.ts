@@ -56,7 +56,8 @@ function getArcModel(graph: Graph): ArcModel {
     addArc(s, t, edge);
     if (s !== t && getEdgeMode(graph, edge) !== 'directed') addArc(t, s, edge);
   }
-  return { nodes: graph.nodes, n, indexOf, arcs, out, in: inn };
+  // Snapshot the nodes so mutations mid-iteration cannot desync positions
+  return { nodes: graph.nodes.slice(), n, indexOf, arcs, out, in: inn };
 }
 
 /**
