@@ -31,6 +31,15 @@ export interface KatzCentralityOptions<E = any>
   getWeight?: (edge: GraphEdge<E>) => number;
 }
 
+export interface PageRankOptions extends IterativeCentralityOptions {
+  /**
+   * Teleport weights by node id for personalized PageRank: random jumps (and
+   * dangling-node mass) land on these nodes in proportion to their weight.
+   * Missing nodes get 0. Default: uniform over all nodes.
+   */
+  personalization?: Record<string, number>;
+}
+
 export interface HITSResult {
   hubs: Record<string, number>;
   authorities: Record<string, number>;
@@ -267,16 +276,125 @@ export function getBetweennessCentrality(
 }
 
 /**
+ * Returns betweenness centrality scores for all edges, keyed by edge id: the
+ * share of shortest paths between all ordered node pairs that pass through
+ * each edge.
+ *
+ * Uses Brandes' algorithm over unweighted shortest paths, following edge
+ * directions (non-directed edges both ways). Parallel edges split the paths
+ * between them. Scores are normalized by `n · (n − 1)`, like NetworkX; on an
+ * undirected graph that is the share of unordered pairs. Edges that no
+ * shortest path uses (self-loops, dangling edges) score 0.
+ *
+ * Pass `options.signal` to cancel: the abort is checked once per source node
+ * and throws `signal.reason`.
+ *
+ * @example
+ * ```ts
+ * // a – b – c: the bridge edges carry every path
+ * getEdgeBetweennessCentrality(graph); // { ab: 0.667, bc: 0.667 }
+ * ```
+ */
+export function getEdgeBetweennessCentrality(
+  graph: Graph,
+  options?: TraversalCentralityOptions,
+): Record<string, number> {
+  const csr = getCSR(graph);
+  const n = csr.ids.length;
+  const totals = new Float64Array(graph.edges.length);
+  const sigma = new Float64Array(n);
+  const dist = new Int32Array(n);
+  const delta = new Float64Array(n);
+  const order = new Int32Array(n);
+
+  for (let s = 0; s < n; s++) {
+    throwIfAborted(options?.signal);
+    sigma.fill(0);
+    dist.fill(-1);
+    delta.fill(0);
+    sigma[s] = 1;
+    dist[s] = 0;
+    order[0] = s;
+    let head = 0;
+    let tail = 1;
+    while (head < tail) {
+      const u = order[head++];
+      const du = dist[u];
+      for (let a = csr.outOffsets[u]; a < csr.outOffsets[u + 1]; a++) {
+        const v = csr.outTargets[a];
+        if (dist[v] === -1) {
+          dist[v] = du + 1;
+          order[tail++] = v;
+        }
+        if (dist[v] === du + 1) sigma[v] += sigma[u];
+      }
+    }
+    for (let k = tail - 1; k >= 0; k--) {
+      const w = order[k];
+      const sigmaW = sigma[w];
+      if (sigmaW === 0) continue;
+      const coefficient = (1 + delta[w]) / sigmaW;
+      for (let a = csr.inOffsets[w]; a < csr.inOffsets[w + 1]; a++) {
+        const v = csr.inOrigins[a];
+        if (dist[v] === dist[w] - 1) {
+          const credit = sigma[v] * coefficient;
+          totals[csr.inEdgeIndex[a]] += credit;
+          delta[v] += credit;
+        }
+      }
+    }
+  }
+
+  const scale = n > 1 ? 1 / (n * (n - 1)) : 0;
+  const scores: Record<string, number> = {};
+  graph.edges.forEach((edge, e) => {
+    scores[edge.id] = (scores[edge.id] ?? 0) + totals[e] * scale;
+  });
+  return scores;
+}
+
+/** Normalized teleport distribution (uniform unless personalized). */
+function getTeleportVector(
+  ids: string[],
+  personalization: Record<string, number> | undefined,
+): Float64Array {
+  const n = ids.length;
+  const teleport = new Float64Array(n);
+  if (!personalization) return teleport.fill(1 / n);
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const value = personalization[ids[i]] ?? 0;
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `getPageRank: personalization for "${ids[i]}" is ${value}; weights must be finite and non-negative`,
+      );
+    }
+    teleport[i] = value;
+    total += value;
+  }
+  if (total === 0) {
+    throw new Error(
+      'getPageRank: personalization assigns no positive weight to any node in the graph',
+    );
+  }
+  for (let i = 0; i < n; i++) teleport[i] /= total;
+  return teleport;
+}
+
+/**
  * Returns PageRank scores for all nodes.
  *
- * Uses power iteration with damping factor `alpha`.
+ * Uses power iteration with damping factor `alpha`. Pass
+ * `options.personalization` for personalized PageRank (random walks with
+ * restart biased toward some nodes), e.g. "which states matter most from
+ * here?".
  *
  * Pass `options.signal` to cancel: the abort is checked once per iteration
  * and throws `signal.reason`.
  */
 export function getPageRank(
   graph: Graph,
-  options?: IterativeCentralityOptions,
+  options?: PageRankOptions,
 ): Record<string, number> {
   const nodeIds = getNodeIds(graph);
   if (nodeIds.length === 0) {
@@ -296,9 +414,12 @@ export function getPageRank(
   // Seed from `scores` so callers' shape (Record keyed by id) stays authoritative
   for (let i = 0; i < n; i++) current[i] = scores[csr.ids[i]];
 
+  const teleport = getTeleportVector(csr.ids, options?.personalization);
+
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     throwIfAborted(options?.signal);
-    const next = new Float64Array(n).fill((1 - alpha) / n);
+    const next = new Float64Array(n);
+    for (let i = 0; i < n; i++) next[i] = (1 - alpha) * teleport[i];
 
     let danglingMass = 0;
     for (let u = 0; u < n; u++) {
@@ -314,8 +435,8 @@ export function getPageRank(
     }
 
     if (danglingMass > 0) {
-      const share = (alpha * danglingMass) / n;
-      for (let i = 0; i < n; i++) next[i] += share;
+      const share = alpha * danglingMass;
+      for (let i = 0; i < n; i++) next[i] += share * teleport[i];
     }
 
     let diff = 0;

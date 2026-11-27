@@ -177,6 +177,10 @@ interface Spec {
   notFound?: (result: any) => boolean;
 }
 
+/** A one-edge directed pattern for the subgraph-isomorphism specs. */
+const edgePattern = () =>
+  createGraph({ nodes: nodes('x', 'y'), edges: [edge('xy', 'x', 'y')] });
+
 const ids = (spec: Omit<Spec, 'takesIds'>): Spec => ({ ...spec, takesIds: true });
 const notDag = /cycle|acyclic|DAG|directed/i;
 
@@ -272,6 +276,37 @@ const specs: Record<string, Spec> = {
   getEulerianPath: { run: (g) => api.getEulerianPath(g) },
   getEulerianCircuit: { run: (g) => api.getEulerianCircuit(g) },
   getMinimumSpanningTree: { run: (g) => api.getMinimumSpanningTree(g) },
+  getMinimumSpanningArborescence: { run: (g) => api.getMinimumSpanningArborescence(g) },
+  getCondensation: { run: (g) => api.getCondensation(g) },
+  getTopologicalGenerations: { run: (g) => api.getTopologicalGenerations(g) },
+  getTransitiveClosure: { run: (g) => api.getTransitiveClosure(g), shallow: 'output is quadratic' },
+  getLongestPath: {
+    run: (g) => api.getLongestPath(g),
+    throws: {
+      directedLoop: notDag,
+      undirectedLoop: notDag,
+      parallelUndirected: notDag,
+      mixed: notDag,
+    },
+  },
+  getCycleBasis: { run: (g) => api.getCycleBasis(g) },
+  getEccentricity: ids({ run: (g, a) => api.getEccentricity(g, a) }),
+  getEccentricities: { run: (g) => api.getEccentricities(g), shallow: 'one BFS per node' },
+  getDiameter: { run: (g) => api.getDiameter(g), shallow: 'one BFS per node' },
+  getRadius: { run: (g) => api.getRadius(g), shallow: 'one BFS per node' },
+  getCenter: { run: (g) => api.getCenter(g), shallow: 'one BFS per node' },
+  getPeriphery: { run: (g) => api.getPeriphery(g), shallow: 'one BFS per node' },
+  genMaximalCliques: { run: (g) => api.genMaximalCliques(g) },
+  getMaximalCliques: { run: (g) => api.getMaximalCliques(g) },
+  getTriangleCounts: { run: (g) => api.getTriangleCounts(g) },
+  getClusteringCoefficients: { run: (g) => api.getClusteringCoefficients(g) },
+  getAverageClustering: { run: (g) => api.getAverageClustering(g) },
+  getTransitivity: { run: (g) => api.getTransitivity(g) },
+  getMaximumMatching: { run: (g) => api.getMaximumMatching(g), shallow: 'blossom algorithm is cubic' },
+  getGlobalMinCut: { run: (g) => api.getGlobalMinCut(g), shallow: 'Stoer-Wagner is cubic' },
+  genSubgraphIsomorphisms: { run: (g) => api.genSubgraphIsomorphisms(g, edgePattern()) },
+  getSubgraphIsomorphisms: { run: (g) => api.getSubgraphIsomorphisms(g, edgePattern()) },
+  hasSubgraphIsomorphism: { run: (g) => api.hasSubgraphIsomorphism(g, edgePattern()) },
 
   // --- paths ---
   getShortestPath: ids({ run: (g, a, b) => api.getShortestPath(g, { from: a, to: b }) }),
@@ -315,6 +350,14 @@ const specs: Record<string, Spec> = {
   getGirvanNewmanCommunities: { run: (g) => api.getGirvanNewmanCommunities(g), shallow: 'betweenness per split' },
   getGreedyModularityCommunities: { run: (g) => api.getGreedyModularityCommunities(g), shallow: 'quadratic merges' },
   getLouvainCommunities: { run: (g) => api.getLouvainCommunities(g) },
+  getLeidenCommunities: { run: (g) => api.getLeidenCommunities(g) },
+  getEdgeBetweennessCentrality: { run: (g) => api.getEdgeBetweennessCentrality(g), shallow: 'one BFS per node' },
+  getCommonNeighbors: ids({ run: (g, a, b) => api.getCommonNeighbors(g, a, b) }),
+  getJaccardCoefficient: ids({ run: (g, a, b) => api.getJaccardCoefficient(g, a, b) }),
+  getAdamicAdarIndex: ids({ run: (g, a, b) => api.getAdamicAdarIndex(g, a, b) }),
+  getResourceAllocationIndex: ids({ run: (g, a, b) => api.getResourceAllocationIndex(g, a, b) }),
+  getPreferentialAttachment: ids({ run: (g, a, b) => api.getPreferentialAttachment(g, a, b) }),
+  getLinkPredictions: ids({ run: (g, a) => api.getLinkPredictions(g, { from: a }) }),
   getModularity: { run: (g) => api.getModularity(g, [g.nodes]) },
 
   // --- transforms & set operations ---
@@ -323,6 +366,7 @@ const specs: Record<string, Spec> = {
   getNeighborhood: ids({ run: (g, a) => api.getNeighborhood(g, a) }),
   getMappedGraph: { run: (g) => api.getMappedGraph(g, { node: (node) => node.data }) },
   getFilteredGraph: { run: (g) => api.getFilteredGraph(g, { node: () => true }) },
+  getContractedGraph: { run: (g, a, b) => api.getContractedGraph(g, [a, b]) },
   getLineGraph: { run: (g) => api.getLineGraph(g) },
   getReversedGraph: { run: (g) => api.getReversedGraph(g) },
   getGraphUnion: { run: (g) => api.getGraphUnion(g, g) },

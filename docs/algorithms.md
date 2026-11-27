@@ -36,6 +36,9 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 | `getBridges(graph)` | Edges whose removal disconnects | O(n + m) | Iterative, stack-safe low-link traversal over the undirected projection. Result sorted by id. |
 | `getArticulationPoints(graph)` | Cut vertices | O(n + m) | Iterative undirected semantics; sorted by id. |
 | `getBiconnectedComponents(graph)` | Biconnected components (node arrays) | O(n + m) | Handles parallel edges and self-loop singleton components; articulation points may repeat. |
+| `getCondensation(graph)` | DAG of strongly connected components | O(n + m) | Each component becomes one node (id of its first member, members in `data.nodeIds`); edges between components merge into one directed edge listing the originals in `data.edgeIds`. A DAG view of a cyclic state machine. |
+| `getCycleBasis(graph)` | Fundamental cycle basis (node arrays) | O(n + m + output) | `m − n + c` cycles over the undirected projection: BFS spanning forest in `graph.nodes` order, one cycle per remaining edge (self-loop = 1 node, parallel edge = 2). Iterative. |
+| `getGlobalMinCut(graph, opts?)` | Cheapest edge set splitting the graph in two: `{ value, partition, cutEdges }` | Stoer–Wagner O(n·m log n) | No source/sink chosen in advance (see `getMinCut` for s–t cuts). Edges undirected, parallel weights summed; disconnected graphs cut at 0; `undefined` below two nodes; negative weights throw. |
 
 ## Cycles & DAG
 
@@ -47,6 +50,9 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 | `genTopologicalSort(graph, opts?)` / `getTopologicalSort(graph, opts?)` | Topological order (`get*`: or `null`) | O(n + m) | Kahn's algorithm. `from` nodes go first among nodes without predecessors; ties otherwise follow `graph.nodes` order. A non-directed edge is mutual precedence (a 2-cycle). On a cycle, `gen*` stops after the schedulable prefix and `get*` returns `null`. |
 | `getTransitiveReduction(graph)` | New graph with transitively-redundant edges removed | O(n·m) time, O(n²) reach memory | DAG-only: throws on a cycle or any non-directed edge. Exact-duplicate parallel edges collapse to the first in `graph.edges` order. Input not mutated. |
 | `getDominatorTree(graph, opts?)` | `{ nodeId: idomId \| null }` rooted at `from` | near-linear (Cooper–Harvey–Kennedy iteration) | Root maps to `null`; unreachable nodes omitted; an unknown root yields `{}`. Mode-aware traversal. For statecharts: "which states must every path from the initial state pass through?" |
+| `getTransitiveClosure(graph, opts?)` | New graph with an edge for every reachable pair | O(n·(n + m)), output up to O(n²) | Any graph, cyclic or not; originals kept, one `closure:["u","v"]` edge added per missing pair (no self-loops). All-non-directed graphs get one edge per unordered pair. |
+| `getLongestPath(graph, opts?)` | Heaviest path (critical path) as a `GraphPath` | O(n + m) | DAG-only (throws on a cycle or non-directed edge). Weights default to `edge.weight ?? 1` and may be negative; `undefined` for an empty graph. |
+| `getTopologicalGenerations(graph)` | Nodes grouped into layers (`GraphNode[][]`), or `null` on a cycle | O(n + m) | Each node one layer after its latest predecessor; same cycle rules as `getTopologicalSort`. For parallel scheduling or layering. |
 
 ## Shortest paths
 
@@ -63,6 +69,17 @@ Active BFS, DFS, and postorder generators snapshot graph structure when iteratio
 | `getJoinedPath(headPath, tailPath)` | Concatenated `GraphPath` | O(steps) | Throws unless head ends where tail starts. |
 
 **Numeric contract.** Every shortest-path weight and intermediate cost must remain finite; `NaN`, infinities, and arithmetic overflow throw. Dijkstra, A*, and bidirectional/early-exit searches also assert "no negative weights" **up front**: O(1) via cached CSR flags for default weights, or one O(m) sweep for custom `getWeight`. Bellman–Ford handles finite negative edges; negative cycles still throw.
+
+## Distances
+
+All follow edge directions (non-directed edges both ways). Unweighted hop counts by default; pass `getWeight` for non-negative weighted distances (Dijkstra).
+
+| Function | Computes | Complexity | Notes |
+|---|---|---|---|
+| `getEccentricity(graph, nodeId, opts?)` | Largest distance from one node | O(n + m) | `Infinity` when some node is unreachable from it; unknown ids return `undefined`. |
+| `getEccentricities(graph, opts?)` | Eccentricity of every node | O(n·(n + m)) | |
+| `getDiameter(graph, opts?)` / `getRadius(graph, opts?)` | Largest / smallest eccentricity | O(n·(n + m)) | Diameter is `Infinity` unless strongly connected; radius is finite when one node reaches all (a DAG root). `undefined` for an empty graph. |
+| `getCenter(graph, opts?)` / `getPeriphery(graph, opts?)` | Nodes at the radius / diameter | O(n·(n + m)) | `graph.nodes` order. |
 
 ## Path sets & coverage
 
@@ -99,6 +116,7 @@ whose output can itself be O(m²).
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
 | `getMinimumSpanningTree(graph, opts?)` | New `Graph` containing the MST/forest edges | Prim (default) O(m log m); `algorithm: 'kruskal'` O(m log m) | Mode-aware: non-directed edges are candidates in both directions; directed edges only source→target (Prim). All nodes are kept; weights must be finite. |
+| `getMinimumSpanningArborescence(graph, opts?)` | New `Graph` with the cheapest directed spanning tree, or `undefined` | Chu–Liu/Edmonds with mergeable heaps, O(m log n) | Every non-root node gets exactly one incoming edge, all reachable from the root. Without `from` the cheapest root is chosen; `maximum: true` for the heaviest. Non-directed edges usable either way; weights may be negative. `undefined` when no root reaches every node. |
 
 ## Centrality
 
@@ -109,7 +127,8 @@ All return `Record<nodeId, number>` (or `HITSResult`). Iterative methods take `{
 | `getDegreeCentrality` / `getInDegreeCentrality` / `getOutDegreeCentrality` | Degree / n − 1 | O(n + m) | |
 | `getClosenessCentrality(graph)` | Closeness over unweighted hops | O(n(n + m)) | Wasserman–Faust scaled by reachable fraction, so disconnected graphs are comparable. Directed/undirected per edge semantics. |
 | `getBetweennessCentrality(graph)` | Brandes betweenness, normalized | O(n·m) | **Unweighted** shortest paths. Normalization keys off `graph.mode` (undirected scores halved), not per-edge modes. CSR typed-array implementation. |
-| `getPageRank(graph, opts?)` | PageRank (power iteration) | O(k(n + m)) | `alpha` damping (0.85). Dangling mass redistributed uniformly; result sums to 1. |
+| `getEdgeBetweennessCentrality(graph)` | Brandes edge betweenness, `Record<edgeId, number>` | O(n·m) | Unweighted, direction-aware; parallel edges split paths. Normalized by `n(n − 1)` like NetworkX. |
+| `getPageRank(graph, opts?)` | PageRank (power iteration) | O(k(n + m)) | `alpha` damping (0.85). Dangling mass redistributed uniformly; result sums to 1. Pass `personalization: { [nodeId]: weight }` for personalized PageRank (teleports and dangling mass follow the weights). |
 | `getHITS(graph, opts?)` | `{ hubs, authorities }` | O(k(n + m)) | L2-normalized each iteration. |
 | `getEigenvectorCentrality(graph, opts?)` | Eigenvector centrality | O(k·m) | `A + I` shift (networkx/graphology scheme) so bipartite graphs converge. Score flows along edge direction (fed by in-neighbors); optional `getWeight`. **Throws on non-convergence.** |
 | `getKatzCentrality(graph, opts?)` | Katz: `x' = αAᵀx + β` | O(k·m) | Converges only for `alpha < 1/λ_max`; **throws on non-convergence** (default `alpha` 0.1, `beta` 1). L2-normalized. |
@@ -121,6 +140,7 @@ All community algorithms treat the graph as **undirected** regardless of mode. O
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
 | `getLouvainCommunities(graph, opts?)` | Two-phase Louvain partition (`string[][]` of node ids) | ≈O(m) per pass, ≤ `maxPasses` (10) | Deterministic: `graph.nodes` order, no shuffling. Parallel-edge weights summed; self-loops count as internal weight. `resolution` γ > 1 favors smaller communities. |
+| `getLeidenCommunities(graph, opts?)` | Leiden partition (`string[][]` of node ids) | ≈O(m) per pass, ≤ `maxPasses` (10) | Louvain plus a refinement phase, so every community is internally connected. Queue-based local moving; deterministic greedy refinement. Same options and output shape as Louvain. |
 | `getLabelPropagationCommunities(graph, opts?)` | LPA partition (`GraphNode[][]`) | O(k·m) | Without `seed`: synchronous, lexicographic tie-breaking (deterministic). With `seed`: classic asynchronous variant with shuffled order + random ties, mulberry32-seeded, **deterministic per seed**. |
 | `genGirvanNewmanCommunities(graph, opts?)` | Lazy successive splits via edge-betweenness removal | O(n·m) per removal round | Yields a partition each time the component count grows; abandon early to skip deeper levels. |
 | `getGirvanNewmanCommunities(graph, opts?)` | The split at `level` (default 1) | as above | `level <= 0` returns the connected components. |
@@ -140,6 +160,7 @@ All community algorithms treat the graph as **undirected** regardless of mode. O
 |---|---|---|---|
 | `isBipartite(graph)` | 2-colorability | O(n + m) | Edges treated as undirected; **self-loops make a graph non-bipartite**. |
 | `getMaximumBipartiteMatching(graph)` | Maximum matching (`BipartiteMatch[]`) | Hopcroft–Karp O(m·√n) | Bipartition derived by 2-coloring. Throws if not bipartite, naming the conflicting edge. Matches report the realizing edge with its stored orientation; for parallel edges, the first one used wins. |
+| `getMaximumMatching(graph, opts?)` | Maximum-weight matching on any graph (`GraphMatch[]`) | Edmonds' blossom with duals, O(n³) | Not limited to bipartite graphs. Default weight 1 gives maximum cardinality; `maxCardinality: true` maximizes size first, then weight. Edges undirected; the heaviest of parallel edges is used. |
 
 ## Cores
 
@@ -148,13 +169,43 @@ All community algorithms treat the graph as **undirected** regardless of mode. O
 | `getCoreNumbers(graph)` | Core number per node | O(m) (Batagelj–Zaveršnik bucket peeling) | **Undirected degree convention**: every edge contributes to both endpoints regardless of mode/direction; self-loops ignored. |
 | `getKCore(graph, k)` | Node ids in the k-core | O(m) | `k <= 0` returns every node id; order follows `graph.nodes`. |
 
+## Cliques & clustering
+
+All use the simple undirected projection: edges connect endpoints regardless of mode, parallel edges collapse, self-loops and dangling edges are ignored.
+
+| Function | Computes | Complexity | Notes |
+|---|---|---|---|
+| `genMaximalCliques(graph)` / `getMaximalCliques(graph)` | Every maximal clique (`GraphNode[]` each) | Bron–Kerbosch with Tomita pivoting, O(3^(n/3)) worst case | Iterative and lazy; isolated nodes are cliques of one. |
+| `getTriangleCounts(graph)` | Triangles through each node | O(Σ deg²) | |
+| `getClusteringCoefficients(graph)` / `getAverageClustering(graph)` | Local clustering coefficient per node / its mean | O(Σ deg²) | 0 below two neighbors; the average of an empty graph is 0. |
+| `getTransitivity(graph)` | Global clustering: 3 × triangles / connected triples | O(Σ deg²) | 0 without triples. |
+
+## Link prediction
+
+Same undirected projection as above. Pair scores return 0 (or `[]`) for unknown ids.
+
+| Function | Computes | Complexity | Notes |
+|---|---|---|---|
+| `getCommonNeighbors(graph, a, b)` | Shared neighbors | O(deg) | |
+| `getJaccardCoefficient` / `getAdamicAdarIndex` / `getResourceAllocationIndex` / `getPreferentialAttachment` | Pair similarity scores | O(deg) | Shared / union neighbors; Σ 1/log(deg); Σ 1/deg; deg · deg. |
+| `getLinkPredictions(graph, opts?)` | Ranked non-adjacent pairs (`{ sourceId, targetId, score }[]`) | O(Σ deg²) | `method` (default `'adamic-adar'`), `from` to score one node's pairs, `limit` for the top results. Zero scores are left out. |
+
 ## Isomorphism & equivalence
 
 | Function | Computes | Complexity | Notes |
 |---|---|---|---|
 | `isIsomorphic(graphA, graphB, opts?)` | Structural isomorphism | exponential worst case; near-linear on sparse, irregular graphs | VF2-style iterative backtracking: nodes matched in breadth-first order, candidates drawn from neighbors of matched nodes, O(deg) checks. Preserves each edge's *effective* mode and direction; parallel edges and self-loops must match in number (and mode). `nodeMatch`/`edgeMatch` refine by payload; parallel edges are paired exactly, not greedily. Dangling edges are ignored. |
+| `genSubgraphIsomorphisms(graph, pattern, opts?)` / `getSubgraphIsomorphisms(...)` / `hasSubgraphIsomorphism(...)` | Occurrences of `pattern` inside `graph` as `{ patternId: graphId }` mappings | exponential worst case | Motif search. Edges are arcs (non-directed = both ways); every pattern arc must exist between the mapped nodes. Monomorphism by default, `induced: true` forbids extra arcs. `nodeMatch`/`edgeMatch` refine by payload. Iterative backtracking with connectivity-ordered candidates. |
 | `areEntitiesEqual(a, b, keys?)` | Key-wise node/edge equality | O(keys) | Objects compared by JSON stringification. |
 | `isLayoutEqual(a, b)` / `isNonLayoutEqual(a, b)` | Equality on `LAYOUT_KEYS` / everything else | O(keys) | Layout keys: `x`, `y`, `width`, `height`, `points`, …. Useful for "did layout actually change?" checks. |
+
+## Structural transforms
+
+Transforms return new graphs; inputs are never mutated. See also `getSubgraph`, `getFilteredGraph`, `getMappedGraph`, `getReversedGraph`, `getLineGraph`, and `getFlattenedGraph`.
+
+| Function | Computes | Complexity | Notes |
+|---|---|---|---|
+| `getContractedGraph(graph, nodeIds, opts?)` | The graph with `nodeIds` merged into one node | O(n + m) | The merged node copies the first contracted node under `opts.id` (default: that node's id). Edges are redirected, keeping their ids; internal edges are dropped unless `selfLoops: true`. Hierarchy and initial-state references follow the merge; port references the merged node lacks are removed. |
 
 ## Random walks (model-based testing)
 

@@ -30,7 +30,7 @@ A guide for developers moving an existing `@dagrejs/graphlib` (often plus `dagre
 | `g.setParent(v, p)` / `g.parent(v)` / `g.children(v)` | `parentId` on the node config / `getParent(graph, id)` / `getChildren(graph, id)` |
 | `g.sources()` / `g.sinks()` | `getSources(graph)` / `getSinks(graph)` |
 | `g.setGraph(label)` / `g.graph()` | `data` on the graph config / `graph.data` |
-| `g.filterNodes(fn)` | `getSubgraph(graph, nodeIds)` |
+| `g.filterNodes(fn)` | `getFilteredGraph(graph, { node: fn })` |
 | `graphlib.json.write(g)` / `read` | Not needed. The graph is already JSON |
 
 ### `graphlib.alg.*`

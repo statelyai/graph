@@ -547,6 +547,135 @@ export function getFilteredGraph<N, E, G, P>(
   });
 }
 
+// Node contraction
+
+export interface ContractedGraphOptions {
+  /**
+   * Id of the merged node. Defaults to the first existing id in `nodeIds`.
+   * Must not be the id of a node outside the contracted set.
+   */
+  id?: string;
+  /**
+   * Keep edges between contracted nodes as self-loops on the merged node.
+   * Default `false`: they are dropped.
+   */
+  selfLoops?: boolean;
+}
+
+/**
+ * Returns a new graph where the given nodes are merged into a single node
+ * (node contraction, or a quotient by one group). The reverse of expanding a
+ * group: use it to collapse a cluster of states into one.
+ *
+ * - The merged node copies the first contracted node (data, ports, layout)
+ *   under the new id. Its parent is the closest ancestor outside the set.
+ * - Edges touching a contracted node are redirected to the merged node and
+ *   keep their ids and fields. Edges between contracted nodes are dropped
+ *   unless `selfLoops` is set. Port references the merged node lacks are
+ *   removed.
+ * - `parentId` and `initialNodeId` references (and the graph's
+ *   `initialNodeId`) to contracted nodes point at the merged node.
+ * - Unknown ids are ignored; if none of the ids exist, the result is a copy.
+ *
+ * @example
+ * ```ts
+ * // a → b → c → a, c → d
+ * const contracted = getContractedGraph(graph, ['a', 'b', 'c'], { id: 'loop' });
+ * contracted.edges.map((e) => `${e.sourceId}->${e.targetId}`); // ['loop->d']
+ * ```
+ */
+export function getContractedGraph<N, E, G, P>(
+  graph: Graph<N, E, G, P>,
+  nodeIds: readonly string[],
+  options?: ContractedGraphOptions,
+): Graph<N, E, G, P> {
+  const idx = getIndex(graph);
+  const members = new Set(nodeIds.filter((id) => idx.nodeById.has(id)));
+  const first = members.values().next().value as string | undefined;
+  const mergedId = options?.id ?? first;
+  if (first !== undefined && mergedId !== undefined) {
+    if (!members.has(mergedId) && idx.nodeById.has(mergedId)) {
+      throw new Error(
+        `getContractedGraph: id "${mergedId}" belongs to a node outside the contracted set`,
+      );
+    }
+  }
+  const resolve = (id: string): string =>
+    mergedId !== undefined && members.has(id) ? mergedId : id;
+  const resolveOptional = (id: string | null | undefined) =>
+    id == null ? id : resolve(id);
+
+  const firstNode =
+    first === undefined ? undefined : graph.nodes[idx.nodeById.get(first)!];
+  const mergedPorts = new Set(firstNode?.ports?.map((port) => port.name));
+  const nodes: NodeConfig<N, P>[] = [];
+  for (const node of graph.nodes) {
+    if (members.has(node.id)) {
+      if (node !== firstNode) continue;
+      const config = toNodeConfig(node);
+      config.id = mergedId!;
+      // Closest ancestor outside the contracted set
+      let parentId = node.parentId;
+      const visited = new Set<string>();
+      while (parentId != null && members.has(parentId) && !visited.has(parentId)) {
+        visited.add(parentId);
+        const parentIndex = idx.nodeById.get(parentId);
+        parentId =
+          parentIndex === undefined ? null : graph.nodes[parentIndex].parentId;
+      }
+      if (parentId != null && !members.has(parentId)) config.parentId = parentId;
+      else delete config.parentId;
+      if (config.initialNodeId != null && members.has(config.initialNodeId)) {
+        delete config.initialNodeId;
+      }
+      nodes.push(config);
+      continue;
+    }
+    const config = toNodeConfig(node);
+    if (config.parentId != null) config.parentId = resolve(config.parentId);
+    if (config.initialNodeId != null) {
+      config.initialNodeId = resolve(config.initialNodeId);
+    }
+    nodes.push(config);
+  }
+
+  const edges: EdgeConfig<E>[] = [];
+  for (const edge of graph.edges) {
+    const sourceInside = members.has(edge.sourceId);
+    const targetInside = members.has(edge.targetId);
+    if (sourceInside && targetInside && !options?.selfLoops) continue;
+    const config = toEdgeConfig(edge);
+    config.sourceId = resolve(edge.sourceId);
+    config.targetId = resolve(edge.targetId);
+    if (
+      sourceInside &&
+      config.sourcePort !== undefined &&
+      (edge.sourceId !== first || !mergedPorts.has(config.sourcePort))
+    ) {
+      delete config.sourcePort;
+    }
+    if (
+      targetInside &&
+      config.targetPort !== undefined &&
+      (edge.targetId !== first || !mergedPorts.has(config.targetPort))
+    ) {
+      delete config.targetPort;
+    }
+    edges.push(config);
+  }
+
+  return createGraph({
+    id: graph.id,
+    mode: graph.mode,
+    initialNodeId: resolveOptional(graph.initialNodeId) ?? undefined,
+    nodes,
+    edges,
+    data: graph.data,
+    direction: graph.direction,
+    style: graph.style,
+  });
+}
+
 /**
  * @deprecated Use {@link getReversedGraph}.
  */

@@ -63,9 +63,11 @@ export {
   getHITS,
   getEigenvectorCentrality,
   getKatzCentrality,
+  getEdgeBetweennessCentrality,
 } from './algorithms/centrality';
 export type {
   IterativeCentralityOptions,
+  PageRankOptions,
   EigenvectorCentralityOptions,
   KatzCentralityOptions,
   HITSResult,
@@ -98,10 +100,19 @@ export {
 } from './algorithms/connectivity';
 
 export { isIsomorphic } from './algorithms/isomorphism';
+export {
+  genSubgraphIsomorphisms,
+  getSubgraphIsomorphisms,
+  hasSubgraphIsomorphism,
+} from './algorithms/subgraph-isomorphism';
+export type { SubgraphIsomorphismOptions } from './algorithms/subgraph-isomorphism';
 export type { IsomorphismOptions } from './algorithms/isomorphism';
 
 export { getLouvainCommunities } from './algorithms/louvain';
 export type { LouvainOptions } from './algorithms/louvain';
+
+export { getLeidenCommunities } from './algorithms/leiden';
+export type { LeidenOptions } from './algorithms/leiden';
 
 export { getMaxFlow, getMinCut } from './algorithms/flow';
 export type {
@@ -115,6 +126,70 @@ export { getDominatorTree } from './algorithms/dominators';
 export type { DominatorTreeOptions } from './algorithms/dominators';
 
 export { getTransitiveReduction } from './algorithms/reduction';
+
+export {
+  getTransitiveClosure,
+  getLongestPath,
+  getTopologicalGenerations,
+} from './algorithms/dag';
+export type {
+  TransitiveClosureOptions,
+  LongestPathOptions,
+} from './algorithms/dag';
+
+export { getCondensation } from './algorithms/condensation';
+export type {
+  CondensationNodeData,
+  CondensationEdgeData,
+} from './algorithms/condensation';
+
+export {
+  getEccentricity,
+  getEccentricities,
+  getDiameter,
+  getRadius,
+  getCenter,
+  getPeriphery,
+} from './algorithms/distance';
+export type { EccentricityOptions } from './algorithms/distance';
+
+export {
+  genMaximalCliques,
+  getMaximalCliques,
+  getTriangleCounts,
+  getClusteringCoefficients,
+  getAverageClustering,
+  getTransitivity,
+} from './algorithms/cliques';
+export type { MaximalCliquesOptions } from './algorithms/cliques';
+
+export {
+  getCommonNeighbors,
+  getJaccardCoefficient,
+  getAdamicAdarIndex,
+  getResourceAllocationIndex,
+  getPreferentialAttachment,
+  getLinkPredictions,
+} from './algorithms/link-prediction';
+export type {
+  LinkPrediction,
+  LinkPredictionMethod,
+  LinkPredictionOptions,
+} from './algorithms/link-prediction';
+
+export { getGlobalMinCut } from './algorithms/global-min-cut';
+export type {
+  GlobalMinCutOptions,
+  GlobalMinCutResult,
+} from './algorithms/global-min-cut';
+
+export { getMinimumSpanningArborescence } from './algorithms/arborescence';
+export type { SpanningArborescenceOptions } from './algorithms/arborescence';
+
+export { getMaximumMatching } from './algorithms/matching';
+export type { GraphMatch, MaximumMatchingOptions } from './algorithms/matching';
+
+export { getCycleBasis } from './algorithms/cycle-basis';
 
 export { getGraphColoring, isValidColoring } from './algorithms/coloring';
 export type {
